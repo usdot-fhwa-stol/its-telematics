@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: ${spring_datasource_url:jdbc:mysql://localhost:3306/rsm?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${spring_datasource_username:root}
+    password: ${spring_datasource_password:}
+    driver-class-name: ${spring_datasource_driver:com.mysql.cj.jdbc.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate.dialect: ${spring_jpa_hibernate_dialect:org.hibernate.dialect.MySQLDialect}
+
+messaging:
+  nats:
+    enabled: ${messaging_nats_enabled:false}
+    uri: ${messaging_nats_uri:nats://localhost:4222}
+
+logging:
+  level:
+    root: INFO
+    com.telematic.telematic_rsu_management_service: INFO
+
+registration:
+  tru-autoconfig:
+    subject: unit.*.register.rsu.autoconfig
+  tru-config:
+    subject: unit.*.register.rsu.config
+    request-timeout: 5

@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: telematic_rsu_management_service
+
+messaging:
+  nats:
+    enabled: true
+    uri: nats://localhost:4222
+    connection-name: telematic_rsu_management_service_connection
+    max-reconnect-attempts: -1
+    reconnect-wait-millis: 2000
+    
+registration:
+  tru-autoconfig:
+    subject: unit.*.register.rsu.autoconfig
+  tru-config:
+    subject: unit.*.register.rsu.config

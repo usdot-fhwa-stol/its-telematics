@@ -1,0 +1,48 @@
+package com.telematic.telematic_rsu_management_service.registration.api;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.telematic.telematic_rsu_management_service.messaging.Message;
+import com.telematic.telematic_rsu_management_service.messaging.Serializer;
+import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
+import com.telematic.telematic_rsu_management_service.registration.dto.RsuConfigItemMessage;
+import com.telematic.telematic_rsu_management_service.registration.dto.TruConfigMessage;
+import com.telematic.telematic_rsu_management_service.registration.service.RegistrationService;
+
+@RestController
+@RequestMapping("/api/registration")
+public class TruRegistrationController {
+    private final RegistrationService registrationService;
+
+    @Value("${registration.tru-config.subject:unit.*.register.rsu.config}")
+    private String truConfigSubject;
+    @Value("${registration.tru-config.request-timeout:5}")
+    private long requestTimeout;
+
+    public TruRegistrationController(RegistrationService registrationService, Serializer serializer) {
+        this.registrationService = registrationService;
+    }
+    
+    @GetMapping(path = "/get-all-tru-registration-status")
+    public ResponseEntity<?> getTruRegistrationStatus() {
+        List<TRUConfigStatus> truConfigMessages = registrationService.getAllTruConfigs();
+        return ResponseEntity.ok().body(truConfigMessages);
+    }
+
+    @PostMapping(path = "/update-tru-config")
+    public ResponseEntity<?> updateTruConfig(@RequestBody TruConfigMessage rsuConfigItemMessage) {
+        Message message = registrationService.requestTruConfig(truConfigSubject, rsuConfigItemMessage,
+                requestTimeout);
+        return ResponseEntity.ok().body(message);
+    }
+}
