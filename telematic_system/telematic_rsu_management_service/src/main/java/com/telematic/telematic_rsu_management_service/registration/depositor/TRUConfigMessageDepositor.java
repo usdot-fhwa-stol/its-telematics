@@ -9,7 +9,7 @@ import com.telematic.telematic_rsu_management_service.model.RSUConfigStatus;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
 import com.telematic.telematic_rsu_management_service.registration.dto.RsuConfigItemMessage;
 import com.telematic.telematic_rsu_management_service.registration.dto.TruConfigMessage;
-import com.telematic.telematic_rsu_management_service.registration.repository.TRUConfigStatusRepository;
+import com.telematic.telematic_rsu_management_service.repository.TRUConfigStatusRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,7 +29,10 @@ public class TRUConfigMessageDepositor {
         RsuConfigItemMessage rsuConfigItemMessage = truConfigMessage.getRsuConfigs().get(0);
         if(truConfigMessage.getRsuConfigs() != null && !truConfigMessage.getRsuConfigs().isEmpty() && truConfigMessage.getRsuConfigs().size() == 1) {
                 log.info("Process TRU Config Message with Action: {}", rsuConfigItemMessage.getAction());
-                if (rsuConfigItemMessage.getAction().equals("add")) {
+                if (rsuConfigItemMessage.getAction().equals("add") || rsuConfigItemMessage.getAction().equals("create")) {
+                    if (existingRsuConfigStatusList.size() >= existingTruConfig.getUnitConfig().getMaxConnections()) {
+                        throw new IllegalStateException("Cannot add more RSU configs than the maximum allowed connections");
+                    }
                     RSUConfigStatus newRsuConfigStatus = new RSUConfigStatus();
                     newRsuConfigStatus.setEvent(rsuConfigItemMessage.getEvent());
                     newRsuConfigStatus.setRsuEndpoint(rsuConfigItemMessage.getRsuEndpoint());
@@ -38,7 +41,7 @@ public class TRUConfigMessageDepositor {
                     newRsuConfigStatus.setTruConfigStatus(existingTruConfig);
                     existingTruConfig.getRsuConfigs().add(newRsuConfigStatus);
                     truConfigStatusRepository.save(existingTruConfig);
-                     log.info("Added RSU Config IP: {} port: {} for TRU Unit ID: {}, TRU ID: {}",
+                    log.info("Added RSU Config IP: {} port: {} for TRU Unit ID: {}, TRU ID: {}",
                                     newRsuConfigStatus.getRsuEndpoint().getIp(),
                                     newRsuConfigStatus.getRsuEndpoint().getPort(),
                                     existingTruConfig.getUnitConfig().getUnitId(),
@@ -73,6 +76,8 @@ public class TRUConfigMessageDepositor {
                             rsuConfigItemMessage.getRsuEndpoint().getPort(),
                             existingTruConfig.getUnitConfig().getUnitId(),
                             existingTruConfig.getId());
+                }else {
+                    throw new IllegalArgumentException("Unsupported action: " + rsuConfigItemMessage.getAction());
                 }
         }else{
             throw new IllegalArgumentException("Only one RSU config item is supported per TRU config message");

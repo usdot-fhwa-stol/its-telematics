@@ -7,7 +7,10 @@ import com.telematic.telematic_rsu_management_service.messaging.Message;
 import com.telematic.telematic_rsu_management_service.messaging.MessageHandler;
 import com.telematic.telematic_rsu_management_service.messaging.Serializer;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Component
+@Slf4j
 public class UnitHealthStatusHandler implements MessageHandler {
     private Serializer serializer;
     private UnitStatusDepositor unitStatusDepositor;
@@ -20,7 +23,7 @@ public class UnitHealthStatusHandler implements MessageHandler {
     public void onMessage(Message message) {        
         byte[] payload = message.payload();
         TRUHealthStatusMessage truHealthStatusMessage = serializer.decode(payload, TRUHealthStatusMessage.class);
-        System.out.println("Handling Unit Health Status Message: " + truHealthStatusMessage);
+        log.info("Handling Unit Health Status Message: {}", truHealthStatusMessage);
         unitStatusDepositor.depositUnitStatus(truHealthStatusMessage);
     }
     

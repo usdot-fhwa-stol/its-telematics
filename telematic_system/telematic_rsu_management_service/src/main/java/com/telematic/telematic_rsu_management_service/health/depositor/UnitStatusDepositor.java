@@ -5,7 +5,7 @@ import com.telematic.telematic_rsu_management_service.health.dto.RSUHealthStatus
 import com.telematic.telematic_rsu_management_service.health.dto.TRUHealthStatusMessage;
 import com.telematic.telematic_rsu_management_service.model.RSUConfigStatus;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
-import com.telematic.telematic_rsu_management_service.registration.repository.TRUConfigStatusRepository;
+import com.telematic.telematic_rsu_management_service.repository.TRUConfigStatusRepository;
 
 @Component
 public class UnitStatusDepositor {
@@ -29,6 +29,8 @@ public class UnitStatusDepositor {
                 }
             }
             truConfigStatusRepository.save(truConfigStatus);
+        } else {
+            throw new IllegalArgumentException("TRUConfigStatus not found for unitId: " + truHealthStatusMessage.getUnitHealthStatus().getUnitId());
         }
     }
 }

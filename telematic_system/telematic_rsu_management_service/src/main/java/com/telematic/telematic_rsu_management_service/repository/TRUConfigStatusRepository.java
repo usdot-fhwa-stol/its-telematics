@@ -1,4 +1,4 @@
-package com.telematic.telematic_rsu_management_service.registration.repository;
+package com.telematic.telematic_rsu_management_service.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

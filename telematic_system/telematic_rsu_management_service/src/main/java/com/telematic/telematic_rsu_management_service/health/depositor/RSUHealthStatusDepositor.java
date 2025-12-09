@@ -3,7 +3,7 @@ package com.telematic.telematic_rsu_management_service.health.depositor;
 import org.springframework.stereotype.Component;
 import com.telematic.telematic_rsu_management_service.health.dto.TRUHealthStatusMessage;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
-import com.telematic.telematic_rsu_management_service.registration.repository.TRUConfigStatusRepository;
+import com.telematic.telematic_rsu_management_service.repository.TRUConfigStatusRepository;
 
 @Component
 public class RSUHealthStatusDepositor {

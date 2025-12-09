@@ -9,9 +9,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Entity
 @Table(name = "rsu_endpoint")
 public class RSUEndpoint {
@@ -20,9 +22,11 @@ public class RSUEndpoint {
     @GeneratedValue
     private int id;
     
+    @EqualsAndHashCode.Include
     @JsonProperty("IP")
     private String ip;
 
+    @EqualsAndHashCode.Include
     @JsonProperty("Port")
     private Integer port;
 

@@ -14,7 +14,7 @@ import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
 import com.telematic.telematic_rsu_management_service.registration.depositor.TRUConfigMessageDepositor;
 import com.telematic.telematic_rsu_management_service.registration.dto.TruConfigMessage;
 import com.telematic.telematic_rsu_management_service.registration.handler.TRUAutoConfigMessageHandler;
-import com.telematic.telematic_rsu_management_service.registration.repository.TRUConfigStatusRepository;
+import com.telematic.telematic_rsu_management_service.repository.TRUConfigStatusRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,14 +23,14 @@ import lombok.extern.slf4j.Slf4j;
 public class RegistrationService {
 
     private final MessagingClient messagingClient;
-    private final TRUAutoConfigMessageHandler truConfigMessageHandler;
+    private final TRUAutoConfigMessageHandler truAutoConfigMessageHandler;
     private final TRUConfigMessageDepositor truConfigMessageDepositor;
     private final TRUConfigStatusRepository truConfigStatusRepository;
     private final Serializer serializer;
     
-    public RegistrationService(MessagingClient messagingClient, TRUAutoConfigMessageHandler truConfigMessageHandler, Serializer serializer, TRUConfigMessageDepositor truConfigMessageDepositor, TRUConfigStatusRepository truConfigStatusRepository) {
+    public RegistrationService(MessagingClient messagingClient, TRUAutoConfigMessageHandler truAutoConfigMessageHandler, Serializer serializer, TRUConfigMessageDepositor truConfigMessageDepositor, TRUConfigStatusRepository truConfigStatusRepository) {
         this.messagingClient = messagingClient;
-        this.truConfigMessageHandler = truConfigMessageHandler;
+        this.truAutoConfigMessageHandler = truAutoConfigMessageHandler;
         this.serializer = serializer;
         this.truConfigMessageDepositor = truConfigMessageDepositor;
         this.truConfigStatusRepository = truConfigStatusRepository;
@@ -52,8 +52,8 @@ public class RegistrationService {
     }
 
     public void subscribeTruConfig(String subject) {
-        log.info("Subscribing to TRU config messages on subject '{}'", subject);
-        messagingClient.subscribe(subject, truConfigMessageHandler);
+        log.info("Subscribing to TRU auto configuration on subject: '{}'", subject);
+        messagingClient.subscribe(subject, truAutoConfigMessageHandler);
     }
     
     public List<TRUConfigStatus> getAllTruConfigs() {
