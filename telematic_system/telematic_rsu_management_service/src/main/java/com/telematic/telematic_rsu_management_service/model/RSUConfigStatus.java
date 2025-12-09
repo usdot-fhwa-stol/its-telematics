@@ -39,10 +39,6 @@ public class RSUConfigStatus {
     @JsonProperty("status")
     private String status;
 
-    @JsonProperty("dataTypes")
-    @OneToMany(mappedBy = "rsuConfigStatus", cascade = jakarta.persistence.CascadeType.ALL)
-    private List<RSUDataType> dataTypes;
-
     @JsonProperty("timestamp")
     private Long timestamp;
 

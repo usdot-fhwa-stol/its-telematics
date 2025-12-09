@@ -42,6 +42,6 @@ public class TRUConfigStatus {
     @JsonProperty("PluginConfigStatus")
     @OneToOne(cascade = jakarta.persistence.CascadeType.ALL)
     @JoinColumn(name = "tru_plugin_config_status_id")
-    private TRUPluginConfigStatus pluginConfigStatus;   
+    private UnitPluginStatus pluginConfigStatus;   
 
 }

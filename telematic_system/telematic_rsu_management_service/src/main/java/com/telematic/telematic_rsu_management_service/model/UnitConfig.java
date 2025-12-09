@@ -15,8 +15,8 @@ import lombok.Data;
 @Entity
 @Table(name = "unit_config")
 public class UnitConfig {
-     @Id
-     @GeneratedValue
+    @Id
+    @GeneratedValue
     @Column(name = "unit_config_id")
      private int id;
     
@@ -30,7 +30,7 @@ public class UnitConfig {
     private Integer maxConnections;
 
     @JsonProperty("BridgePluginHeartbeatInterval")
-    private Integer bridgePluginHeartbeatInterval;
+    private Integer pluginHeartbeatInterval;
 
     @JsonProperty("HealthMonitorPluginHeartbeatInterval")
     private Integer healthMonitorPluginHeartbeatInterval;

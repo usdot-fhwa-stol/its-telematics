@@ -12,7 +12,7 @@ import java.util.List;
 @Data
 public class TruConfigMessage {
     @JsonProperty("Unit")
-    private UnitConfig unit;
+    private UnitConfig unitConfig;
 
     @JsonProperty("RSUConfigs")
     private List<RsuConfigItemMessage> rsuConfigs;

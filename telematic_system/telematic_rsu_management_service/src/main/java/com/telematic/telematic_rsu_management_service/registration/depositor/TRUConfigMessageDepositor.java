@@ -15,35 +15,16 @@ import lombok.extern.slf4j.Slf4j;
 
 @Component
 @Slf4j
-public class TruConfigMessageDepositor {
+public class TRUConfigMessageDepositor {
     
     private final TRUConfigStatusRepository truConfigStatusRepository;
 
-    public TruConfigMessageDepositor(TRUConfigStatusRepository truConfigStatusRepository) {
+    public TRUConfigMessageDepositor(TRUConfigStatusRepository truConfigStatusRepository) {
         this.truConfigStatusRepository = truConfigStatusRepository;
     }
 
-    public void processAutoTruConfigMessage(TruConfigMessage configMessage) {
-        TRUConfigStatus truConfigStatus = new TRUConfigStatus();
-        truConfigStatus.setUnitConfig(configMessage.getUnit());
-        truConfigStatus.setTimestamp(configMessage.getTimestamp());
-        List<RSUConfigStatus> rsuConfigStatuses = configMessage.getRsuConfigs().stream().map(rsuConfigItem -> {
-            RSUConfigStatus rsuConfigStatus = new RSUConfigStatus();
-            rsuConfigStatus.setEvent(rsuConfigItem.getEvent());
-            rsuConfigStatus.setRsuEndpoint(rsuConfigItem.getRsuEndpoint());
-            rsuConfigStatus.setStatus(null);
-            rsuConfigStatus.setDataTypes(null);
-            rsuConfigStatus.setTimestamp(configMessage.getTimestamp());
-            rsuConfigStatus.setTruConfigStatus(truConfigStatus);
-            return rsuConfigStatus;
-        }).toList();
-        truConfigStatus.setRsuConfigs(rsuConfigStatuses);
-        truConfigStatusRepository.save(truConfigStatus);
-        log.info("Saved TRU Config Status with ID: {}", truConfigStatus.getId());
-    }
-
     public void processTruConfigMessage(TruConfigMessage truConfigMessage) {
-        TRUConfigStatus existingTruConfig = getTruConfigByUnitId(truConfigMessage.getUnit().getUnitId());
+        TRUConfigStatus existingTruConfig = truConfigStatusRepository.findByUnitId(truConfigMessage.getUnitConfig().getUnitId());
         List<RSUConfigStatus> existingRsuConfigStatusList = existingTruConfig.getRsuConfigs();
         RsuConfigItemMessage rsuConfigItemMessage = truConfigMessage.getRsuConfigs().get(0);
         if(truConfigMessage.getRsuConfigs() != null && !truConfigMessage.getRsuConfigs().isEmpty() && truConfigMessage.getRsuConfigs().size() == 1) {
@@ -53,7 +34,6 @@ public class TruConfigMessageDepositor {
                     newRsuConfigStatus.setEvent(rsuConfigItemMessage.getEvent());
                     newRsuConfigStatus.setRsuEndpoint(rsuConfigItemMessage.getRsuEndpoint());
                     newRsuConfigStatus.setStatus(null);
-                    newRsuConfigStatus.setDataTypes(null);
                     newRsuConfigStatus.setTimestamp(truConfigMessage.getTimestamp());
                     newRsuConfigStatus.setTruConfigStatus(existingTruConfig);
                     existingTruConfig.getRsuConfigs().add(newRsuConfigStatus);
@@ -97,17 +77,5 @@ public class TruConfigMessageDepositor {
         }else{
             throw new IllegalArgumentException("Only one RSU config item is supported per TRU config message");
         }
-    }
-    
-    public List<TRUConfigStatus> getAllTruConfigs() {
-        return truConfigStatusRepository.findAll();
-    }
-
-    public TRUConfigStatus getTruConfigByUnitId(String unitId) {
-        TRUConfigStatus res = truConfigStatusRepository.findByUnitConfig_UnitId(unitId);
-        if (res == null) {
-            res = truConfigStatusRepository.findByUnitId(unitId);
-        }        
-        return res;
     }
 }
