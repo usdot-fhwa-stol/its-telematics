@@ -14,7 +14,7 @@ import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
 import com.telematic.telematic_rsu_management_service.registration.depositor.TRUConfigMessageDepositor;
 import com.telematic.telematic_rsu_management_service.registration.dto.TruConfigMessage;
 import com.telematic.telematic_rsu_management_service.registration.handler.TRUAutoConfigMessageHandler;
-import com.telematic.telematic_rsu_management_service.repository.TRUConfigStatusRepository;
+import com.telematic.telematic_rsu_management_service.repository.mysql.TRUConfigStatusRepository;
 
 import lombok.extern.slf4j.Slf4j;
 

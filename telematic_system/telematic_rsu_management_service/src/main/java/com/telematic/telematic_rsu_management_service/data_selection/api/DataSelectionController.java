@@ -18,13 +18,13 @@ public class DataSelectionController {
         this.dataSelectionService = dataSelectionService;
     }
 
-    @GetMapping("/tru-topics")
+    @GetMapping("/available-topics")
     public ResponseEntity<?> getAvailableTopics(@RequestBody TRUTopicsMessage truTopicsMessage) {
          TRUTopicsMessage response = dataSelectionService.requestAvailableTopics(truTopicsMessage);
          return ResponseEntity.ok().body(response);
     }
 
-    @PostMapping("/confirm-selection")
+    @PostMapping("/confirm-topics")
     public ResponseEntity<?> confirmDataSelection(@RequestBody TRUTopicsMessage truTopicsMessage) {
         TRUTopicsMessage response = dataSelectionService.requestDataSelection(truTopicsMessage);
         return ResponseEntity.ok().body(response);

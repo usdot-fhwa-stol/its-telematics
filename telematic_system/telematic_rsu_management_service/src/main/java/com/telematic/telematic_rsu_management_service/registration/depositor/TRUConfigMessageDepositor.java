@@ -9,7 +9,7 @@ import com.telematic.telematic_rsu_management_service.model.RSUConfigStatus;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
 import com.telematic.telematic_rsu_management_service.registration.dto.RsuConfigItemMessage;
 import com.telematic.telematic_rsu_management_service.registration.dto.TruConfigMessage;
-import com.telematic.telematic_rsu_management_service.repository.TRUConfigStatusRepository;
+import com.telematic.telematic_rsu_management_service.repository.mysql.TRUConfigStatusRepository;
 
 import lombok.extern.slf4j.Slf4j;
 

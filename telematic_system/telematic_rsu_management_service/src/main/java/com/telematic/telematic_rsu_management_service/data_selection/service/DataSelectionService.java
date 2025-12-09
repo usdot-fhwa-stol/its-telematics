@@ -19,7 +19,7 @@ import com.telematic.telematic_rsu_management_service.model.DataSelectionRuleCon
 import com.telematic.telematic_rsu_management_service.model.RSUConfigStatus;
 import com.telematic.telematic_rsu_management_service.model.RSUEndpoint;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
-import com.telematic.telematic_rsu_management_service.repository.TRUConfigStatusRepository;
+import com.telematic.telematic_rsu_management_service.repository.mysql.TRUConfigStatusRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -53,12 +53,17 @@ public class DataSelectionService {
     
     public TRUTopicsMessage requestAvailableTopics(TRUTopicsMessage truTopicsMessage) {
         availableTopicSubject = availableTopicSubject.replace("*", truTopicsMessage.getUnitId());
-        log.info("Requesting available topics for TRU ID '{}' by to subject: {}", truTopicsMessage.getUnitId(), availableTopicSubject);
+        log.info("Requesting available topics for TRU ID '{}' by to subject '{}': {}", truTopicsMessage.getUnitId(), availableTopicSubject, truTopicsMessage);
         Message message = natsMessagingClient.request(availableTopicSubject, serializer.encode(truTopicsMessage),
                 Duration.ofSeconds(requestTimeoutSeconds));
         TRUTopicsMessage responseTopicMessage = serializer.decode(message.payload(), TRUTopicsMessage.class);
         log.info("Received available topics response: {}", responseTopicMessage);
         TRUConfigStatus truConfigStatus = truConfigStatusRepository.findByUnitId(truTopicsMessage.getUnitId());
+        if (truConfigStatus == null || truConfigStatus.getRsuConfigs() == null
+                || truConfigStatus.getRsuConfigs().isEmpty()) {
+            log.info("No existing data selection rules found for TRU ID '{}'", truTopicsMessage.getUnitId());
+            return responseTopicMessage;
+        }
         Map<RSUEndpoint, List<String>> endpointToRules = truConfigStatus.getRsuConfigs().stream()
             .collect(Collectors.toMap(
                 RSUConfigStatus::getRsuEndpoint,
@@ -70,7 +75,7 @@ public class DataSelectionService {
                     return a;
                 }
                 ));
-        log.debug("Mark available topics based on existing rules : {}", endpointToRules);
+        log.info("Mark available topics based on existing rules: {} ", endpointToRules);
         for(RSUTopicsMessage rsuTopicsMessage : responseTopicMessage.getRsuTopics()) {
             List<String> existingRules = endpointToRules.get(rsuTopicsMessage.getRsuEndpoint());
             for (TopicMessage topicMessage : rsuTopicsMessage.getTopics()) {
@@ -86,11 +91,13 @@ public class DataSelectionService {
 
     public TRUTopicsMessage requestDataSelection(TRUTopicsMessage truTopicsMessage) {
         confirmTopicSubject = confirmTopicSubject.replace("*", truTopicsMessage.getUnitId());
-        log.info("Requesting topic confirmation for TRU ID '{}' to subject: {}", truTopicsMessage.getUnitId(), confirmTopicSubject);
+        log.info("Requesting topic confirmation for TRU ID '{}' to subject '{}': {}", truTopicsMessage.getUnitId(),
+                confirmTopicSubject, truTopicsMessage);
         Message message = natsMessagingClient.request(confirmTopicSubject, serializer.encode(truTopicsMessage),
-                Duration.ofSeconds(confirmTopicRequestTimeoutSeconds));
-        dataSelectionDepositor.processDataSelection(truTopicsMessage);
+                Duration.ofSeconds(confirmTopicRequestTimeoutSeconds));   
         TRUTopicsMessage truTopicsMessageRResponse = serializer.decode(message.payload(), TRUTopicsMessage.class);
+        log.info("Received confirm topics response: {}", truTopicsMessageRResponse);
+        dataSelectionDepositor.processDataSelection(truTopicsMessageRResponse);
         return truTopicsMessageRResponse;
     }
 }

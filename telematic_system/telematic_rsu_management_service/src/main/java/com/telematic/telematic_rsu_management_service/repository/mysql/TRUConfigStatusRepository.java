@@ -1,4 +1,4 @@
-package com.telematic.telematic_rsu_management_service.repository;
+package com.telematic.telematic_rsu_management_service.repository.mysql;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

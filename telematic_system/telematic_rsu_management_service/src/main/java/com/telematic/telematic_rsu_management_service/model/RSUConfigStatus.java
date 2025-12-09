@@ -47,7 +47,7 @@ public class RSUConfigStatus {
     @JsonBackReference
     private TRUConfigStatus truConfigStatus;
 
-    @OneToMany(mappedBy = "rsuConfigStatus", cascade = jakarta.persistence.CascadeType.ALL)
+    @OneToMany(mappedBy = "rsuConfigStatus", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true)
     @JsonBackReference
     private List<DataSelectionRuleConfig> dataSelectionRuleConfigs;
 

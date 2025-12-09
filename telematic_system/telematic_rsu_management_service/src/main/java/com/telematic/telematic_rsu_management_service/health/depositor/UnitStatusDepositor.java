@@ -5,7 +5,7 @@ import com.telematic.telematic_rsu_management_service.health.dto.RSUHealthStatus
 import com.telematic.telematic_rsu_management_service.health.dto.TRUHealthStatusMessage;
 import com.telematic.telematic_rsu_management_service.model.RSUConfigStatus;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
-import com.telematic.telematic_rsu_management_service.repository.TRUConfigStatusRepository;
+import com.telematic.telematic_rsu_management_service.repository.mysql.TRUConfigStatusRepository;
 
 @Component
 public class UnitStatusDepositor {
