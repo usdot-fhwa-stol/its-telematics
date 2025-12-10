@@ -14,6 +14,7 @@ messaging:
   nats:
     enabled: ${messaging_nats_enabled:false}
     uri: ${messaging_nats_uri:nats://localhost:4222}
+    dispatcher.strategy: ${messaging_nats_dispatcher_strategy:isolated}
 
 logging:
   level:
@@ -21,27 +22,38 @@ logging:
     com.telematic.telematic_rsu_management_service: INFO
 
 registration:
-  tru-autoconfig:
-    subject:  ${registration_tru_autoconfig_subject:unit.*.register.rsu.autoconfig}
-  tru-config:
-    subject: ${registration_tru_config_subject:unit.*.register.rsu.config}
-    request-timeout: ${registration_tru_config_request_timeout:5}
+  tru:
+    autoconfig:
+      subject:  ${registration_tru_autoconfig_subject:unit.*.register.rsu.autoconfig}
+    config:
+        subject: ${registration_tru_config_subject:unit.*.register.rsu.config}
+        request.timeout: ${registration_tru_config_request_timeout:5}
 
-data-selection:
-  available-topics:
-    subject: ${data_selection_available_topics_subject:unit.*.data.selection.available.topics}
-    request-timeout-seconds: ${data_selection_available_topics_request_timeout_seconds:10}
-  confirm-topics:
-    subject: ${data_selection_confirm_topics_subject:unit.*.data.selection.confirm.topics}
-    request-timeout-seconds: ${data_selection_confirm_topics_request_timeout_seconds:10}
+monitor:
+  rsu:
+    health:
+      subject: ${monitor_rsu_health_subject:unit.*.monitor.rsu.health_status}
+      health.timeout.seconds: ${monitor_rsu_health_health_timeout_seconds:10}
+  plugin:
+    health:
+      subject: ${monitor_plugin_health_subject:unit.*.monitor.plugin.health_status}
+      health.timeout.seconds: ${monitor_plugin_health_health_timeout_seconds:10}
 
-data-ingestion:
-  subject: ${data_ingestion_subject:unit.*.data.ingestion.rsu.*.data}
-  influx:
-    remove-fields: ${data_ingestion_influx_remove_fields:}
+data:
+  selection:
+    available.topics:
+      subject: ${data_selection_available_topics_subject:unit.*.topic.rsu.available_topics}
+      request.timeout.seconds: ${data_selection_available_topics_request_timeout_seconds:10}
+    confirm.topics:
+      subject: ${data_selection_confirm_topics_subject:unit.*.topic.rsu.selected_topics}
+      request.timeout.seconds: ${data_selection_confirm_topics_request_timeout_seconds:10}
+  ingestion:
+    subject: ${data_ingestion_subject:unit.*.stream.rsu.*.*} # subject with wildcards for unit_Id, rsu_id and topic_name
+    influx:
+      remove-fields: ${data_ingestion_influx_remove_fields:}
 
 influx:
   url: ${data_ingestion_influx_url:http://localhost:8086}
-  token: ${data_ingestion_influx_token:my-influxdb-token}
-  org: ${data_ingestion_influx_org:my-org}
-  bucket: ${data_ingestion_influx_bucket:rsu-data}
+  token: ${data_ingestion_influx_token:my_influxdb_token}
+  org: ${data_ingestion_influx_org:my_org}
+  bucket: ${data_ingestion_influx_bucket:rsu_data}

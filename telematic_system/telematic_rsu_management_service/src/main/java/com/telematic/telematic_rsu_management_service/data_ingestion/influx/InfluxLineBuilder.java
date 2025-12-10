@@ -1,13 +1,32 @@
+/*
+ * Copyright (C) 2025 LEIDOS.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package com.telematic.telematic_rsu_management_service.data_ingestion.influx;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.*;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
 public class InfluxLineBuilder {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -72,7 +91,6 @@ public class InfluxLineBuilder {
      */
     public void removeFields(Map<String, String> fields, Collection<String> removeKeys) {
         if (fields == null || fields.isEmpty() || removeKeys == null || removeKeys.isEmpty()) return;
-        // Build exact and prefix patterns
         Set<String> exact = new HashSet<>();
         List<String> prefixes = new ArrayList<>();
         for (String k : removeKeys) {
@@ -83,7 +101,6 @@ public class InfluxLineBuilder {
                 exact.add(k);
             }
         }
-        // Collect keys to remove to avoid concurrent modification
         List<String> toRemove = new ArrayList<>();
         for (String key : fields.keySet()) {
             if (exact.contains(key)) {
@@ -97,6 +114,7 @@ public class InfluxLineBuilder {
                 }
             }
         }
+        log.info("Removing fields: {}", toRemove);
         toRemove.forEach(fields::remove);
     }
 
@@ -122,7 +140,7 @@ public class InfluxLineBuilder {
     private String formatFieldValue(JsonNode node) {
         if (node == null || node.isNull()) return null;
         if (node.isIntegralNumber()) {
-            return node.asLong() + "i";
+            return String.valueOf(node.asLong());
         } else if (node.isFloatingPointNumber()) {
             return String.valueOf(node.asDouble());
         } else if (node.isBoolean()) {
@@ -144,17 +162,5 @@ public class InfluxLineBuilder {
 
     private String escapeString(String s) {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
-    }
-
-    private String toCamelCase(String s) {
-        if (s == null) return "";
-        String[] parts = s.replaceAll("[^A-Za-z0-9]+", " ").trim().split(" ");
-        if (parts.length == 0) return "";
-        StringBuilder sb = new StringBuilder(parts[0].toLowerCase());
-        for (int i = 1; i < parts.length; i++) {
-            if (parts[i].isEmpty()) continue;
-            sb.append(Character.toUpperCase(parts[i].charAt(0))).append(parts[i].substring(1).toLowerCase());
-        }
-        return sb.toString();
     }
 }
