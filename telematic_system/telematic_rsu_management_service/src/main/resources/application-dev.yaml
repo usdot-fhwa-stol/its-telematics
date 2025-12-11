@@ -1,3 +1,9 @@
+logging:
+  config: classpath:log4j2-spring.xml
+  level:
+    root: INFO
+    com.telematic.telematic_rsu_management_service: INFO
+    
 spring:
   datasource:
     url: ${spring_datasource_url:jdbc:mysql://localhost:3306/rsm?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true}
@@ -15,11 +21,7 @@ messaging:
     enabled: ${messaging_nats_enabled:false}
     uri: ${messaging_nats_uri:nats://localhost:4222}
     dispatcher.strategy: ${messaging_nats_dispatcher_strategy:isolated}
-
-logging:
-  level:
-    root: INFO
-    com.telematic.telematic_rsu_management_service: INFO
+ 
 
 registration:
   tru:
@@ -48,9 +50,17 @@ data:
       subject: ${data_selection_confirm_topics_subject:unit.*.topic.rsu.selected_topics}
       request.timeout.seconds: ${data_selection_confirm_topics_request_timeout_seconds:10}
   ingestion:
-    subject: ${data_ingestion_subject:unit.*.stream.rsu.*.*} # subject with wildcards for unit_Id, rsu_id and topic_name
+    # subject prefix with wildcards for unit_Id and rsu_ip
+    subject-prefix: ${data_ingestion_subject_prefix:unit.*.stream.rsu.*} 
     influx:
       remove-fields: ${data_ingestion_influx_remove_fields:}
+    queue-group: ${data_ingestion_queue_group:ingestion-workers}
+    workers: ${data_ingestion_workers:2}
+    subjects: ${data_ingestion_subjects:}
+    workers-per-unit-rsu-pair: ${data_ingestion_workers_per_unit_rsu_pair:10}
+    refresh:
+      initial-delay-ms: ${data_ingestion_refresh_initial_delay_ms:30000}
+      interval-ms: ${data_ingestion_refresh_interval_ms:30000}
 
 influx:
   url: ${data_ingestion_influx_url:http://localhost:8086}

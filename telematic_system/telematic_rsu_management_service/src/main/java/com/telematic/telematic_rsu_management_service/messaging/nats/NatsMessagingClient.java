@@ -51,4 +51,12 @@ public class NatsMessagingClient implements MessagingClient {
     public NatsSubscription subscribe(String subject, MessageHandler handler) {
         return subscriber.subscribe(subject, handler);
     }
+
+    public NatsSubscription subscribeQueue(String subject, String queue, MessageHandler handler, int workers) {
+        return subscriber.subscribeQueue(subject, queue, handler, workers);
+    }
+
+    public void unsubscribeSubject(String subject) {
+        subscriber.unsubscribeSubject(subject);
+    }
 }

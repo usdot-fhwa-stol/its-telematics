@@ -15,11 +15,13 @@
  */
 package com.telematic.telematic_rsu_management_service.data_ingestion.depositor;
 
-import org.springframework.beans.factory.annotation.Value;
+import java.time.Instant;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Component;
 
 import com.telematic.telematic_rsu_management_service.data_ingestion.influx.InfluxLineBuilder;
-import com.telematic.telematic_rsu_management_service.messaging.Message;
 import com.telematic.telematic_rsu_management_service.repository.influx.InfluxDbClient;
 
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 public class DataIngestionDepositor {
     private final InfluxDbClient influxDbClient;
     private final InfluxLineBuilder influxLineBuilder;
+    private static final Logger CSV = LogManager.getLogger("csv");
 
     public DataIngestionDepositor(InfluxDbClient influxDbClient, InfluxLineBuilder influxLineBuilder) {
         this.influxDbClient = influxDbClient;
@@ -37,12 +40,23 @@ public class DataIngestionDepositor {
 
     public void depositData(String json) {
         try {
+            long startTimeMs = Instant.now().toEpochMilli();
+            long buildLineStartTimeMs = Instant.now().toEpochMilli();
             String line = influxLineBuilder.buildLine(json);
+            long buildLineEndTimeMs = Instant.now().toEpochMilli();
+            long buildLineLatencyMs = (buildLineEndTimeMs - buildLineStartTimeMs);
             log.info("Built Influx line: {}", line);
+            long saveStartTimeMs = Instant.now().toEpochMilli();
             // boolean ok = influxDbClient.writeLine(line);
             // if (!ok) {
             //     log.error("Influx write failed.");
             // }
+            long saveEndTimeMs = Instant.now().toEpochMilli();
+            long depositLatencyMs = (saveEndTimeMs - saveStartTimeMs);
+            long endTimeMs = Instant.now().toEpochMilli();
+            long overallLatencyMs = (endTimeMs - startTimeMs);
+            String threadName = Thread.currentThread().getName();
+            CSV.info("{}", String.format("%d,%d,%d,%d,%s", buildLineLatencyMs, depositLatencyMs, overallLatencyMs, endTimeMs, threadName));
         } catch (Exception e) {
             log.error("Failed to build Influx line: {}", e.getMessage());
             throw new RuntimeException("Failed to build Influx line", e);

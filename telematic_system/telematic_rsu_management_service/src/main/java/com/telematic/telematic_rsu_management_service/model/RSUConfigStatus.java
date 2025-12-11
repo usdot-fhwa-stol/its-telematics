@@ -17,10 +17,9 @@ package com.telematic.telematic_rsu_management_service.model;
 
 import java.util.List;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.telematic.telematic_rsu_management_service.registration.dto.TruConfigMessage;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

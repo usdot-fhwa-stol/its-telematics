@@ -16,21 +16,28 @@
 package com.telematic.telematic_rsu_management_service.config;
 
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+import java.util.concurrent.ThreadPoolExecutor;
+
 @Configuration
-public class AsyncConfig {
+public class ExecutorConfigConfig {
 
     @Bean
-    public TaskExecutor taskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setThreadNamePrefix("registration-");
-        executor.setCorePoolSize(20);
-        executor.setMaxPoolSize(40);
-        executor.setQueueCapacity(100);
-        executor.initialize();
-        return executor;
+    @Primary
+    public ThreadPoolTaskExecutor taskExecutor() {
+        ThreadPoolTaskExecutor exec = new ThreadPoolTaskExecutor();
+        exec.setThreadNamePrefix("rsm-");
+        exec.setCorePoolSize(10);
+        exec.setMaxPoolSize(20);
+        exec.setQueueCapacity(1000);
+        exec.setKeepAliveSeconds(30);
+        exec.setAwaitTerminationSeconds(30);
+        exec.setWaitForTasksToCompleteOnShutdown(true);
+        exec.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        exec.initialize();
+        return exec;
     }
 }

@@ -2,8 +2,14 @@
 <Configuration status="WARN">
   <Appenders>
     <Console name="Console" target="SYSTEM_OUT">
-      <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5p [%t] %c{1.} - %m%n"/>
+      <PatternLayout withAnsi="true" pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight{%-5level} [%t] %c{1.} - %m%n"/>
     </Console>
+    <RollingFile name="CsvLatency" fileName="/workspace/logs/latency.csv" filePattern="/workspace/logs/latency-%d{yyyy-MM-dd}.csv.gz">
+      <CsvParameterLayout delimiter="," header="buildLineLatencyMs,depositLatencyMs,overallLatencyMs,endTimeMs,threadName"/>
+      <Policies>
+        <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+      </Policies>
+    </RollingFile>
   </Appenders>
 
   <Loggers>
@@ -22,5 +28,8 @@
     <Root level="INFO">
       <AppenderRef ref="Console"/>
     </Root>
+    <Logger name="csv" level="INFO" additivity="false">
+      <AppenderRef ref="CsvLatency"/>
+    </Logger>
   </Loggers>
 </Configuration>

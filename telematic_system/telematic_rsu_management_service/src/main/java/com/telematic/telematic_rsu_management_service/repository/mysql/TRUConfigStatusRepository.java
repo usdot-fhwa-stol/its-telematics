@@ -15,6 +15,9 @@
  */
 package com.telematic.telematic_rsu_management_service.repository.mysql;
 
+import java.util.List;
+
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -24,4 +27,22 @@ import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
 public interface TRUConfigStatusRepository extends JpaRepository<TRUConfigStatus, Long> {
 	@Query("select t from TRUConfigStatus t where t.unitConfig.unitId = :unitId")
 	TRUConfigStatus findByUnitId(@Param("unitId") String unitId);
+
+	@EntityGraph(attributePaths = {
+		"unitConfig",
+		"pluginConfigStatus",
+		"rsuConfigs",
+		"rsuConfigs.rsuEndpoint"
+	})
+	@Query("select t from TRUConfigStatus t")
+	List<TRUConfigStatus> findAllWithAssociations();
+
+	@EntityGraph(attributePaths = {
+		"unitConfig",
+		"pluginConfigStatus",
+		"rsuConfigs",
+		"rsuConfigs.rsuEndpoint"
+	})
+	@Query("select t from TRUConfigStatus t where t.unitConfig.unitId = :unitId")
+	TRUConfigStatus findByUnitIdWithAssociations(@Param("unitId") String unitId);
 }

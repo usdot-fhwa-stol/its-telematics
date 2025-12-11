@@ -13,18 +13,8 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package com.telematic.telematic_rsu_management_service;
+package com.telematic.telematic_rsu_management_service.data_ingestion.influx.pipeline;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.scheduling.annotation.EnableScheduling;
-
-@SpringBootApplication
-@EnableScheduling
-public class TelematicRsuManagementServiceApplication {
-
-	public static void main(String[] args) {
-		SpringApplication.run(TelematicRsuManagementServiceApplication.class, args);
-	}
-
+public interface Processor {
+    void process(LineRecordContext ctx);
 }

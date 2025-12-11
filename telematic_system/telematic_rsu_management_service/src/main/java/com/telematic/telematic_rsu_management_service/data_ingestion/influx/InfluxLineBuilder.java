@@ -15,110 +15,55 @@
  */
 package com.telematic.telematic_rsu_management_service.data_ingestion.influx;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import org.springframework.stereotype.Component;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.telematic.telematic_rsu_management_service.data_ingestion.influx.pipeline.LineRecordContext;
 
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.*;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
 @Component
 @Slf4j
 public class InfluxLineBuilder {
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private final InfluxPipelineLineBuilder pipelineLineBuilder;
 
-    @Value("${data.ingestion.influx.remove-fields:}")
-    private String removeFieldsProp;
+    public InfluxLineBuilder(InfluxPipelineLineBuilder pipelineLineBuilder) {
+        this.pipelineLineBuilder = pipelineLineBuilder;
+    }
 
     public String buildLine(String json) throws Exception {
+        LineRecordContext ctx = new LineRecordContext();
         JsonNode root = MAPPER.readTree(json);
         JsonNode metadata = root.path("metadata");
         JsonNode payload = root.path("payload");
 
-        String event = sanitize(metadata.path("event").asText("unknown"));
+        String event = metadata.path("event").asText("unknown");
         String measurement = event;
+        ctx.setMeasurement(measurement);
 
         Map<String, String> tags = new LinkedHashMap<>();
-        tags.put("unitId", sanitize(metadata.path("unitId").asText("")));
-        tags.put("rsuIp", sanitize(metadata.path("rsuIp").asText("")));
-        tags.put("port", sanitize(metadata.path("port").asText("")));
-        tags.put("topicName", sanitize(metadata.path("topicName").asText("")));
+        tags.put("unitId", metadata.path("unitId").asText(""));
+        tags.put("rsuIp", metadata.path("rsuIp").asText(""));
+        tags.put("port", metadata.path("port").asText(""));
+        tags.put("topicName", metadata.path("topicName").asText(""));
+        ctx.setTags(tags);
 
-        Map<String, String> fields = new LinkedHashMap<>();
+        Map<String, Object> fields = new LinkedHashMap<>();
         flatten("payload", payload, fields);
-        if (removeFieldsProp != null && !removeFieldsProp.isBlank()) {
-            removeFields(fields, Arrays.asList(removeFieldsProp.split(",")));
-        }
+        ctx.setFields(fields);
 
         long timestampNs = parseEpochNs(metadata.path("timestamp").asLong(0L));
-        return buildLine(measurement, tags, fields, timestampNs);
-    }
-    
-    public String buildLine(String measurement, Map<String, String> tags, Map<String, String> fields, Long timestampNs) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(sanitize(measurement));
-        if (tags != null && !tags.isEmpty()) {
-            sb.append(',');
-            boolean first = true;
-            for (Map.Entry<String, String> e : tags.entrySet()) {
-                if (!first) sb.append(',');
-                first = false;
-                sb.append(sanitize(e.getKey())).append('=').append(sanitize(e.getValue()));
-            }
-        }
-        sb.append(' ');
-        boolean firstField = true;
-        for (Map.Entry<String, String> e : fields.entrySet()) {
-            if (e.getValue() == null) continue;
-            if (!firstField) sb.append(',');
-            firstField = false;
-            sb.append(sanitize(e.getKey())).append('=').append(e.getValue());
-        }
-        if (timestampNs != null && timestampNs > 0) {
-            sb.append(' ').append(timestampNs);
-        }
-        return sb.toString();
+        ctx.setTimestamp(timestampNs);
+        
+        return pipelineLineBuilder.build(ctx);
     }
 
-    /**
-     * Remove fields from the flattened payload map based on provided keys or prefixes.
-     * Keys are matched exactly; if a key in {@code removeKeys} ends with '*' it will be treated
-     * as a prefix pattern and any field starting with that prefix will be removed.
-     * Example removeKeys: ["payload.coreData.lat", "payload.J2735 Message.value.coreData.*"].
-     */
-    public void removeFields(Map<String, String> fields, Collection<String> removeKeys) {
-        if (fields == null || fields.isEmpty() || removeKeys == null || removeKeys.isEmpty()) return;
-        Set<String> exact = new HashSet<>();
-        List<String> prefixes = new ArrayList<>();
-        for (String k : removeKeys) {
-            if (k == null || k.isBlank()) continue;
-            if (k.endsWith("*")) {
-                prefixes.add(k.substring(0, k.length() - 1));
-            } else {
-                exact.add(k);
-            }
-        }
-        List<String> toRemove = new ArrayList<>();
-        for (String key : fields.keySet()) {
-            if (exact.contains(key)) {
-                toRemove.add(key);
-                continue;
-            }
-            for (String p : prefixes) {
-                if (!p.isEmpty() && key.startsWith(p)) {
-                    toRemove.add(key);
-                    break;
-                }
-            }
-        }
-        log.info("Removing fields: {}", toRemove);
-        toRemove.forEach(fields::remove);
-    }
-
-    private void flatten(String prefix, JsonNode node, Map<String, String> out) {
+    private void flatten(String prefix, JsonNode node, Map<String, Object> out) {
         if (node == null || node.isMissingNode() || node.isNull()) return;
         if (node.isObject()) {
             node.fields().forEachRemaining(e -> {
@@ -133,34 +78,11 @@ public class InfluxLineBuilder {
                 idx++;
             }
         } else {
-            out.put(prefix, formatFieldValue(node));
-        }
-    }
-
-    private String formatFieldValue(JsonNode node) {
-        if (node == null || node.isNull()) return null;
-        if (node.isIntegralNumber()) {
-            return String.valueOf(node.asLong());
-        } else if (node.isFloatingPointNumber()) {
-            return String.valueOf(node.asDouble());
-        } else if (node.isBoolean()) {
-            return String.valueOf(node.asBoolean());
-        } else {
-            String val = node.asText("");
-            return '"' + escapeString(val) + '"';
+            out.put(prefix, node.asText("unknown"));
         }
     }
 
     private long parseEpochNs(Long epochMs) {
         return epochMs * 1_000L;
-    }
-
-    private String sanitize(String s) {
-        if (s == null) return "";
-        return s.replace(" ", "\\ ").replace(",", "\\,").replace("=", "\\=");
-    }
-
-    private String escapeString(String s) {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }
