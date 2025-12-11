@@ -40,6 +40,6 @@ public class RegistrationStartupRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        taskExecutor.execute(() -> registrationService.subscribeTruConfig(truAutoConfigSubject));
+        taskExecutor.execute(() -> registrationService.subscribeAutoTruConfig(truAutoConfigSubject));
     }
 }

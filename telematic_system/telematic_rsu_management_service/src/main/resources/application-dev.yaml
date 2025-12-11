@@ -2,13 +2,13 @@ logging:
   config: classpath:log4j2-spring.xml
   level:
     root: INFO
-    com.telematic.telematic_rsu_management_service: INFO
+    com.telematic.telematic_rsu_management_service: ${logging_level_com_telematic_telematic_rsu_management_service:DEBUG}
     
 spring:
   datasource:
     url: ${spring_datasource_url:jdbc:mysql://localhost:3306/rsm?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true}
-    username: ${spring_datasource_username:root}
-    password: ${spring_datasource_password:}
+    username: ${spring_datasource_username:app}
+    password: ${spring_datasource_password:app}
     driver-class-name: ${spring_datasource_driver:com.mysql.cj.jdbc.Driver}
   jpa:
     hibernate:
@@ -18,9 +18,8 @@ spring:
 
 messaging:
   nats:
-    enabled: ${messaging_nats_enabled:false}
+    enabled: ${messaging_nats_enabled:true}
     uri: ${messaging_nats_uri:nats://localhost:4222}
-    dispatcher.strategy: ${messaging_nats_dispatcher_strategy:isolated}
  
 
 registration:
@@ -57,7 +56,7 @@ data:
     queue-group: ${data_ingestion_queue_group:ingestion-workers}
     workers: ${data_ingestion_workers:2}
     subjects: ${data_ingestion_subjects:}
-    workers-per-unit-rsu-pair: ${data_ingestion_workers_per_unit_rsu_pair:10}
+    workers-per-unit-rsu-pair: ${data_ingestion_workers_per_unit_rsu_pair:5}
     refresh:
       initial-delay-ms: ${data_ingestion_refresh_initial_delay_ms:30000}
       interval-ms: ${data_ingestion_refresh_interval_ms:30000}
@@ -65,5 +64,4 @@ data:
 influx:
   url: ${data_ingestion_influx_url:http://localhost:8086}
   token: ${data_ingestion_influx_token:my_influxdb_token}
-  org: ${data_ingestion_influx_org:my_org}
-  bucket: ${data_ingestion_influx_bucket:rsu_data}
+  database: ${data_ingestion_influx_database:rsu_data}

@@ -35,7 +35,7 @@ public class NatsPublisher implements Publisher {
     @Override
     public void publish(String subject, byte[] payload, Map<String, String> headers) {
         if (connection == null) {
-            return; // no-op if not wired yet
+            return; 
         }
         Headers h = null;
         if (headers != null && !headers.isEmpty()) {

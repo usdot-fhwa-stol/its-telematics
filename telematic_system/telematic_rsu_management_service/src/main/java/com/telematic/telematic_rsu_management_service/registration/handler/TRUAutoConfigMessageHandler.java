@@ -37,10 +37,11 @@ public class TRUAutoConfigMessageHandler implements MessageHandler {
     }
     
     @Override
-    public void onMessage(Message message) {
+    public byte[] onMessage(Message message) {
         byte[] payload = message.payload();
         TruConfigMessage configMessage = serializer.decode(payload, TruConfigMessage.class);
         log.info("Automatic TRU Config Message received: {}", configMessage);
         truAutoConfigMessageDepositor.processAutoTruConfigMessage(configMessage);
+        return "ok".getBytes();
     }    
 }

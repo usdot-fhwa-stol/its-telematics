@@ -35,11 +35,12 @@ public class UnitHealthStatusHandler implements MessageHandler {
         this.unitStatusDepositor = unitStatusDepositor;
     }
     @Override
-    public void onMessage(Message message) {        
+    public byte[] onMessage(Message message) {        
         byte[] payload = message.payload();
         TRUHealthStatusMessage truHealthStatusMessage = serializer.decode(payload, TRUHealthStatusMessage.class);
         log.info("Handling Unit Health Status Message: {}", truHealthStatusMessage);
         unitStatusDepositor.depositUnitStatus(truHealthStatusMessage);
+        return null;
     }
     
 }

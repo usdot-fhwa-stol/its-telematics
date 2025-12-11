@@ -30,11 +30,13 @@ public class NatsMessagingClient implements MessagingClient {
     private NatsPublisher publisher;
     private NatsRequester natsRequester;
     private NatsSubscriber subscriber;
+    private NatsReplyer replyer;
 
-    public NatsMessagingClient(NatsPublisher publisher, NatsSubscriber subscriber, NatsRequester natsRequester) {
+    public NatsMessagingClient(NatsPublisher publisher, NatsSubscriber subscriber, NatsRequester natsRequester, NatsReplyer replyer) {
         this.publisher = publisher;
         this.subscriber = subscriber;
         this.natsRequester = natsRequester;
+        this.replyer = replyer;
     }
 
 	@Override
@@ -50,6 +52,11 @@ public class NatsMessagingClient implements MessagingClient {
     @Override
     public NatsSubscription subscribe(String subject, MessageHandler handler) {
         return subscriber.subscribe(subject, handler);
+    }
+
+    @Override
+    public void reply(String subject, MessageHandler handler) {
+        replyer.reply(subject, handler);
     }
 
     public NatsSubscription subscribeQueue(String subject, String queue, MessageHandler handler, int workers) {

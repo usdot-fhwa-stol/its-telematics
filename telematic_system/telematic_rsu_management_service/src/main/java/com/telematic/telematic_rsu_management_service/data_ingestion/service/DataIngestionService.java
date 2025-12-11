@@ -27,7 +27,8 @@ import com.telematic.telematic_rsu_management_service.messaging.nats.NatsMessagi
 import com.telematic.telematic_rsu_management_service.model.RSUConfigStatus;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
 import com.telematic.telematic_rsu_management_service.repository.mysql.TRUConfigStatusRepository;
-
+import java.util.Map;;
+import java.util.HashMap;
 import lombok.extern.slf4j.Slf4j;
 
 @Component
@@ -37,7 +38,7 @@ public class DataIngestionService {
     private DataIngestionHandler dataIngestionHandler;
     private final TRUConfigStatusRepository truConfigStatusRepository;
     
-    @Value("${data.ingestion.workers-per-unit-rsu-pair:10}")
+    @Value("${data.ingestion.workers-per-unit-rsu-pair:5}")
     private int workersPerUnitRsuPair;
 
     @Value("${data.ingestion.subject-prefix:unit.*.stream.rsu.*}")
@@ -53,7 +54,8 @@ public class DataIngestionService {
     
      public void enableDataInjestionSubscriptions() {
         try {
-            for (String newPrefixSubject : getLatestSubjectPrefixes().stream()
+            Map<String, Integer> latestSubjectPrefixesRulesMap = getLatestSubjectPrefixes();
+            for (String newPrefixSubject : latestSubjectPrefixesRulesMap.keySet().stream()
                     .filter(prefix -> !activePrefixes.contains(prefix)).toList()) {
                 String queueGroup = newPrefixSubject.replace('.', '_').replace('>', 'g') + "_queue";
                 log.info("Subscribing to ingestion prefix subject '{}' with queue '{}' (workers={})",
@@ -64,7 +66,7 @@ public class DataIngestionService {
             }
             
             for(String oldPrefix : activePrefixes.stream()
-                    .filter(prefix -> !getLatestSubjectPrefixes().contains(prefix)).toList()) {
+                    .filter(prefix -> !latestSubjectPrefixesRulesMap.keySet().contains(prefix)).toList()) {
                     log.info("Unsubscribing data ingestion for prefix subject '{}'", oldPrefix);
                     natsMessagingClient.unsubscribeSubject(oldPrefix);
                     activePrefixes.remove(oldPrefix);
@@ -74,8 +76,9 @@ public class DataIngestionService {
         }
     }
 
-    private Set<String> getLatestSubjectPrefixes() {
+    private Map<String, Integer> getLatestSubjectPrefixes() {
         Set<String> latestPrefixes = new HashSet<>();
+        Map<String, Integer> subjectPrefixRuleCountMap = new HashMap<>();
         for (TRUConfigStatus tru : truConfigStatusRepository.findAllWithAssociations()) {
             String unitId = tru.getUnitConfig().getUnitId();
             if (unitId == null || unitId.isBlank()) {
@@ -89,10 +92,10 @@ public class DataIngestionService {
                 String ipNormalized = ip.replace('.', '_');
                 String basePrefix = dataIngestionSubjectPrefix.replaceFirst("\\*", unitId).replaceFirst("\\*", ipNormalized);
                 String prefixSubject = basePrefix + ".>";
-                latestPrefixes.add(prefixSubject);
+                subjectPrefixRuleCountMap.put(prefixSubject, rsu.getDataSelectionRuleConfigs().size());
             }
         }
-        return latestPrefixes;
+        return subjectPrefixRuleCountMap;
     }
 
     @Scheduled(initialDelayString = "${data.ingestion.refresh.initial-delay-ms:10000}", fixedDelayString = "${data.ingestion.refresh.interval-ms:30000}")

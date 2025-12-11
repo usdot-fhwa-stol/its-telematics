@@ -37,6 +37,12 @@ public class TRUAutoConfigMessageDepositor {
     }
 
     public void processAutoTruConfigMessage(TruConfigMessage configMessage) {
+        String unitId = configMessage.getUnitConfig().getUnitId();
+        log.info("Processing automatic TRU Config Message for Unit ID: {}", unitId);
+        TRUConfigStatus existConfigStatus = truConfigStatusRepository.findByUnitId(unitId);
+        if (existConfigStatus != null) {
+            throw new IllegalStateException("TRU Config Status already exists for Unit ID: " + unitId);
+        }
         TRUConfigStatus truConfigStatus = new TRUConfigStatus();
         truConfigStatus.setUnitConfig(configMessage.getUnitConfig());
         truConfigStatus.setTimestamp(configMessage.getTimestamp());

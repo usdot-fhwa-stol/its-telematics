@@ -15,40 +15,41 @@
  */
 package com.telematic.telematic_rsu_management_service.messaging.nats;
 
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import com.telematic.telematic_rsu_management_service.messaging.Message;
-import com.telematic.telematic_rsu_management_service.messaging.Requester;
+import com.telematic.telematic_rsu_management_service.messaging.MessageHandler;
+import com.telematic.telematic_rsu_management_service.messaging.Replyer;
 
 import io.nats.client.Connection;
+import io.nats.client.Dispatcher;
 
 @Component
 @ConditionalOnProperty(prefix = "messaging.nats", name = "enabled", havingValue = "true", matchIfMissing = false)
-public class NatsRequester implements Requester {
+public class NatsReplyer implements Replyer {
     private final Connection connection;
-
-    public NatsRequester(Connection connection) {
+    
+    public NatsReplyer(Connection connection) {
         this.connection = connection;
     }
 
     @Override
-    public Message request(String subject, byte[] payload, java.time.Duration timeout) {
+    public void reply(String subject, MessageHandler handler) {
         if (connection == null) {
-            return null;
+            return;
         }
-        try{
-            CompletableFuture<io.nats.client.Message> future = connection.requestWithTimeout(subject, payload, timeout);
-            return new Message(subject, future.get(timeout.toSeconds(), TimeUnit.SECONDS).getData(), null);
-        }catch(ExecutionException | InterruptedException | CancellationException | TimeoutException e){
-            throw new RuntimeException("Failed to get response from NATS request", e);
-        }       
+        Dispatcher dispatcher = connection.createDispatcher(msg -> {
+            String fromSubject = msg.getSubject();
+            String replyTo = msg.getReplyTo();
+            byte[] payload = msg.getData();
+            byte[] responsePayload = handler.onMessage(new Message(fromSubject, payload, null));
+            if (replyTo != null && !replyTo.isEmpty()) {
+                connection.publish(replyTo, responsePayload);
+            }
+        });
+        dispatcher.subscribe(subject);
     }
     
 }

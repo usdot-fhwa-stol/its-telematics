@@ -36,11 +36,12 @@ public class RSUHealthStatusHandler implements MessageHandler {
     }
     
     @Override
-    public void onMessage(Message message) {
+    public byte[] onMessage(Message message) {
         byte[] payload = message.payload();
         TRUHealthStatusMessage truHealthStatusMessage = serializer.decode(payload, TRUHealthStatusMessage.class);
         log.info("Handling RSU Health Status Message: {}", truHealthStatusMessage);
         rsuHealthStatusDepositor.depositRSUHealthStatus(truHealthStatusMessage);
+        return null;
     }
     
 }

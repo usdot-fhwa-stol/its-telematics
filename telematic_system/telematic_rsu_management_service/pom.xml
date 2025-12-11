@@ -13,19 +13,6 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<name>telematic_rsu_management_service</name>
 	<description>Telematic RSU management service is a standalone service to manage RSU specific unit and stream data originated from RSU</description>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
 	<properties>
 		<java.version>17</java.version>
 		<testcontainers.version>1.20.1</testcontainers.version>
@@ -83,7 +70,6 @@
 				</exclusion>
 			</exclusions>
 		</dependency>
-		<!-- Use Spring Boot's Log4j2 starter for proper auto-configuration -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-log4j2</artifactId>
@@ -93,7 +79,11 @@
 			<artifactId>commons-csv</artifactId>
 			<version>1.10.0</version>
 		</dependency>
-		<!-- Remove direct Log4j2 artifacts to avoid conflicts; starter brings them -->
+		<dependency>
+			<groupId>com.influxdb</groupId>
+			<artifactId>influxdb3-java</artifactId>
+			<version>1.7.0</version>
+		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.datatype</groupId>
 			<artifactId>jackson-datatype-jsr310</artifactId>

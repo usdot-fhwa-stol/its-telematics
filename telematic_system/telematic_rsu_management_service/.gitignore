@@ -5,6 +5,7 @@ target/
 !**/src/test/**/target/
 .devcontainer
 scripts/
+logs/
 ### STS ###
 .apt_generated
 .classpath

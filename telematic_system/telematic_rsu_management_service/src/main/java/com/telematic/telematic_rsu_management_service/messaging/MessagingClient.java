@@ -22,4 +22,5 @@ public interface MessagingClient {
     void publish(String subject, byte[] payload, Map<String, String> headers);
     Message request(String subject, byte[] payload, Duration timeout);
     Subscription subscribe(String subject, MessageHandler handler);
+    void reply(String subject, MessageHandler handler);
 }

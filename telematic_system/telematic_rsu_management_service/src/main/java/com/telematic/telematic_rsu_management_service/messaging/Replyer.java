@@ -15,8 +15,6 @@
  */
 package com.telematic.telematic_rsu_management_service.messaging;
 
-import java.time.Duration;
-
-public interface Requester {
-    public Message request(String subject, byte[] payload, Duration timeout);
+public interface Replyer {
+    public void reply(String subject, MessageHandler handler);
 }

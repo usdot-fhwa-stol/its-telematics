@@ -32,7 +32,8 @@ public interface TRUConfigStatusRepository extends JpaRepository<TRUConfigStatus
 		"unitConfig",
 		"pluginConfigStatus",
 		"rsuConfigs",
-		"rsuConfigs.rsuEndpoint"
+		"rsuConfigs.rsuEndpoint",
+		"rsuConfigs.dataSelectionRuleConfigs"
 	})
 	@Query("select t from TRUConfigStatus t")
 	List<TRUConfigStatus> findAllWithAssociations();

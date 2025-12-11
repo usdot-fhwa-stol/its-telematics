@@ -33,10 +33,11 @@ public class DataIngestionHandler implements MessageHandler {
     }
 
     @Override
-    public void onMessage(Message message) {
+    public byte[] onMessage(Message message) {
         String json = new String(message.payload());
         log.info("Received JSON: {}", json);
         dataIngestionDepositor.depositData(json);
+        return null;
     }
     
 }

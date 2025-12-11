@@ -22,19 +22,19 @@ import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Component;
 
 import com.telematic.telematic_rsu_management_service.data_ingestion.influx.InfluxLineBuilder;
-import com.telematic.telematic_rsu_management_service.repository.influx.InfluxDbClient;
+import com.telematic.telematic_rsu_management_service.repository.influx.InfluxDBRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
 @Component
 @Slf4j
 public class DataIngestionDepositor {
-    private final InfluxDbClient influxDbClient;
+    private final InfluxDBRepository influxDBRepository;
     private final InfluxLineBuilder influxLineBuilder;
     private static final Logger CSV = LogManager.getLogger("csv");
 
-    public DataIngestionDepositor(InfluxDbClient influxDbClient, InfluxLineBuilder influxLineBuilder) {
-        this.influxDbClient = influxDbClient;
+    public DataIngestionDepositor(InfluxDBRepository influxDBRepository, InfluxLineBuilder influxLineBuilder) {
+        this.influxDBRepository = influxDBRepository;
         this.influxLineBuilder = influxLineBuilder;
     }
 
@@ -47,10 +47,10 @@ public class DataIngestionDepositor {
             long buildLineLatencyMs = (buildLineEndTimeMs - buildLineStartTimeMs);
             log.info("Built Influx line: {}", line);
             long saveStartTimeMs = Instant.now().toEpochMilli();
-            // boolean ok = influxDbClient.writeLine(line);
-            // if (!ok) {
-            //     log.error("Influx write failed.");
-            // }
+            boolean ok = influxDBRepository.writeLine(line);
+            if (!ok) {
+                log.error("Influx write failed.");
+            }
             long saveEndTimeMs = Instant.now().toEpochMilli();
             long depositLatencyMs = (saveEndTimeMs - saveStartTimeMs);
             long endTimeMs = Instant.now().toEpochMilli();

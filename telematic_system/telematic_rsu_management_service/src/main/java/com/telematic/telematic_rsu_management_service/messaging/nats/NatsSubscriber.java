@@ -53,7 +53,7 @@ public class NatsSubscriber implements Subscriber {
 
     @Override
     public NatsSubscription subscribe(String subject, MessageHandler handler) {
-         if (connection == null) {
+        if (connection == null) {
             return new NatsSubscription();
         }
         ExecutorService subjectExecutor = perSubjectExecutors.computeIfAbsent(subject, s ->
@@ -77,7 +77,7 @@ public class NatsSubscriber implements Subscriber {
                 });
             }
             Message m = new Message(msg.getSubject(), data, headers);
-            subjectExecutor.execute(() -> handler.onMessage(m));
+            subjectExecutor.execute(() -> { handler.onMessage(m); });
         });
         d.subscribe(subject);
         subscribedSubjects.add(subject);
@@ -109,7 +109,7 @@ public class NatsSubscriber implements Subscriber {
                 });
             }
             Message m = new Message(msg.getSubject(), data, headers);
-            subjectExecutor.execute(() -> handler.onMessage(m));
+            subjectExecutor.execute(() -> { handler.onMessage(m); });
         });
         d.subscribe(subject, queue);
         subscribedSubjects.add(subject);

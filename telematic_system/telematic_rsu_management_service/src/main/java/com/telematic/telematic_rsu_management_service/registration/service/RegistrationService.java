@@ -66,9 +66,9 @@ public class RegistrationService {
         return message;
     }
 
-    public void subscribeTruConfig(String subject) {
+    public void subscribeAutoTruConfig(String subject) {
         log.info("Subscribing to TRU auto configuration on subject: '{}'", subject);
-        messagingClient.subscribe(subject, truAutoConfigMessageHandler);
+        messagingClient.reply(subject, truAutoConfigMessageHandler);
     }
     
     public List<TRUConfigStatus> getAllTruConfigs() {
