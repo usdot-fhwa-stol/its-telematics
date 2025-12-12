@@ -47,10 +47,10 @@ public class InfluxLineBuilder {
         ctx.setMeasurement(measurement);
 
         Map<String, String> tags = new LinkedHashMap<>();
-        tags.put("unitId", metadata.path("unitId").asText(""));
-        tags.put("rsuIp", metadata.path("rsuIp").asText(""));
-        tags.put("port", metadata.path("port").asText(""));
-        tags.put("topicName", metadata.path("topicName").asText(""));
+        tags.put("unitId", metadata.path("unitId").asText("unknown"));
+        tags.put("rsuIp", metadata.path("rsuIp").asText("0.0.0.0"));
+        tags.put("port", metadata.path("port").asText("0"));
+        tags.put("topicName", metadata.path("topicName").asText("unknown"));
         ctx.setTags(tags);
 
         Map<String, Object> fields = new LinkedHashMap<>();
@@ -82,7 +82,7 @@ public class InfluxLineBuilder {
         }
     }
 
-    private long parseEpochNs(Long epochMs) {
-        return epochMs * 1_000L;
+    private long parseEpochNs(Long epochMicro) {
+        return epochMicro * 1_000L;
     }
 }

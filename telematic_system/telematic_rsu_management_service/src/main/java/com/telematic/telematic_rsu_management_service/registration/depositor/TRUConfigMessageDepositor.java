@@ -44,7 +44,7 @@ public class TRUConfigMessageDepositor {
         RsuConfigItemMessage rsuConfigItemMessage = truConfigMessage.getRsuConfigs().get(0);
         if(truConfigMessage.getRsuConfigs() != null && !truConfigMessage.getRsuConfigs().isEmpty() && truConfigMessage.getRsuConfigs().size() == 1) {
                 log.info("Process TRU Config Message with Action: {}", rsuConfigItemMessage.getAction());
-                if (rsuConfigItemMessage.getAction().equals("add") || rsuConfigItemMessage.getAction().equals("create")) {
+                if (rsuConfigItemMessage.getAction().equalsIgnoreCase("add") || rsuConfigItemMessage.getAction().equalsIgnoreCase("create")) {
                     if (existingRsuConfigStatusList.size() >= existingTruConfig.getUnitConfig().getMaxConnections()) {
                         throw new IllegalStateException("Cannot add more RSU configs than the maximum allowed connections");
                     }
@@ -61,7 +61,7 @@ public class TRUConfigMessageDepositor {
                                     newRsuConfigStatus.getRsuEndpoint().getPort(),
                                     existingTruConfig.getUnitConfig().getUnitId(),
                                                             existingTruConfig.getId());
-                }else if (rsuConfigItemMessage.getAction().equals("update") || rsuConfigItemMessage.getAction().equals("modify")) {
+                }else if (rsuConfigItemMessage.getAction().equalsIgnoreCase("update") || rsuConfigItemMessage.getAction().equalsIgnoreCase("modify")) {
                     for (RSUConfigStatus rsuConfigStatus : existingRsuConfigStatusList) {
                         if (rsuConfigStatus.getRsuEndpoint().getIp().equals(rsuConfigItemMessage.getRsuEndpoint().getIp())
                                 && rsuConfigStatus.getRsuEndpoint().getPort().equals(rsuConfigItemMessage.getRsuEndpoint().getPort())) {
@@ -76,7 +76,7 @@ public class TRUConfigMessageDepositor {
                             break;
                         }
                     }
-                }else if (rsuConfigItemMessage.getAction().equals("remove") || rsuConfigItemMessage.getAction().equals("delete")) {
+                }else if (rsuConfigItemMessage.getAction().equalsIgnoreCase("remove") || rsuConfigItemMessage.getAction().equalsIgnoreCase("delete")) {
                     existingRsuConfigStatusList.removeIf(rsuConfigStatus -> {
                         boolean match = rsuConfigStatus.getRsuEndpoint().getIp().equals(rsuConfigItemMessage.getRsuEndpoint().getIp())
                                 && rsuConfigStatus.getRsuEndpoint().getPort().equals(rsuConfigItemMessage.getRsuEndpoint().getPort());

@@ -92,7 +92,7 @@ public class NatsSubscriber implements Subscriber {
         ExecutorService subjectExecutor = perSubjectExecutors.computeIfAbsent(subject+"-" + queue + "-" + workerId, s ->
         Executors.newSingleThreadExecutor(r -> {
                 Thread t = new Thread(r);
-                t.setName(s);
+                t.setName(subject+'-'+workerId);
                 t.setDaemon(true);
                 return t;
             })

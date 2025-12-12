@@ -48,7 +48,7 @@ public class InfluxPipelineLineBuilder {
         sb.append(measurement);
 
         for (Map.Entry<String, String> e : ctx.getTags().entrySet()) {
-            sb.append(',').append(e.getKey()).append('=').append(e.getValue());
+            sb.append(',').append(e.getValue());
         }
 
         StringJoiner fieldsJoiner = new StringJoiner(",");

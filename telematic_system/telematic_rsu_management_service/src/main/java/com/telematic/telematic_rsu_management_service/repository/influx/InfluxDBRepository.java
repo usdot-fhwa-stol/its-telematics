@@ -20,6 +20,8 @@ package com.telematic.telematic_rsu_management_service.repository.influx;
 import org.springframework.stereotype.Component;
 
 import com.influxdb.v3.client.InfluxDBClient;
+import com.influxdb.v3.client.write.WriteOptions;
+import com.influxdb.v3.client.write.WritePrecision;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -39,7 +41,8 @@ public class InfluxDBRepository {
             return false;
         }
         try {
-            client.writeRecord(line);
+            WriteOptions options = new WriteOptions.Builder().precision(WritePrecision.NS).build();
+            client.writeRecord(line, options);
             return true;
         } catch (Exception e) {
             log.error("Error writing line to InfluxDB3: {}", e.getMessage(), e);
