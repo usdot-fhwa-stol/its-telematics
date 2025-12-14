@@ -1,23 +1,36 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:telematic-test;DB_CLOSE_DELAY=-1;MODE=MySQL
-    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:testdb
     username: sa
-    password:
+    password: 
+    driver-class-name: org.h2.Driver
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: create-drop
     properties:
       hibernate.dialect: org.hibernate.dialect.H2Dialect
-    open-in-view: false
-  sql:
-    init:
-      mode: never
+  main:
+    allow-bean-definition-overriding: true
 
 messaging:
   nats:
     enabled: false
+    uri: nats://localhost:4222
+
+influx:
+  url: http://localhost:8181
+  token: test-token
+  database: test_db
+  write:
+    batch-size: 100
+    flush-interval-ms: 50
+    queue-capacity: 1000
+
+data:
+  ingestion:
+    workers-per-unit-rsu-pair: 1
     
 logging:
   level:
-    org.springframework: INFO
+    root: INFO
+    com.telematic: DEBUG

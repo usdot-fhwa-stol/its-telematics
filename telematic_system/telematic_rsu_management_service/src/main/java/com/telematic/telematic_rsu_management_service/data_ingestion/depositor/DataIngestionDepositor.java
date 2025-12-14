@@ -21,8 +21,6 @@ import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
@@ -85,7 +83,7 @@ public class DataIngestionDepositor {
                 Thread.currentThread().interrupt();
             }
         }
-        log.info("[{}] InfluxDB writer stopped. Final count - Enqueued: {}, Written: {}", instanceId, totalEnqueued, totalWritten);
+        log.info("[{}] InfluxDB writer stopped", instanceId);
     }
 
     private void writerLoop() {
