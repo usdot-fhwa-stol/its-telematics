@@ -4,18 +4,24 @@
     <Console name="Console" target="SYSTEM_OUT">
       <PatternLayout withAnsi="true" pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight{%-5level} [%t] %c{1.} - %m%n"/>
     </Console>
-    <RollingFile name="CsvLatency" fileName="/workspace/logs/latency.csv" filePattern="/workspace/logs/latency-%d{yyyy-MM-dd}.csv.gz">
-      <CsvParameterLayout delimiter="," header="buildLineLatencyMs,depositLatencyMs,overallLatencyMs,endTimeMs,threadName"/>
+    
+    <RollingFile name="AppLogFile" fileName="/workspace/logs/application.log" 
+                 filePattern="/workspace/logs/application-%d{yyyy-MM-dd}.log.gz">
+      <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%t] %c{1.} - %m%n"/>
       <Policies>
         <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+        <SizeBasedTriggeringPolicy size="50 MB"/>
       </Policies>
+      <DefaultRolloverStrategy max="30"/>
     </RollingFile>
+    
   </Appenders>
 
   <Loggers>
     <!-- Application package logging -->
     <Logger name="com.telematic.telematic_rsu_management_service" level="INFO" additivity="false">
       <AppenderRef ref="Console"/>
+      <AppenderRef ref="AppLogFile"/>
     </Logger>
 
     <!-- Spring framework noise reduction -->
@@ -27,9 +33,8 @@
 
     <Root level="INFO">
       <AppenderRef ref="Console"/>
+      <AppenderRef ref="AppLogFile"/>
     </Root>
-    <Logger name="csv" level="INFO" additivity="false">
-      <AppenderRef ref="CsvLatency"/>
-    </Logger>
+    
   </Loggers>
 </Configuration>

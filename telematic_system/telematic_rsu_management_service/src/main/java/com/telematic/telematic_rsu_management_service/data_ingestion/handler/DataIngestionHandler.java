@@ -15,6 +15,7 @@
  */
 package com.telematic.telematic_rsu_management_service.data_ingestion.handler;
 
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 import com.telematic.telematic_rsu_management_service.data_ingestion.depositor.DataIngestionDepositor;
@@ -24,9 +25,11 @@ import com.telematic.telematic_rsu_management_service.messaging.MessageHandler;
 import lombok.extern.slf4j.Slf4j;
 
 @Component
+@Scope("prototype")
 @Slf4j
 public class DataIngestionHandler implements MessageHandler {
     private DataIngestionDepositor dataIngestionDepositor;
+    private volatile long messageCount = 0;
 
     public DataIngestionHandler(DataIngestionDepositor dataIngestionDepositor) {
         this.dataIngestionDepositor = dataIngestionDepositor;
@@ -34,8 +37,9 @@ public class DataIngestionHandler implements MessageHandler {
 
     @Override
     public byte[] onMessage(Message message) {
+        messageCount++;
         String json = new String(message.payload());
-        log.info("Received JSON: {}", json);
+        log.debug("Received message #{}: {}", messageCount, json);
         dataIngestionDepositor.depositData(json);
         return null;
     }

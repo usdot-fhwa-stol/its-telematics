@@ -15,9 +15,15 @@
  */
 package com.telematic.telematic_rsu_management_service.config;
 
+import java.util.concurrent.ThreadPoolExecutor;
+
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import com.influxdb.v3.client.InfluxDBClient;
 
@@ -36,5 +42,26 @@ public class InfluxClientConfig {
     @Bean
     public InfluxDBClient influxDbClient() {
         return InfluxDBClient.getInstance(host, token.toCharArray(), database);
+    }
+
+    @Bean
+    @Qualifier("influxWebClient")
+    public WebClient influxWebClient() {
+       return WebClient.create(host);
+    }
+
+    @Bean
+    @Qualifier("influxWriterExecutor")
+    public TaskExecutor influxWriterExecutor() {
+        ThreadPoolTaskExecutor exec = new ThreadPoolTaskExecutor();
+        exec.setCorePoolSize(1);
+        exec.setMaxPoolSize(1);
+        exec.setQueueCapacity(0);
+        exec.setThreadNamePrefix("influx-writer-");
+        exec.setWaitForTasksToCompleteOnShutdown(true);
+        exec.setAwaitTerminationSeconds(10);
+        exec.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        exec.initialize();
+        return exec;
     }
 }

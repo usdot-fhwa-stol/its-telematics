@@ -49,15 +49,15 @@ public class InfluxLineBuilder {
         Map<String, String> tags = new LinkedHashMap<>();
         tags.put("unitId", metadata.path("unitId").asText("unknown"));
         tags.put("rsuIp", metadata.path("rsuIp").asText("0.0.0.0"));
-        tags.put("port", metadata.path("port").asText("0"));
         tags.put("topicName", metadata.path("topicName").asText("unknown"));
+        tags.put("port", metadata.path("port").asText("0"));
         ctx.setTags(tags);
 
         Map<String, Object> fields = new LinkedHashMap<>();
         flatten("payload", payload, fields);
         ctx.setFields(fields);
 
-        long timestampNs = parseEpochNs(metadata.path("timestamp").asLong(0L));
+        long timestampNs = metadata.path("timestamp").asLong(0L);
         ctx.setTimestamp(timestampNs);
         
         return pipelineLineBuilder.build(ctx);
@@ -80,9 +80,5 @@ public class InfluxLineBuilder {
         } else {
             out.put(prefix, node.asText("unknown"));
         }
-    }
-
-    private long parseEpochNs(Long epochMicro) {
-        return epochMicro * 1_000L;
     }
 }

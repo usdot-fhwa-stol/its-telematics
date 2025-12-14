@@ -45,7 +45,7 @@ public class TRURegistrationController {
         this.registrationService = registrationService;
     }
     
-    @GetMapping(path = "/get-all-tru-registration-status")
+    @GetMapping(path = "/all-tru-registration-status")
     public ResponseEntity<?> getTruRegistrationStatus() {
         List<TRUConfigStatus> truConfigMessages = registrationService.getAllTruConfigs();
         return ResponseEntity.ok().body(truConfigMessages);

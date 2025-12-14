@@ -15,19 +15,23 @@
  */
 package com.telematic.telematic_rsu_management_service.data_ingestion.bootstrap;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Component;
 
 import com.telematic.telematic_rsu_management_service.data_ingestion.service.DataIngestionService;
 
+import jakarta.annotation.PostConstruct;
+
 @Component
 public class DataIngestionStartupRunner implements ApplicationRunner {
     private final DataIngestionService dataIngestionService;
-    private TaskExecutor taskExecutor;
-    
+    private final TaskExecutor taskExecutor;
 
-    public DataIngestionStartupRunner(DataIngestionService dataIngestionService, TaskExecutor taskExecutor) {
+
+    public DataIngestionStartupRunner(DataIngestionService dataIngestionService,
+                                      TaskExecutor taskExecutor) {
         this.dataIngestionService = dataIngestionService;
         this.taskExecutor = taskExecutor;
     }
@@ -35,5 +39,10 @@ public class DataIngestionStartupRunner implements ApplicationRunner {
     @Override
     public void run(org.springframework.boot.ApplicationArguments args) throws Exception {
         taskExecutor.execute(() -> dataIngestionService.enableDataInjestionSubscriptions());
+    }
+
+    @PostConstruct
+    public void init() {
+        dataIngestionService.initializeDataIngestionService();
     }
 }

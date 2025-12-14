@@ -19,6 +19,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -26,6 +27,7 @@ import com.telematic.telematic_rsu_management_service.data_ingestion.handler.Dat
 import com.telematic.telematic_rsu_management_service.messaging.nats.NatsMessagingClient;
 import com.telematic.telematic_rsu_management_service.model.RSUConfigStatus;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
+import com.telematic.telematic_rsu_management_service.repository.influx.InfluxDBRepository;
 import com.telematic.telematic_rsu_management_service.repository.mysql.TRUConfigStatusRepository;
 
 import lombok.extern.slf4j.Slf4j;
@@ -34,8 +36,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class DataIngestionService {
     private NatsMessagingClient natsMessagingClient;
-    private DataIngestionHandler dataIngestionHandler;
+    private final ApplicationContext applicationContext;
     private final TRUConfigStatusRepository truConfigStatusRepository;
+    private final InfluxDBRepository influxDBRepository;
     
     @Value("${data.ingestion.workers-per-unit-rsu-pair:10}")
     private int workersPerUnitRsuPair;
@@ -43,23 +46,51 @@ public class DataIngestionService {
     @Value("${data.ingestion.subject-prefix:unit.*.stream.rsu.*}")
     private String dataIngestionSubjectPrefix;
 
+    @Value("${influx.token:}")
+    private String adminToken;
+
+    @Value("${influx.database:}")
+    private String databaseName;
+
     private final Set<String> activePrefixes = new HashSet<>();
 
-    public DataIngestionService(NatsMessagingClient natsMessagingClient, DataIngestionHandler dataIngestionHandler, TRUConfigStatusRepository truConfigStatusRepository) {
+    public DataIngestionService(NatsMessagingClient natsMessagingClient, ApplicationContext applicationContext, TRUConfigStatusRepository truConfigStatusRepository, InfluxDBRepository influxDBRepository) {
         this.natsMessagingClient = natsMessagingClient;
-        this.dataIngestionHandler = dataIngestionHandler;
+        this.applicationContext = applicationContext;
         this.truConfigStatusRepository = truConfigStatusRepository;
+        this.influxDBRepository = influxDBRepository;
+    }
+
+    public void initializeDataIngestionService() {
+        try {
+            if (adminToken != null && !adminToken.isBlank() && databaseName != null && !databaseName.isBlank()) {
+                influxDBRepository.createDatabaseIfNotExists(databaseName, adminToken);
+            } else {
+                throw new RuntimeException(String.format(
+                        "InfluxDB database creation failure: missing token or bucket name (token present? %b, bucket: '%s')",
+                        adminToken != null && !adminToken.isBlank(), databaseName));
+            }            
+        } catch (RuntimeException e) {
+            throw new RuntimeException(String.format("InfluxDB database creation failed: %s.", e.getMessage()), e);
+        }
     }
     
      public void enableDataInjestionSubscriptions() {
         try {
+            // Add unique instance ID to queue group to avoid message distribution across instances
+            String instanceId = java.util.UUID.randomUUID().toString().substring(0, 8);
+            
             for (String newPrefixSubject : getLatestSubjectPrefixes().stream()
                     .filter(prefix -> !activePrefixes.contains(prefix)).toList()) {
-                String queueGroup = newPrefixSubject.replace('.', '_').replace('>', 'g') + "_queue";
+                String queueGroup = newPrefixSubject.replace('.', '_').replace('>', 'g') + "_queue_" + instanceId;
                 log.info("Subscribing to ingestion prefix subject '{}' with queue '{}' ( workers={} )",
                         newPrefixSubject, queueGroup, workersPerUnitRsuPair);
-                natsMessagingClient.subscribeQueue(newPrefixSubject, queueGroup, dataIngestionHandler,
-                        workersPerUnitRsuPair);
+                
+                for (int i = 0; i < Math.max(1, workersPerUnitRsuPair); i++) {
+                    DataIngestionHandler handler = applicationContext.getBean(DataIngestionHandler.class);
+                    natsMessagingClient.subscribeQueue(newPrefixSubject, queueGroup, handler, 1);
+                    log.info("Created worker #{} for subject '{}'", i, newPrefixSubject);
+                }                
                 activePrefixes.add(newPrefixSubject);
             }
             
@@ -70,7 +101,7 @@ public class DataIngestionService {
                     activePrefixes.remove(oldPrefix);
             }
         } catch (Exception e) {
-            log.warn("Failed refreshing dynamic ingestion subscriptions: {}", e.getMessage());
+            log.error("Failed refreshing dynamic ingestion subscriptions: {}", e.getMessage(), e);
         }
     }
 
@@ -87,14 +118,15 @@ public class DataIngestionService {
                     continue;
                 }
                 String ipNormalized = ip.replace('.', '_');
-                String basePrefix = dataIngestionSubjectPrefix.replaceFirst("\\*", unitId).replaceFirst("\\*", ipNormalized);
+                String basePrefix = dataIngestionSubjectPrefix.replaceFirst("\\*", unitId).replaceFirst("\\*",
+                        ipNormalized);
                 String prefixSubject = basePrefix + ".>";
                 latestPrefixes.add(prefixSubject);
             }
         }
         return latestPrefixes;
     }
-
+    
     @Scheduled(initialDelayString = "${data.ingestion.refresh.initial-delay-ms:10000}", fixedDelayString = "${data.ingestion.refresh.interval-ms:30000}")
     public void scheduledRefresh() {
         enableDataInjestionSubscriptions();

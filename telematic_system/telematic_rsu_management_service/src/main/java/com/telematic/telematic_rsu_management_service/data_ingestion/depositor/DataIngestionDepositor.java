@@ -15,48 +15,135 @@
  */
 package com.telematic.telematic_rsu_management_service.data_ingestion.depositor;
 
-import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 import com.telematic.telematic_rsu_management_service.data_ingestion.influx.InfluxLineBuilder;
 import com.telematic.telematic_rsu_management_service.repository.influx.InfluxDBRepository;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 
 @Component
 @Slf4j
+@Scope("prototype") 
 public class DataIngestionDepositor {
     private final InfluxDBRepository influxDBRepository;
     private final InfluxLineBuilder influxLineBuilder;
-    private static final Logger CSV = LogManager.getLogger("csv");
+
+    @Value("${influx.write.batch-size:1000}")
+    private int batchSize;
+
+    @Value("${influx.write.flush-interval-ms:10}")
+    private long flushIntervalMs;
+
+    @Value("${influx.write.queue-capacity:50000}")
+    private int queueCapacity;
+
+    private LinkedBlockingQueue<String> queue;
+    private volatile boolean running = false;
+    private Thread writerThread;
+    private String instanceId;
 
     public DataIngestionDepositor(InfluxDBRepository influxDBRepository, InfluxLineBuilder influxLineBuilder) {
         this.influxDBRepository = influxDBRepository;
         this.influxLineBuilder = influxLineBuilder;
+        this.instanceId = UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    @PostConstruct
+    public void init() {
+        queue = new LinkedBlockingQueue<>(queueCapacity);
+        running = true;
+        writerThread = new Thread(this::writerLoop, "influx-batch-writer-" + instanceId);
+        writerThread.setDaemon(false);
+        writerThread.start();
+        log.info("Started InfluxDB batch writer [{}]: batch={}, flush={}ms, queue={}", 
+                 instanceId, batchSize, flushIntervalMs, queueCapacity);
+    }
+
+    @PreDestroy
+    public void destroy() {
+        log.info("[{}] Shutting down InfluxDB writer. Queue remaining: {}", 
+                 instanceId, queue != null ? queue.size() : 0);
+        running = false;
+        if (writerThread != null) {
+            writerThread.interrupt();
+            try {
+                writerThread.join(5000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        log.info("[{}] InfluxDB writer stopped. Final count - Enqueued: {}, Written: {}", instanceId, totalEnqueued, totalWritten);
+    }
+
+    private void writerLoop() {
+        List<String> batch = new ArrayList<>(batchSize);
+
+        while (running) {
+            try {
+                queue.drainTo(batch, batchSize);
+                if (batch.isEmpty()) {
+                    String first = queue.poll(flushIntervalMs, TimeUnit.MILLISECONDS);
+                    if (first != null) {
+                        batch.add(first);
+                        queue.drainTo(batch, batchSize - 1);
+                    }
+                }                
+                
+                if (!batch.isEmpty()) {
+                    influxDBRepository.writeBatch(batch);
+                    log.info("Wrote number of {} records", batch.size());
+                    batch.clear();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                log.error("Batch write error: {}", e.getMessage(), e);
+                batch.clear();
+            }
+        }
+
+        // Flush remaining on shutdown
+        if (!queue.isEmpty()) {
+            List<String> remaining = new ArrayList<>();
+            queue.drainTo(remaining);
+            if (!remaining.isEmpty()) {
+                try {
+                    influxDBRepository.writeBatch(remaining);
+                    log.info("Flushed {} remaining records on shutdown", remaining.size());
+                } catch (Exception e) {
+                    log.warn("Failed to flush remaining writes: {}", e.getMessage());
+                }
+            }
+        }
     }
 
     public void depositData(String json) {
         try {
-            long startTimeMs = Instant.now().toEpochMilli();
-            long buildLineStartTimeMs = Instant.now().toEpochMilli();
             String line = influxLineBuilder.buildLine(json);
-            long buildLineEndTimeMs = Instant.now().toEpochMilli();
-            long buildLineLatencyMs = (buildLineEndTimeMs - buildLineStartTimeMs);
-            log.info("Built Influx line: {}", line);
-            long saveStartTimeMs = Instant.now().toEpochMilli();
-            boolean ok = influxDBRepository.writeLine(line);
-            if (!ok) {
-                log.error("Influx write failed.");
+            log.debug("Built Influx line: {} (bytes: {})", line, line.getBytes().length);
+            
+            if (queue != null) {
+                boolean enqueued = queue.offer(line);
+                if (!enqueued) {
+                    log.warn("Influx writer queue full; dropping write. Queue size: {}", queue.size());
+                }
+            } else {
+                log.error("Queue not initialized");
             }
-            long saveEndTimeMs = Instant.now().toEpochMilli();
-            long depositLatencyMs = (saveEndTimeMs - saveStartTimeMs);
-            long endTimeMs = Instant.now().toEpochMilli();
-            long overallLatencyMs = (endTimeMs - startTimeMs);
-            String threadName = Thread.currentThread().getName();
-            CSV.info("{}", String.format("%d,%d,%d,%d,%s", buildLineLatencyMs, depositLatencyMs, overallLatencyMs, endTimeMs, threadName));
         } catch (Exception e) {
             log.error("Failed to build Influx line: {}", e.getMessage());
             throw new RuntimeException("Failed to build Influx line", e);
