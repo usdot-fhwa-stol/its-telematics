@@ -314,9 +314,9 @@ jobs:
           web_app_server.sonar.tests=tests
           web_app_server.sonar.exclusions=tests/**
           EOF
+          cp /tmp/sonar-scanner.properties $GITHUB_WORKSPACE/sonar-project.properties
       - name: Run SonarScanner
         uses: usdot-fhwa-stol/actions/sonar-scanner@main
         with:
-          sonar-properties-path: /tmp/sonar-scanner.properties
           sonar-token: ${{ secrets.SONAR_TOKEN }}
           working-dir: $GITHUB_WORKSPACE
