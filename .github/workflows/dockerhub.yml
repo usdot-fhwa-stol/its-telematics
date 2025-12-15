@@ -6,6 +6,7 @@ on:
       - "develop"
       - "master"
       - "release/*"
+      - "TELE-664-implement-rsu-management-service"
     tags:
       - "carma-system-*"
 
