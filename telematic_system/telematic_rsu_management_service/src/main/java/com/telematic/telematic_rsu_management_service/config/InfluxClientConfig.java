@@ -49,19 +49,4 @@ public class InfluxClientConfig {
     public WebClient influxWebClient() {
        return WebClient.create(host);
     }
-
-    @Bean
-    @Qualifier("influxWriterExecutor")
-    public TaskExecutor influxWriterExecutor() {
-        ThreadPoolTaskExecutor exec = new ThreadPoolTaskExecutor();
-        exec.setCorePoolSize(1);
-        exec.setMaxPoolSize(1);
-        exec.setQueueCapacity(0);
-        exec.setThreadNamePrefix("influx-writer-");
-        exec.setWaitForTasksToCompleteOnShutdown(true);
-        exec.setAwaitTerminationSeconds(10);
-        exec.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        exec.initialize();
-        return exec;
-    }
 }
