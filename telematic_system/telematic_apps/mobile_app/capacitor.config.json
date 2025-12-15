@@ -1,0 +1,5 @@
+{
+  "appId": "com.telematic_app",
+  "appName": "telematic_mobile_app",
+  "webDir": "../web_app/client/build"
+}

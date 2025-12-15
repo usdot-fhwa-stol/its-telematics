@@ -1,0 +1,5 @@
+# Dependency directories
+node_modules/
+
+# yarn v2
+package-lock.json
