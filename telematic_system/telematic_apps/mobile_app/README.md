@@ -56,33 +56,6 @@ cd telematic_apps/mobile_app
 npm install
 ```
 
-### 3. Configure Environment
-
-Create a `.env` file in the root directory or update `src/env.js`:
-```javascript
-// src/env.js
-export const BASE_URL = 'http://your-backend-url:8080/telematic';
-export const WS_URL = 'ws://your-backend-url:8080';
-```
-
-Or create `.env` file:
-```env
-REACT_APP_API_URL=http://your-backend-url:8080/telematic
-REACT_APP_WS_URL=ws://your-backend-url:8080
-```
-
-### 4. Verify Setup
-
-Test that the web version works before building for mobile:
-```bash
-npm start
-```
-
-Open http://localhost:3000 and verify:
-- Login page loads
-- Can authenticate
-- Can navigate between pages
-
 ## Building for Android
 
 ### 1. Build the React Application
