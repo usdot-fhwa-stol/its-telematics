@@ -281,7 +281,6 @@ jobs:
           sonar.javascript.lcov.reportPaths=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/coverage/lcov.info
           sonar.modules=cloud_nats_bridge,ros2_nats_bridge,streets_nats_bridge,telematic_rsu_management_service,web_app_client,web_app_server,rosbag2_processing_service
           sonar.organization=usdot-fhwa-stol
-          sonar.projectBaseDir=$GITHUB_WORKSPACE
           sonar.projectKey=usdot-fhwa-stol_cda-telematics
           sonar.projectName=cda-telematics
           sonar.scm.exclusions.disabled=true
@@ -319,4 +318,3 @@ jobs:
         uses: usdot-fhwa-stol/actions/sonar-scanner@main
         with:
           sonar-token: ${{ secrets.SONAR_TOKEN }}
-          working-dir: $GITHUB_WORKSPACE
