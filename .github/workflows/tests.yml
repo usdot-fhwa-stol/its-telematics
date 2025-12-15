@@ -70,7 +70,7 @@ jobs:
   telematic_cloud_messaging_coverage:
     runs-on: ubuntu-latest
     container:
-      image: openjdk:17-jdk-slim-buster
+      image: maven:3.9-eclipse-temurin-17-alpine
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}
@@ -90,7 +90,7 @@ jobs:
   telematic_rsu_management_service_coverage:
     runs-on: ubuntu-latest
     container:
-      image: openjdk:17-jdk-slim-buster
+      image: maven:3.9-eclipse-temurin-17-alpine
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}
