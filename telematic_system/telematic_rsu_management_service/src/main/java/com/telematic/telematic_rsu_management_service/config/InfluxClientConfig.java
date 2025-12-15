@@ -30,13 +30,13 @@ import com.influxdb.v3.client.InfluxDBClient;
 @Configuration
 public class InfluxClientConfig {
     
-    @Value("${influx.url:http://localhost:8181}")
+    @Value("${rsu_influx.url:http://localhost:8181}")
     private String host;
 
-    @Value("${influx.database:rsu_data}")
+    @Value("${rsu_influx.database:rsu_data}")
     private String database;
 
-    @Value("${influx.token:}")
+    @Value("${rsu_influx.token:}")
     private String token;
 
     @Bean

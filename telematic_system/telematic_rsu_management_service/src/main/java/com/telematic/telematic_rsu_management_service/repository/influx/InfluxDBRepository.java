@@ -40,13 +40,13 @@ public class InfluxDBRepository {
     private InfluxDBClient client;
     private WebClient influxWebClient;
 
-    @Value("${influx.endpoints.configure-database:/api/v3/configure/database?format=json}")
+    @Value("${rsu_influx.endpoints.configure-database:/api/v3/configure/database?format=json}")
     private String configureDatabaseEndpoint;
 
-    @Value("${influx.database:rsu_data}")
+    @Value("${rsu_influx.database:rsu_data}")
     private String database;
 
-    @Value("${influx.token:}")
+    @Value("${rsu_influx.token:}")
     private String token;
 
     public InfluxDBRepository(InfluxDBClient client, @Qualifier("influxWebClient") WebClient influxWebClient) {

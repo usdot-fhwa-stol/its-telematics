@@ -1,3 +1,6 @@
+server:
+  port: ${rsu_server_port:8082}
+
 logging:
   config: classpath:log4j2-spring.xml
   level:
@@ -6,15 +9,15 @@ logging:
     
 spring:
   datasource:
-    url: ${spring_datasource_url:jdbc:mysql://localhost:3306/rsm?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true}
-    username: ${spring_datasource_username:app}
-    password: ${spring_datasource_password:app}
-    driver-class-name: ${spring_datasource_driver:com.mysql.cj.jdbc.Driver}
+    url: ${rsu_spring_datasource_url:jdbc:mysql://localhost:3306/rsm?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${rsu_spring_datasource_username:telematic}
+    password: ${rsu_spring_datasource_password:telematic}
+    driver-class-name: ${rsu_spring_datasource_driver:com.mysql.cj.jdbc.Driver}
   jpa:
     hibernate:
       ddl-auto: update
     properties:
-      hibernate.dialect: ${spring_jpa_hibernate_dialect:org.hibernate.dialect.MySQLDialect}
+      hibernate.dialect: ${rsu_spring_jpa_hibernate_dialect:org.hibernate.dialect.MySQLDialect}
 
 messaging:
   nats:
@@ -58,7 +61,7 @@ data:
       initial-delay-ms: ${rsu_data_ingestion_refresh_initial_delay_ms:30000}
       interval-ms: ${rsu_data_ingestion_refresh_interval_ms:30000}
       
-influx:
+rsu_influx:
   url: ${rsu_data_ingestion_influx_url:http://localhost:8181}
   token: ${rsu_data_ingestion_influx_token:apiv3_YOUR_ADMIN_TOKEN_VALUE}
   database: ${rsu_data_ingestion_influx_database:rsu_data_dev}

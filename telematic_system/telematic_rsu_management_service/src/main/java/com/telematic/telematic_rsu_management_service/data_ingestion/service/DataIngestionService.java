@@ -46,10 +46,10 @@ public class DataIngestionService {
     @Value("${data.ingestion.subject-prefix:unit.*.stream.rsu.*}")
     private String dataIngestionSubjectPrefix;
 
-    @Value("${influx.token:}")
+    @Value("${rsu_influx.token:}")
     private String adminToken;
 
-    @Value("${influx.database:}")
+    @Value("${rsu_influx.database:}")
     private String databaseName;
 
     private final Set<String> activePrefixes = new HashSet<>();

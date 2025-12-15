@@ -39,13 +39,13 @@ public class DataIngestionDepositor {
     private final InfluxDBRepository influxDBRepository;
     private final InfluxLineBuilder influxLineBuilder;
 
-    @Value("${influx.write.batch-size:1000}")
+    @Value("${rsu_influx.write.batch-size:1000}")
     private int batchSize;
 
-    @Value("${influx.write.flush-interval-ms:10}")
+    @Value("${rsu_influx.write.flush-interval-ms:10}")
     private long flushIntervalMs;
 
-    @Value("${influx.write.queue-capacity:50000}")
+    @Value("${rsu_influx.write.queue-capacity:50000}")
     private int queueCapacity;
 
     private LinkedBlockingQueue<String> queue;
