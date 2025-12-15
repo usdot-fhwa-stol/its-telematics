@@ -1,70 +1,112 @@
-# Getting Started with Create React App
+# CAV Telematics Mobile Application
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A cross-platform mobile application for Connected and Automated Vehicle (CAV) telematics management, built with React and Ionic Capacitor.
 
-## Available Scripts
+## Overview
 
-In the project directory, you can run:
+The CAV Telematics Mobile Application provides mobile access to the telematics system, allowing users to manage events, monitor topics, view dashboards, and administer users on Android devices.
 
-### `npm start`
+## Features
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- **User Authentication & Authorization** - Secure login with JWT token-based authentication
+- **Event Management** - Create, view, edit, and delete testing events
+- **Topic Management** - Monitor and manage vehicle and infrastructure topics
+- **Grafana Dashboards** - View real-time telemetry and analytics dashboards
+- **User Administration** - Manage users and roles (admin only)
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Technology Stack
 
-### `npm test`
+### Frontend
+- **React 18.2.0** - UI framework
+- **Material-UI v5** - Component library
+- **React Router v6** - Navigation
+- **Axios** - HTTP client for API calls
+- **React Hook Form** - Form management
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Mobile
+- **Ionic Capacitor** - Native mobile runtime
+- **Android SDK** - Android platform support
 
-### `npm run build`
+### Backend
+- **Node.js/Express** - REST API server
+- **MySQL** - Database
+- **JWT** - Authentication tokens
+- **AWS S3** - File storage
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Prerequisites
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Before you begin, ensure you have the following installed:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- **Node.js** 16.x or higher ([Download](https://nodejs.org/))
+- **npm** 8.x or higher (comes with Node.js)
+- **Android Studio** ([Download](https://developer.android.com/studio))
+- **Java JDK** 17 or higher ([Download](https://www.oracle.com/java/technologies/downloads/))
+- **Git** (for version control)
 
-### `npm run eject`
+## Installation
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### 1. Clone the Repository
+```bash
+git clone 
+cd telematic_apps/mobile_app
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### 2. Install Dependencies
+```bash
+npm install
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### 3. Configure Environment
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Create a `.env` file in the root directory or update `src/env.js`:
+```javascript
+// src/env.js
+export const BASE_URL = 'http://your-backend-url:8080/telematic';
+export const WS_URL = 'ws://your-backend-url:8080';
+```
 
-## Learn More
+Or create `.env` file:
+```env
+REACT_APP_API_URL=http://your-backend-url:8080/telematic
+REACT_APP_WS_URL=ws://your-backend-url:8080
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### 4. Verify Setup
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Test that the web version works before building for mobile:
+```bash
+npm start
+```
 
-### Code Splitting
+Open http://localhost:3000 and verify:
+- Login page loads
+- Can authenticate
+- Can navigate between pages
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Building for Android
 
-### Analyzing the Bundle Size
+### 1. Build the React Application
+```bash
+npm run build
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+This creates an optimized production build in the `build/` directory.
 
-### Making a Progressive Web App
+### 2. Sync with Capacitor
+```bash
+npx cap sync android
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+This copies your React build to the Android project and updates native dependencies.
 
-### Advanced Configuration
+### 3. Open in Android Studio
+```bash
+npx cap open android
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### 4. Run on Device/Emulator
 
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+In Android Studio:
+1. Connect an Android device (with USB debugging enabled) OR start an emulator
+2. Select your device from the dropdown
+3. Click the green **Run** button (▶️)
