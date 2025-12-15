@@ -1,0 +1,23 @@
+{
+  "name": "telematic_rsu_management_service",
+  "dockerComposeFile": [
+    "docker-compose.yml"
+  ],
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "postCreateCommand": "git config --global --add safe.directory /workspace && (command -v pip3 >/dev/null 2>&1 || (apt-get update -y && apt-get install -y python3-pip)) && python3 -m pip install -r scripts/requirements.txt || true",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "redhat.vscode-yaml"
+      ]
+    }
+  },
+  "remoteEnv": {
+    "SPRING_PROFILES_ACTIVE": "dev",
+    "MESSAGING_NATS_ENABLED": "true",
+    "MESSAGING_NATS_URI": "nats://localhost:4222"
+  }
+}
