@@ -193,8 +193,8 @@ jobs:
           path: src/cda-telematics/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/coverage.xml
           if-no-files-found: error
   sonar:
-    # Remove cloud bridge and vehicle bridge coverage temporarily as test build failed
-    needs: [telematic_cloud_messaging_coverage, telematic_rsu_management_service_coverage, web_app_client_coverage, web_app_server_coverage, rosbag2_processing_service_coverage]
+    # Remove cloud bridge and vehicle bridge, telematic_cloud_messaging_coverage coverage temporarily as test build failed
+    needs: [telematic_rsu_management_service_coverage, web_app_client_coverage, web_app_server_coverage, rosbag2_processing_service_coverage]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ${{ github.event.repository.name }}
