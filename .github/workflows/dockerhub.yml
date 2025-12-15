@@ -59,6 +59,29 @@ jobs:
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
+    
+  dockerhub-telematic-rsu-management-service:
+    needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./telematic_system/telematic_rsu_management_service/
+          push: true
+          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_rsu_management_service:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          build-args: |
+            BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
+            VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}          
 
   dockerhub-carma-streets-bridge:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]

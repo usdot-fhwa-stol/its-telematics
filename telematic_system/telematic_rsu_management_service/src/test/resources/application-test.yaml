@@ -17,7 +17,7 @@ messaging:
     enabled: false
     uri: nats://localhost:4222
 
-influx:
+rsu_influx:
   url: http://localhost:8181
   token: test-token
   database: test_db
