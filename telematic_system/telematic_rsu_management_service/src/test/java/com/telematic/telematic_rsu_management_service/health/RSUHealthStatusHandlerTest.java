@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package com.telematic.health;
+package com.telematic.telematic_rsu_management_service.health;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;

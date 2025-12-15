@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package com.telematic.messaging;
+package com.telematic.telematic_rsu_management_service.messaging;
 
 import static org.junit.jupiter.api.Assertions.*;
 
