@@ -1,6 +1,6 @@
 # CAV Telematics Mobile Application
 
-A cross-platform mobile application for Connected and Automated Vehicle (CAV) telematics management, built with React and Ionic Capacitor.
+An Android mobile application for Connected and Automated Vehicle (CAV) telematics management, built with React and Ionic Capacitor.
 
 ## Overview
 
