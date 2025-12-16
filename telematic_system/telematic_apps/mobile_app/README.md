@@ -4,7 +4,7 @@ An Android mobile application for Connected and Automated Vehicle (CAV) telemati
 
 ## Overview
 
-The CAV Telematics Mobile Application provides mobile access to the telematics system, allowing users to manage events, monitor topics, view dashboards, and administer users on Android devices.
+The CAV Telematics Mobile Application provides mobile access to the telematics system, allowing users to manage events and topics, and view dashboards on Android devices.
 
 ## Features
 
@@ -12,7 +12,6 @@ The CAV Telematics Mobile Application provides mobile access to the telematics s
 - **Event Management** - Create, view, edit, and delete testing events
 - **Topic Management** - Monitor and manage vehicle and infrastructure topics
 - **Grafana Dashboards** - View real-time telemetry and analytics dashboards
-- **User Administration** - Manage users and roles (admin only)
 
 ## Technology Stack
 
@@ -25,7 +24,7 @@ The CAV Telematics Mobile Application provides mobile access to the telematics s
 
 ### Mobile
 - **Ionic Capacitor** - Native mobile runtime
-- **Android SDK** - Android platform support
+- **Android SDK** - Android platform support 
 
 ### Backend
 - **Node.js/Express** - REST API server
@@ -37,13 +36,13 @@ The CAV Telematics Mobile Application provides mobile access to the telematics s
 
 Before you begin, ensure you have the following installed:
 
-- **Node.js** 16.x or higher ([Download](https://nodejs.org/))
+- **Node.js** 22.x or higher ([Download](https://nodejs.org/))
 - **npm** 8.x or higher (comes with Node.js)
 - **Android Studio** ([Download](https://developer.android.com/studio))
 - **Java JDK** 17 or higher ([Download](https://www.oracle.com/java/technologies/downloads/))
 - **Git** (for version control)
 
-## Installation
+## Development Setup
 
 ### 1. Clone the Repository
 ```bash
