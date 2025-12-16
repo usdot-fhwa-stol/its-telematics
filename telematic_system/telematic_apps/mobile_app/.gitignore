@@ -1,6 +1,4 @@
 # Dependency directories
 node_modules/
-.idea
-
 # yarn v2
 package-lock.json
