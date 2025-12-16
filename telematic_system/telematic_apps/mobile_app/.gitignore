@@ -1,5 +1,6 @@
 # Dependency directories
 node_modules/
+android/.idea
 
 # yarn v2
 package-lock.json
