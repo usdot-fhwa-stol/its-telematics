@@ -64,7 +64,7 @@ public class DataIngestionDepositor {
         queue = new LinkedBlockingQueue<>(queueCapacity);
         running = true;
         writerThread = new Thread(this::writerLoop, "influx-batch-writer-" + instanceId);
-        writerThread.setDaemon(false);
+        writerThread.setDaemon(true);
         writerThread.start();
         log.info("Started InfluxDB batch writer [{}]: batch={}, flush={}ms, queue={}", 
                  instanceId, batchSize, flushIntervalMs, queueCapacity);
@@ -72,6 +72,10 @@ public class DataIngestionDepositor {
 
     @PreDestroy
     public void destroy() {
+        shutdown();
+    }
+
+    public void shutdown() {
         log.info("[{}] Shutting down InfluxDB writer. Queue remaining: {}", 
                  instanceId, queue != null ? queue.size() : 0);
         running = false;

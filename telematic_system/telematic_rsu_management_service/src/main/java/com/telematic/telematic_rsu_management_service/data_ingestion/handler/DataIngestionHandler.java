@@ -29,7 +29,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class DataIngestionHandler implements MessageHandler {
     private DataIngestionDepositor dataIngestionDepositor;
-    private volatile long messageCount = 0;
 
     public DataIngestionHandler(DataIngestionDepositor dataIngestionDepositor) {
         this.dataIngestionDepositor = dataIngestionDepositor;
@@ -37,11 +36,16 @@ public class DataIngestionHandler implements MessageHandler {
 
     @Override
     public byte[] onMessage(Message message) {
-        messageCount++;
         String json = new String(message.payload());
-        log.debug("Received message #{}: {}", messageCount, json);
+        log.debug("Received message: {}", json);
         dataIngestionDepositor.depositData(json);
         return null;
+    }
+    
+    public void cleanup() {
+        if (dataIngestionDepositor != null) {
+            dataIngestionDepositor.shutdown();
+        }
     }
     
 }

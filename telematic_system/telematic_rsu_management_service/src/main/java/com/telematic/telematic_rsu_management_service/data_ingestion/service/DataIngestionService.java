@@ -15,7 +15,11 @@
  */
 package com.telematic.telematic_rsu_management_service.data_ingestion.service;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -53,6 +57,7 @@ public class DataIngestionService {
     private String databaseName;
 
     private final Set<String> activePrefixes = new HashSet<>();
+    private final Map<String, List<DataIngestionHandler>> prefixHandlers = new HashMap<>();
 
     public DataIngestionService(NatsMessagingClient natsMessagingClient, ApplicationContext applicationContext, TRUConfigStatusRepository truConfigStatusRepository, InfluxDBRepository influxDBRepository) {
         this.natsMessagingClient = natsMessagingClient;
@@ -86,17 +91,33 @@ public class DataIngestionService {
                 log.info("Subscribing to ingestion prefix subject '{}' with queue '{}' ( workers={} )",
                         newPrefixSubject, queueGroup, workersPerUnitRsuPair);
                 
+                List<DataIngestionHandler> handlers = new ArrayList<>();
                 for (int i = 0; i < Math.max(1, workersPerUnitRsuPair); i++) {
+                    log.info("Create worker #{} for subject '{}'", i, newPrefixSubject);
                     DataIngestionHandler handler = applicationContext.getBean(DataIngestionHandler.class);
-                    natsMessagingClient.subscribeQueue(newPrefixSubject, queueGroup, handler, 1);
-                    log.info("Created worker #{} for subject '{}'", i, newPrefixSubject);
+                    natsMessagingClient.subscribeQueue(newPrefixSubject, queueGroup, handler, i);
+                    handlers.add(handler);
                 }                
+                prefixHandlers.put(newPrefixSubject, handlers);
                 activePrefixes.add(newPrefixSubject);
             }
             
             for(String oldPrefix : activePrefixes.stream()
                     .filter(prefix -> !getLatestSubjectPrefixes().contains(prefix)).toList()) {
                     log.info("Unsubscribing data ingestion for prefix subject '{}'", oldPrefix);
+                    
+                    // Clean up handlers before unsubscribing
+                    List<DataIngestionHandler> handlers = prefixHandlers.remove(oldPrefix);
+                    if (handlers != null) {
+                        for (DataIngestionHandler handler : handlers) {
+                            try {
+                                handler.cleanup();
+                            } catch (Exception e) {
+                                log.warn("Error cleaning up handler for prefix '{}': {}", oldPrefix, e.getMessage());
+                            }
+                        }
+                    }
+                    
                     natsMessagingClient.unsubscribeSubject(oldPrefix);
                     activePrefixes.remove(oldPrefix);
             }

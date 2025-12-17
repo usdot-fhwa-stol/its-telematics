@@ -85,14 +85,15 @@ public class NatsSubscriber implements Subscriber {
         return new NatsSubscription();
     }
 
-    public NatsSubscription subscribeQueueWorker(String subject, String queue, MessageHandler handler, int workerId) {
+    public NatsSubscription subscribeQueue(String subject, String queue, MessageHandler handler, int workerId) {
         if (connection == null) {
             return new NatsSubscription();
         }
-        ExecutorService subjectExecutor = perSubjectExecutors.computeIfAbsent(subject+"-" + queue + "-" + workerId, s ->
+        String workerKey = subject + "-" + queue + "-" + workerId;
+        ExecutorService subjectExecutor = perSubjectExecutors.computeIfAbsent(workerKey, s ->
         Executors.newSingleThreadExecutor(r -> {
                 Thread t = new Thread(r);
-                t.setName(subject+'-'+workerId);
+                t.setName(workerKey);
                 t.setDaemon(true);
                 return t;
             })
@@ -115,15 +116,6 @@ public class NatsSubscriber implements Subscriber {
         subscribedSubjects.add(subject);
         subjectDispatchers.computeIfAbsent(subject, s -> ConcurrentHashMap.newKeySet()).add(d);
         return new NatsSubscription();
-    }
-
-    public NatsSubscription subscribeQueue(String subject, String queue, MessageHandler handler, int workers) {
-        NatsSubscription last = new NatsSubscription();
-        for (int i = 0; i < Math.max(1, workers); i++) {
-            last = subscribeQueueWorker(subject, queue, handler, i);
-            log.debug("Created 'worker-{}' for subject '{}' with queue '{}'", i, subject, queue);
-        }
-        return last;
     }
 
     public Set<Dispatcher> getDispatchersForSubject(String subject) {
