@@ -82,13 +82,17 @@ public class DataIngestionService {
     
      public void enableDataInjestionSubscriptions() {
         try {
-            // Add unique instance ID to queue group to avoid message distribution across instances
+            // Add unique instance ID to queue group to avoid message distribution across services
             String instanceId = java.util.UUID.randomUUID().toString().substring(0, 8);
-            
+            /**
+             * Check the database for all TRU and RSU pairs and ensure subscriptions are active
+             * for each. If new pairs are found, add subscriptions. If pairs are removed,
+             * remove subscriptions.
+             */
             for (String newPrefixSubject : getLatestSubjectPrefixes().stream()
                     .filter(prefix -> !activePrefixes.contains(prefix)).toList()) {
                 String queueGroup = newPrefixSubject.replace('.', '_').replace('>', 'g') + "_queue_" + instanceId;
-                log.info("Subscribing to ingestion prefix subject '{}' with queue '{}' ( workers={} )",
+                log.info("Subscribing to ingestion prefix subject '{}' with queue '{}' ( workers={})",
                         newPrefixSubject, queueGroup, workersPerUnitRsuPair);
                 
                 List<DataIngestionHandler> handlers = new ArrayList<>();

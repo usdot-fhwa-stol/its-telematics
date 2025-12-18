@@ -23,7 +23,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 
 @Configuration
-public class ExecutorConfigConfig {
+public class ExecutorConfig {
 
     @Bean
     @Primary
