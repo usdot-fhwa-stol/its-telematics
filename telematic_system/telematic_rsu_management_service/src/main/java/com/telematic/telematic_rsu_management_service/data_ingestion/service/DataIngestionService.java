@@ -82,7 +82,10 @@ public class DataIngestionService {
     
      public void enableDataInjestionSubscriptions() {
         try {
-            // Add unique instance ID to queue group to avoid message distribution across services
+            /* 
+            ** Add unique instance ID to queue group to ensure multiple instances can run in parallel and each get a share of the messages. 
+            ** The instance is identified by a random UUID.
+             */
             String instanceId = java.util.UUID.randomUUID().toString().substring(0, 8);
             /**
              * Check the database for all TRU and RSU pairs and ensure subscriptions are active
