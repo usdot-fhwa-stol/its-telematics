@@ -1,0 +1,54 @@
+/*
+ * Copyright (C) 2025 LEIDOS.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
+package com.telematic.telematic_rsu_management_service.messaging.nats;
+
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
+
+import com.telematic.telematic_rsu_management_service.messaging.Message;
+import com.telematic.telematic_rsu_management_service.messaging.Requester;
+
+import io.nats.client.Connection;
+
+@Component
+@ConditionalOnProperty(prefix = "messaging.nats", name = "enabled", havingValue = "true", matchIfMissing = false)
+public class NatsRequester implements Requester {
+    private final Connection connection;
+
+    public NatsRequester(Connection connection) {
+        this.connection = connection;
+    }
+
+    @Override
+    public Message request(String subject, byte[] payload, java.time.Duration timeout) {
+        if (connection == null) {
+            return null;
+        }
+        try{
+            CompletableFuture<io.nats.client.Message> future = connection.requestWithTimeout(subject, payload, timeout);
+            return new Message(subject, future.get(timeout.toSeconds(), TimeUnit.SECONDS).getData(), null);
+        }catch(ExecutionException | InterruptedException | CancellationException | TimeoutException e){
+            throw new RuntimeException("Failed to get response from NATS request", e);
+        }       
+    }
+    
+}

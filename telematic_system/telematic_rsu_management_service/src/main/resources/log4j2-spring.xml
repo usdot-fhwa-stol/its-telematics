@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+  <Appenders>
+    <Console name="Console" target="SYSTEM_OUT">
+      <PatternLayout withAnsi="true" pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight{%-5level} [%t] %c{1.} - %m%n"/>
+    </Console>
+    
+    <RollingFile name="AppLogFile" fileName="/workspace/logs/application.log" 
+                 filePattern="/workspace/logs/application-%d{yyyy-MM-dd}.log.gz">
+      <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%t] %c{1.} - %m%n"/>
+      <Policies>
+        <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+        <SizeBasedTriggeringPolicy size="50 MB"/>
+      </Policies>
+      <DefaultRolloverStrategy max="30"/>
+    </RollingFile>
+    
+  </Appenders>
+
+  <Loggers>
+    <!-- Application package logging -->
+    <Logger name="com.telematic.telematic_rsu_management_service" level="INFO" additivity="false">
+      <AppenderRef ref="Console"/>
+      <AppenderRef ref="AppLogFile"/>
+    </Logger>
+
+    <!-- Spring framework noise reduction -->
+    <Logger name="org.springframework" level="INFO"/>
+
+    <!-- Hibernate SQL + params (enable when debugging) -->
+    <!-- <Logger name="org.hibernate.SQL" level="DEBUG"/> -->
+    <!-- <Logger name="org.hibernate.type.descriptor.sql" level="TRACE"/> -->
+
+    <Root level="INFO">
+      <AppenderRef ref="Console"/>
+      <AppenderRef ref="AppLogFile"/>
+    </Root>
+    
+  </Loggers>
+</Configuration>

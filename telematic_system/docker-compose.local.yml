@@ -17,6 +17,32 @@ services:
       - /opt/influxdb2/data:/var/lib/influxdb2 # data directory
       - /opt/influxdb2/:/etc/influxdb2 # config directory
 
+  influxdb3-core:
+    image: influxdb:3.7.0-core
+    container_name: influxdb3-core
+    user: "0:0"
+    ports:
+      - '8181:8181'
+    command:
+      - influxdb3
+      - serve
+      - --node-id=node0
+      - --object-store=file
+      - --data-dir=/var/lib/influxdb3/data
+      - --plugin-dir=/var/lib/influxdb3/plugins
+      - --admin-token-file=/run/secrets/admin.token
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "1"
+    secrets:
+      - source: influx_admin_token
+        target: /run/secrets/admin.token
+    volumes:
+      - influxdb3_data:/var/lib/influxdb3/data
+      - influxdb3_plugins:/var/lib/influxdb3/plugins
+
   mysqldb:
     image: mysql:5.7
     restart: always
@@ -37,6 +63,7 @@ services:
       - mysql_root_password
     volumes:
       - mysql-datavolume:/var/lib/mysql
+      - ./scripts/database/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
 
   nats:
     image: 'nats:2.7.3-alpine3.15'
@@ -150,6 +177,25 @@ services:
     env_file:
       - .env
 
+  rsu_management_service:
+    build:
+      context: "./telematic_rsu_management_service"
+    container_name: rsu_management_service
+    image: usdotfhwastoldev/telematic_rsu_management_service:develop
+    depends_on:
+      - nats
+      - mysqldb
+      - influxdb3-core
+    restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "1"
+    network_mode: host
+    command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:4222 && wait-for-it localhost:8181 && java -jar /rsu_management_service/app.jar'
+    env_file:
+      - .env
+
   rosbag2_processing_service:
     build:
           context: ./telematic_historical_data_processing
@@ -175,10 +221,15 @@ services:
       - .env
     command: bash -c 'source /ws/install/setup.bash && wait-for-it 127.0.0.1:3307 -- ros2 run rosbag2_processing_service main'
 
+
 secrets:
   mysql_password:
       file: ./secrets/mysql_password.txt
   mysql_root_password:
       file: ./secrets/mysql_root_password.txt
+  influx_admin_token:
+      file: ./secrets/influx_admin_token.txt
 volumes:
   mysql-datavolume:
+  influxdb3_data:
+  influxdb3_plugins:
