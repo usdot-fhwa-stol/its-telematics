@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
  * Copyright (C) 2026 LEIDOS.
  *
@@ -13,6 +14,8 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
+=======
+>>>>>>> 0cbe6a1 (registration api)
 import { RegistrationRepository } from "./ports/registration.repository";
 
 export class UpdateRSUConfig {
