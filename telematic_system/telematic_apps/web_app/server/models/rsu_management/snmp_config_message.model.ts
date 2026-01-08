@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+
+// SNMP Config Message definition
+>>>>>>> 0cbe6a1 (registration api)
 export class SnmpConfigMessage {
     privacyProtocol?: string;
     securityLevel?: string;

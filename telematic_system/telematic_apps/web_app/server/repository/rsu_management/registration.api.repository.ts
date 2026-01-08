@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
  * Copyright (C) 2026 LEIDOS.
  *
@@ -13,6 +14,8 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
+=======
+>>>>>>> 0cbe6a1 (registration api)
 import axios from 'axios';
 import { RegistrationRepository } from '../../application/rsu_management/ports/registration.repository';
 import { RSUConfigStatus } from '../../models/rsu_management/rsu_config_status.model';
@@ -39,7 +42,12 @@ export class RegistrationApiRepository implements RegistrationRepository {
             console.log(`RSU registration successful: ${JSON.stringify(response.data)}`);
             return response.data;
         } catch (error: any) {
+<<<<<<< HEAD
             this.handleAxiosError('Failed to register RSU', error);
+=======
+            console.error(`Failed to register RSU: ${error.message}`, error);
+            throw new Error(`Failed to register RSU: ${error.message}`);
+>>>>>>> 0cbe6a1 (registration api)
         }
     }
 
@@ -56,6 +64,7 @@ export class RegistrationApiRepository implements RegistrationRepository {
             
             return truConfigStatuses;
         } catch (error: any) {
+<<<<<<< HEAD
             this.handleAxiosError('Failed to get all TRU configs', error);
         }
     }
@@ -86,6 +95,13 @@ export class RegistrationApiRepository implements RegistrationRepository {
         throw new Error(message);
     }
 
+=======
+            console.error(`Failed to get all TRU configs: ${error.message}`, error);
+            throw new Error(`Failed to get all TRU configs: ${error.message}`);
+        }
+    }
+
+>>>>>>> 0cbe6a1 (registration api)
     private mapToTruConfigStatuses(data: any[]): TruConfigStatus[] {
         if (!Array.isArray(data)) {
             console.warn('Response data is not an array, returning empty array');
@@ -93,6 +109,7 @@ export class RegistrationApiRepository implements RegistrationRepository {
         }
 
         return data.map((item: any) => {
+<<<<<<< HEAD
             // Map Unit Config (camelCase from Java)
             const unitJson = item.unitConfig || {};
             const unitConfig = unitJson
@@ -137,12 +154,56 @@ export class RegistrationApiRepository implements RegistrationRepository {
                       pluginJson.timestamp
                   )
                 : ({} as UnitPluginStatus);
+=======
+            // Map Unit Config
+            const unitConfig = item.unitConfig ? new UnitConfig(
+                item.unitConfig.unitId,
+                item.unitConfig.name,
+                item.unitConfig.maxConnections,
+                item.unitConfig.pluginHeartbeatInterval,
+                item.unitConfig.healthMonitorPluginHeartbeatInterval,
+                item.unitConfig.rsuStatusMonitorInterval,
+                item.unitConfig.timestamp
+            ) : {} as UnitConfig;
+
+            // Map RSU Configs
+            const rsuConfigs: RSUConfigStatus[] = Array.isArray(item.rsuConfigs) 
+                ? item.rsuConfigs.map((rsuConfig: any) => {
+                    const rsuEndpoint = rsuConfig.rsu ? new RSUEndpoint(
+                        rsuConfig.rsu.ip,
+                        rsuConfig.rsu.port,
+                        rsuConfig.rsu.timestamp
+                    ) : {} as RSUEndpoint;
+
+                    return new RSUConfigStatus(
+                        rsuConfig.event,
+                        rsuEndpoint,
+                        rsuConfig.status,
+                        rsuConfig.timestamp,
+                        rsuConfig.id
+                    );
+                })
+                : [];
+
+            // Map Plugin Config Status
+            const pluginConfigStatus = item.pluginConfigStatus ? new UnitPluginStatus(
+                item.pluginConfigStatus.bridgePluginStatus,
+                item.pluginConfigStatus.lastCommunicationTimestamp,
+                item.pluginConfigStatus.timestamp,
+                item.pluginConfigStatus.id
+            ) : {} as UnitPluginStatus;
+>>>>>>> 0cbe6a1 (registration api)
 
             return new TruConfigStatus(
                 unitConfig,
                 rsuConfigs,
                 item.timestamp,
+<<<<<<< HEAD
                 pluginConfigStatus
+=======
+                pluginConfigStatus,
+                item.id
+>>>>>>> 0cbe6a1 (registration api)
             );
         });
     }
