@@ -1,11 +1,13 @@
 {
   "name": "server",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
-    "start": "nodemon ./bin/www",
+    "start": "nodemon --exec ts-node ./bin/www",
+    "build": "tsc",
+    "dev": "nodemon --exec ts-node ./bin/www",
     "test": "cross-env NODE_ENV=test DOTENV_CONFIG_PATH=server.test.env jest --setupFiles=dotenv/config --testTimeout=60000 --coverage --verbose --detectOpenHandles  --forceExit",
-    "file-upload-server": "nodemon ./file_upload_server.js"
+    "file-upload-server": "nodemon --exec ts-node ./file_upload_server.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.485.0",
@@ -42,7 +44,14 @@
   "main": "app.js",
   "keywords": [],
   "devDependencies": {
-    "nodemon": "^2.0.21"
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.17",
+    "@types/supertest": "^6.0.2",
+    "nodemon": "^2.0.21",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   },
   "jest": {
     "testEnvironment": "node",
