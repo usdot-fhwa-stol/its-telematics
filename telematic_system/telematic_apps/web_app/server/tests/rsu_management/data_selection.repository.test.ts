@@ -101,6 +101,23 @@ describe('DataSelectionApiRepository', () => {
     );
   });
 
+  test('confirmDataSelection throws with backend error only', async () => {
+    const request = new TRUTopicsMessage('Unit001', [], Date.now());
+
+    (axios.post as jest.Mock).mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: {
+          error: 'Invalid selection',
+        },
+      },
+    });
+
+    await expect(repo.confirmDataSelection(request)).rejects.toThrow(
+      'Failed to confirm data selection (400): Invalid selection'
+    );
+  });
+
   test('getAvailableTopics handles null response data by returning empty TRUTopicsMessage', async () => {
     const request = new TRUTopicsMessage('Unit001', [], Date.now());
 
@@ -110,6 +127,24 @@ describe('DataSelectionApiRepository', () => {
 
     expect(result).toBeInstanceOf(TRUTopicsMessage);
     expect(result.unitId).toBe('');
+    expect(result.rsuTopics).toEqual([]);
+  });
+
+  test('getAvailableTopics handles non-array rsuTopics by returning empty list', async () => {
+    const request = new TRUTopicsMessage('Unit001', [], Date.now());
+
+    const responsePayload = {
+      unitId: 'UnitXYZ',
+      rsuTopics: 'not-an-array',
+      timestamp: 123,
+    };
+
+    (axios.get as jest.Mock).mockResolvedValueOnce({ data: responsePayload });
+
+    const result = await repo.getAvailableTopics(request);
+
+    expect(result).toBeInstanceOf(TRUTopicsMessage);
+    expect(result.unitId).toBe('UnitXYZ');
     expect(result.rsuTopics).toEqual([]);
   });
 
@@ -142,5 +177,42 @@ describe('DataSelectionApiRepository', () => {
     expect(result.rsuTopics[0].rsu.port).toBe(601);
     expect(result.rsuTopics[0].topics[0].name).toBe('mapme');
     expect(result.rsuTopics[0].topics[0].selected).toBe(false);
+  });
+
+  test('getAvailableTopics maps topic list when RSU endpoint is missing', async () => {
+    const request = new TRUTopicsMessage('Unit001', [], Date.now());
+
+    const responsePayload = {
+      unitId: 'Unit001',
+      rsuTopics: [
+        {
+          rsu: null,
+          topics: [
+            { name: 'bsm', selected: true },
+          ],
+        },
+      ],
+      timestamp: 999,
+    };
+
+    (axios.get as jest.Mock).mockResolvedValueOnce({ data: responsePayload });
+
+    const result = await repo.getAvailableTopics(request);
+
+    expect(result.rsuTopics).toHaveLength(1);
+    expect(result.rsuTopics[0].topics).toHaveLength(1);
+    // rsu is created as an empty RSUEndpoint object when endpoint is missing
+    expect(result.rsuTopics[0].rsu).toBeDefined();
+  });
+
+  test('getAvailableTopics throws generic prefix-only error when no response or message', async () => {
+    const request = new TRUTopicsMessage('Unit001', [], Date.now());
+
+    // No response and no message property
+    (axios.get as jest.Mock).mockRejectedValueOnce({});
+
+    await expect(repo.getAvailableTopics(request)).rejects.toThrow(
+      'Failed to get available topics'
+    );
   });
 });

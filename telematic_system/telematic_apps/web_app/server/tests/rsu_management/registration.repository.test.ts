@@ -167,4 +167,56 @@ describe('RegistrationApiRepository', () => {
       'Failed to register RSU: Network down'
     );
   });
+
+  test('registerRsu throws with backend details only', async () => {
+    const payload = { unitConfig: { unitId: 'Unit001' }, rsuConfigs: [] };
+
+    (axios.post as jest.Mock).mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: {
+          details: 'Invalid configuration',
+        },
+      },
+    });
+
+    await expect(repo.registerRsu(payload)).rejects.toThrow(
+      'Failed to register RSU (400): Invalid configuration'
+    );
+  });
+
+  test('getAllTruConfig handles non-array rsuConfigs by returning empty rsu list', async () => {
+    const responsePayload = [
+      {
+        id: 99,
+        unitConfig: {
+          unitId: 'UnitNonArray',
+          name: 'Test',
+          maxConnections: 1,
+          pluginHeartbeatInterval: 1,
+          healthMonitorPluginHeartbeatInterval: 1,
+          rsuStatusMonitorInterval: 1,
+          timestamp: 1,
+        },
+        rsuConfigs: {}, // truthy but not an array
+        pluginConfigStatus: {
+          bridgePluginStatus: 'UP',
+          lastCommunicationTimestamp: 123,
+          timestamp: 123,
+          id: 55,
+        },
+        timestamp: 123,
+      },
+    ];
+
+    (axios.get as jest.Mock).mockResolvedValueOnce({ data: responsePayload });
+
+    const result = await repo.getAllTruConfig();
+
+    expect(result).toHaveLength(1);
+    const status = result[0] as typeof TruConfigStatus.prototype;
+    expect(status.unitConfig.unitId).toBe('UnitNonArray');
+    expect(status.rsuConfigs).toHaveLength(0);
+    expect(status.pluginConfigStatus.bridgePluginStatus).toBe('UP');
+  });
 });
