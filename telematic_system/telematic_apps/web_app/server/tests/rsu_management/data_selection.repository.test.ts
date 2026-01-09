@@ -13,6 +13,44 @@ describe('DataSelectionApiRepository', () => {
     jest.clearAllMocks();
   });
 
+  test('uses RSU_MANAGEMENT_SERVICE_URL env var as default baseUrl', async () => {
+    const originalEnv = process.env.RSU_MANAGEMENT_SERVICE_URL;
+    process.env.RSU_MANAGEMENT_SERVICE_URL = 'http://env-based-url';
+
+    const envRepo: any = new DataSelectionApiRepository();
+    const request = new TRUTopicsMessage('UnitEnv', [], Date.now());
+
+    (axios.get as jest.Mock).mockResolvedValueOnce({ data: { unitId: 'UnitEnv', rsuTopics: [], timestamp: 1 } });
+
+    await envRepo.getAvailableTopics(request);
+
+    expect(axios.get).toHaveBeenCalledWith(
+      'http://env-based-url/api/data-selection/available-topics',
+      { data: request }
+    );
+
+    process.env.RSU_MANAGEMENT_SERVICE_URL = originalEnv;
+  });
+
+  test('falls back to localhost default when env var is not set', async () => {
+    const originalEnv = process.env.RSU_MANAGEMENT_SERVICE_URL;
+    delete process.env.RSU_MANAGEMENT_SERVICE_URL;
+
+    const defaultRepo: any = new DataSelectionApiRepository();
+    const request = new TRUTopicsMessage('UnitLocal', [], Date.now());
+
+    (axios.get as jest.Mock).mockResolvedValueOnce({ data: { unitId: 'UnitLocal', rsuTopics: [], timestamp: 1 } });
+
+    await defaultRepo.getAvailableTopics(request);
+
+    expect(axios.get).toHaveBeenCalledWith(
+      'http://localhost:8082/api/data-selection/available-topics',
+      { data: request }
+    );
+
+    process.env.RSU_MANAGEMENT_SERVICE_URL = originalEnv;
+  });
+
   test('getAvailableTopics sends request and maps response', async () => {
     const request = new TRUTopicsMessage('Unit001', [], Date.now());
 
@@ -179,6 +217,33 @@ describe('DataSelectionApiRepository', () => {
     expect(result.rsuTopics[0].topics[0].selected).toBe(false);
   });
 
+  test('getAvailableTopics creates empty topic list when topics is not an array', async () => {
+    const request = new TRUTopicsMessage('Unit001', [], Date.now());
+
+    const responsePayload = {
+      unitId: 'Unit001',
+      rsuTopics: [
+        {
+          rsu: {
+            ip: '192.168.0.30',
+            port: 700,
+            timestamp: 333,
+          },
+          topics: null,
+        },
+      ],
+      timestamp: 999,
+    };
+
+    (axios.get as jest.Mock).mockResolvedValueOnce({ data: responsePayload });
+
+    const result = await repo.getAvailableTopics(request);
+
+    expect(result.rsuTopics).toHaveLength(1);
+    expect(result.rsuTopics[0].topics).toEqual([]);
+    expect(result.rsuTopics[0].rsu.ip).toBe('192.168.0.30');
+  });
+
   test('getAvailableTopics maps topic list when RSU endpoint is missing', async () => {
     const request = new TRUTopicsMessage('Unit001', [], Date.now());
 
@@ -214,5 +279,58 @@ describe('DataSelectionApiRepository', () => {
     await expect(repo.getAvailableTopics(request)).rejects.toThrow(
       'Failed to get available topics'
     );
+  });
+
+  test('getAvailableTopics throws with backend details only and no status', async () => {
+    const request = new TRUTopicsMessage('Unit001', [], Date.now());
+
+    (axios.get as jest.Mock).mockRejectedValueOnce({
+      response: {
+        data: {
+          details: 'Only details provided',
+        },
+      },
+    });
+
+    await expect(repo.getAvailableTopics(request)).rejects.toThrow(
+      'Failed to get available topics: Only details provided'
+    );
+  });
+
+  test('confirmDataSelection error message includes HTTP status when no backend fields', async () => {
+    const request = new TRUTopicsMessage('Unit001', [], Date.now());
+
+    (axios.post as jest.Mock).mockRejectedValueOnce({
+      response: {
+        status: 503,
+        data: {},
+      },
+      message: 'Service unavailable',
+    });
+
+    await expect(repo.confirmDataSelection(request)).rejects.toThrow(
+      'Failed to confirm data selection (503): Service unavailable'
+    );
+  });
+
+  test('handleAxiosError logs constructed message via console.error', async () => {
+    const request = new TRUTopicsMessage('Unit001', [], Date.now());
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    (axios.post as jest.Mock).mockRejectedValueOnce({
+      response: {
+        status: 500,
+        data: {
+          error: 'Backend failure',
+        },
+      },
+    });
+
+    await expect(repo.confirmDataSelection(request)).rejects.toThrow(
+      'Failed to confirm data selection (500): Backend failure'
+    );
+
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
   });
 });
