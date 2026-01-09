@@ -120,8 +120,6 @@ jobs:
       - name: Build
         run: |
           cd $GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/client
-          npm install -g nodemon
-          npm init -y
           npm install --force
           npm test
       - name: Archive code coverage results
@@ -143,7 +141,6 @@ jobs:
       - name: Build
         run: |
           cd $GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/server
-          npm init -y
           npm install --force
           npm run test --coverage || true
       - name: Archive code coverage results
