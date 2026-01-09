@@ -1,4 +1,3 @@
-// RSU Endpoint definition
 export class RSUEndpoint {
     ip: string;
     port: number;

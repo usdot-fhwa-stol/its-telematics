@@ -51,9 +51,11 @@
     "@types/supertest": "^6.0.2",
     "nodemon": "^2.0.21",
     "ts-node": "^10.9.2",
+    "ts-jest": "^29.1.1",
     "typescript": "^5.3.3"
   },
   "jest": {
+    "preset": "ts-jest",
     "testEnvironment": "node",
     "coveragePathIgnorePatterns": [
       "/node_modules/"

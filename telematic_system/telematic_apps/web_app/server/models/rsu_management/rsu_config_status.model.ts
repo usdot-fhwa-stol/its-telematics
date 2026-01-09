@@ -4,7 +4,7 @@ import { RSUEndpoint } from './rsu_endpoint.model';
 export class RSUConfigStatus {
     id?: number;
     event: string;
-    rsu: RSUEndpoint;
+    rsuEndpoint: RSUEndpoint;
     status: string;
     timestamp: number;
 
@@ -17,7 +17,7 @@ export class RSUConfigStatus {
     ) {
         this.id = id;
         this.event = event;
-        this.rsu = rsu;
+        this.rsuEndpoint = rsu;
         this.status = status;
         this.timestamp = timestamp;
     }

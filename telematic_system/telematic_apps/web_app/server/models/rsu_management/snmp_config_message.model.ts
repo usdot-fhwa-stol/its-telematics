@@ -1,5 +1,3 @@
-
-// SNMP Config Message definition
 export class SnmpConfigMessage {
     privacyProtocol?: string;
     securityLevel?: string;

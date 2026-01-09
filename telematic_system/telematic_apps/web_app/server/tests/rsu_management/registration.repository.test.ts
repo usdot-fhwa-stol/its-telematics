@@ -1,0 +1,119 @@
+const axios = require('axios');
+jest.mock('axios');
+
+const { RegistrationApiRepository } = require('../../repository/rsu_management/registration.api.repository');
+const { TruConfigStatus } = require('../../models/rsu_management/tru_config_status.model');
+
+describe('RegistrationApiRepository', () => {
+  const baseUrl = 'http://rsu-mgmt.test';
+  let repo: any;
+
+  beforeEach(() => {
+    repo = new RegistrationApiRepository(baseUrl);
+    jest.clearAllMocks();
+  });
+
+  test('registerRsu forwards payload and returns response data', async () => {
+    const payload = { unitConfig: { unitId: 'Unit001' }, rsuConfigs: [] };
+    const responseData = { message: 'ok' };
+
+    (axios.post as jest.Mock).mockResolvedValueOnce({ data: responseData });
+
+    const result = await repo.registerRsu(payload);
+
+    expect(axios.post).toHaveBeenCalledWith(
+      `${baseUrl}/api/registration/update-tru-config`,
+      payload
+    );
+    expect(result).toEqual(responseData);
+  });
+
+  test('registerRsu throws rich error when backend returns error details', async () => {
+    const payload = { unitConfig: { unitId: 'Unit001' }, rsuConfigs: [] };
+
+    (axios.post as jest.Mock).mockRejectedValueOnce({
+      response: {
+        status: 500,
+        data: {
+          error: 'Messaging backend unavailable',
+          details: 'The RSU Management service could not get a response from the messaging broker (NATS).'
+        }
+      },
+      message: 'Request failed with status code 500'
+    });
+
+    await expect(repo.registerRsu(payload)).rejects.toThrow(
+      'Failed to register RSU (500): Messaging backend unavailable - The RSU Management service could not get a response from the messaging broker (NATS).'
+    );
+  });
+
+  test('getAllTruConfig maps response into TruConfigStatus instances', async () => {
+    const responsePayload = [
+      {
+        id: 1,
+        unitConfig: {
+          unitId: 'Unit002',
+          name: null,
+          maxConnections: 10,
+          pluginHeartbeatInterval: 10,
+          healthMonitorPluginHeartbeatInterval: 10,
+          rsuStatusMonitorInterval: 10,
+          timestamp: null
+        },
+        rsuConfigs: [
+          {
+            id: 2,
+            event: 'test event',
+            status: null,
+            timestamp: 1767908748103,
+            rsu: {
+              ip: '192.168.1.11',
+              port: 502,
+              timestamp: null
+            }
+          },
+          {
+            id: 3,
+            event: 'test event',
+            status: null,
+            timestamp: 1767908748103,
+            rsu: {
+              ip: '192.168.1.12',
+              port: 502,
+              timestamp: null
+            }
+          },
+          {
+            id: 304,
+            event: 'test event updated',
+            status: null,
+            timestamp: 1767906986500,
+            rsu: {
+              ip: '192.168.1.10',
+              port: 502,
+              timestamp: null
+            }
+          }
+        ],
+        pluginConfigStatus: {},
+        timestamp: 1767908748103
+      }
+    ];
+
+    (axios.get as jest.Mock).mockResolvedValueOnce({ data: responsePayload });
+
+    const result = await repo.getAllTruConfig();
+
+    expect(axios.get).toHaveBeenCalledWith(
+      `${baseUrl}/api/registration/all-tru-registration-status`
+    );
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toBeInstanceOf(TruConfigStatus);
+    expect(result[0].unitConfig.unitId).toBe('Unit002');
+    expect(result[0].rsuConfigs).toHaveLength(3);
+    expect(result[0].rsuConfigs[0].rsuEndpoint.ip).toBe('192.168.1.11');
+    expect(result[0].rsuConfigs[1].rsuEndpoint.ip).toBe('192.168.1.12');
+    expect(result[0].rsuConfigs[2].rsuEndpoint.ip).toBe('192.168.1.10');
+  });
+});

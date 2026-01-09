@@ -60,7 +60,7 @@ export class RegistrationController {
         }
     }
     
-    removeRSUAssginment = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    removeRSUAssignment = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
         console.log('RegistrationController: Received RSU removal request');
         
         try {

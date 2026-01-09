@@ -119,7 +119,8 @@ require("./routes/event_units.router")(app);
 require("./routes/testing_typess.router")(app);
 require("./routes/states.router")(app);
 require("./routes/dashboards.router")(app);
-require("./routes/rsu_registration.router")(app);
+require("./routes/rsu_management/rsu_registration.router")(app);
+require("./routes/rsu_management/data_selection.router")(app);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {

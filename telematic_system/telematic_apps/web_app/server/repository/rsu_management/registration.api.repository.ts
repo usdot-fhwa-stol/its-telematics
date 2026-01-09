@@ -24,8 +24,7 @@ export class RegistrationApiRepository implements RegistrationRepository {
             console.log(`RSU registration successful: ${JSON.stringify(response.data)}`);
             return response.data;
         } catch (error: any) {
-            console.error(`Failed to register RSU: ${error.message}`, error);
-            throw new Error(`Failed to register RSU: ${error.message}`);
+            this.handleAxiosError('Failed to register RSU', error);
         }
     }
 
@@ -42,9 +41,34 @@ export class RegistrationApiRepository implements RegistrationRepository {
             
             return truConfigStatuses;
         } catch (error: any) {
-            console.error(`Failed to get all TRU configs: ${error.message}`, error);
-            throw new Error(`Failed to get all TRU configs: ${error.message}`);
+            this.handleAxiosError('Failed to get all TRU configs', error);
         }
+    }
+
+    private handleAxiosError(prefix: string, error: any): never {
+        const status = error?.response?.status;
+        const data = error?.response?.data;
+        const backendError = data?.error;
+        const backendDetails = data?.details;
+
+        const statusPart = status ? ` (${status})` : '';
+        let message = `${prefix}${statusPart}`;
+
+        if (backendError || backendDetails) {
+            const parts: string[] = [];
+            if (backendError) {
+                parts.push(backendError);
+            }
+            if (backendDetails) {
+                parts.push(backendDetails);
+            }
+            message += `: ${parts.join(' - ')}`;
+        } else if (error?.message) {
+            message += `: ${error.message}`;
+        }
+
+        console.error(message, error);
+        throw new Error(message);
     }
 
     private mapToTruConfigStatuses(data: any[]): TruConfigStatus[] {
@@ -54,43 +78,53 @@ export class RegistrationApiRepository implements RegistrationRepository {
         }
 
         return data.map((item: any) => {
-            // Map Unit Config
-            const unitConfig = item.unitConfig ? new UnitConfig(
-                item.unitConfig.unitId,
-                item.unitConfig.name,
-                item.unitConfig.maxConnections,
-                item.unitConfig.pluginHeartbeatInterval,
-                item.unitConfig.healthMonitorPluginHeartbeatInterval,
-                item.unitConfig.rsuStatusMonitorInterval,
-                item.unitConfig.timestamp
-            ) : {} as UnitConfig;
+            // Map Unit Config (camelCase from Java)
+            const unitJson = item.unitConfig || {};
+            const unitConfig = unitJson
+                ? new UnitConfig(
+                      unitJson.unitId,
+                      unitJson.name,
+                      unitJson.maxConnections,
+                      unitJson.pluginHeartbeatInterval,
+                      unitJson.healthMonitorPluginHeartbeatInterval,
+                      unitJson.rsuStatusMonitorInterval,
+                      unitJson.timestamp,
+                  )
+                : ({} as UnitConfig);
 
             // Map RSU Configs
-            const rsuConfigs: RSUConfigStatus[] = Array.isArray(item.rsuConfigs) 
-                ? item.rsuConfigs.map((rsuConfig: any) => {
-                    const rsuEndpoint = rsuConfig.rsu ? new RSUEndpoint(
-                        rsuConfig.rsu.ip,
-                        rsuConfig.rsu.port,
-                        rsuConfig.rsu.timestamp
-                    ) : {} as RSUEndpoint;
+            const rsuArray = item.rsuConfigs || [];
+            const rsuConfigs: RSUConfigStatus[] = Array.isArray(rsuArray)
+                ? rsuArray.map((rsuConfig: any) => {
+                      const rsuJson = rsuConfig.rsu || rsuConfig.rsuEndpoint || {};
+                      const rsuEndpoint = rsuJson
+                          ? new RSUEndpoint(
+                                    rsuJson.ip,
+                                    rsuJson.port,
+                                rsuJson.timestamp,
+                            )
+                          : ({} as RSUEndpoint);
 
-                    return new RSUConfigStatus(
-                        rsuConfig.event,
-                        rsuEndpoint,
-                        rsuConfig.status,
-                        rsuConfig.timestamp,
-                        rsuConfig.id
-                    );
-                })
+                      return new RSUConfigStatus(
+                          rsuConfig.event,
+                          rsuEndpoint,
+                          rsuConfig.status,
+                          rsuConfig.timestamp,
+                          rsuConfig.id,
+                      );
+                  })
                 : [];
 
             // Map Plugin Config Status
-            const pluginConfigStatus = item.pluginConfigStatus ? new UnitPluginStatus(
-                item.pluginConfigStatus.bridgePluginStatus,
-                item.pluginConfigStatus.lastCommunicationTimestamp,
-                item.pluginConfigStatus.timestamp,
-                item.pluginConfigStatus.id
-            ) : {} as UnitPluginStatus;
+			const pluginJson = item.pluginConfigStatus || {};
+            const pluginConfigStatus = pluginJson
+                ? new UnitPluginStatus(
+					  pluginJson.bridgePluginStatus,
+					  pluginJson.lastCommunicationTimestamp,
+                      pluginJson.timestamp,
+                      pluginJson.id,
+                  )
+                : ({} as UnitPluginStatus);
 
             return new TruConfigStatus(
                 unitConfig,

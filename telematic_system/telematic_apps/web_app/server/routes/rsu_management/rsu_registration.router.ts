@@ -14,12 +14,12 @@
  * the License.
  */
 import { Application, Router } from 'express';
-import { RegistrationController } from '../controllers/rsu/registration.controller';
-import { AssignRSU } from '../application/rsu_management/assign_rsu';
-import { RemoveRSU } from '../application/rsu_management/remove_rsu';
-import { UpdateRSUConfig } from '../application/rsu_management/update_rsu_config';
-import { AllRsuRegistrationStatus } from '../application/rsu_management/all_rsu_registration_status';
-import { RegistrationApiRepository } from '../repository/rsu_management/registration.api.repository';
+import { RegistrationController } from '../../controllers/rsu_management/registration.controller';
+import { AssignRSU } from '../../application/rsu_management/assign_rsu';
+import { RemoveRSU } from '../../application/rsu_management/remove_rsu';
+import { UpdateRSUConfig } from '../../application/rsu_management/update_rsu_config';
+import { AllRsuRegistrationStatus } from '../../application/rsu_management/all_rsu_registration_status';
+import { RegistrationApiRepository } from '../../repository/rsu_management/registration.api.repository';
 
 export = (app: Application) => {
     const router = Router();
@@ -43,7 +43,7 @@ export = (app: Application) => {
 
     // Define routes
     router.post('/assign-rsu', registrationController.assignRSU);
-    router.post('/remove-rsu', registrationController.removeRSUAssginment);
+    router.post('/remove-rsu', registrationController.removeRSUAssignment);
     router.post('/update-rsu-config', registrationController.updateRSUConfig);
     router.get('/all-tru-config', registrationController.getAllTruConfig);
 

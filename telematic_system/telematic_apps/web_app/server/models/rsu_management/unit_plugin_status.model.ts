@@ -1,4 +1,3 @@
-// Unit Plugin Status definition
 export class UnitPluginStatus {
     id?: number;
     bridgePluginStatus: string;
@@ -9,7 +8,7 @@ export class UnitPluginStatus {
         bridgePluginStatus: string,
         lastCommunicationTimestamp: number,
         timestamp: number,
-        id?: number
+    id?: number
     ) {
         this.id = id;
         this.bridgePluginStatus = bridgePluginStatus;

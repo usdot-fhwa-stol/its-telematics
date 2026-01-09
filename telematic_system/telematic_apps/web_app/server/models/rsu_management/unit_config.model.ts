@@ -1,4 +1,3 @@
-// Unit Config definition
 export class UnitConfig {
     unitId: string;
     name: string;
@@ -14,7 +13,7 @@ export class UnitConfig {
         maxConnections: number,
         pluginHeartbeatInterval: number,
         healthMonitorPluginHeartbeatInterval: number,
-        rsuStatusMonitorInterval: number,
+        resuStatusMonitorInterval: number,
         timestamp?: number
     ) {
         this.unitId = unitId;
@@ -22,7 +21,7 @@ export class UnitConfig {
         this.maxConnections = maxConnections;
         this.pluginHeartbeatInterval = pluginHeartbeatInterval;
         this.healthMonitorPluginHeartbeatInterval = healthMonitorPluginHeartbeatInterval;
-        this.rsuStatusMonitorInterval = rsuStatusMonitorInterval;
+        this.rsuStatusMonitorInterval = resuStatusMonitorInterval;
         this.timestamp = timestamp;
     }
 }
