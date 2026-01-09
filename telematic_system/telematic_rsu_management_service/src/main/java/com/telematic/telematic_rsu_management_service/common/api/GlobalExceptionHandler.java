@@ -32,6 +32,9 @@ import java.util.Map;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final String ERROR_KEY = "error";
+    private static final String DETAILS_KEY = "details";
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<Map<String, Object>> handleValidationException(MethodArgumentNotValidException ex, WebRequest request) {
@@ -42,30 +45,30 @@ public class GlobalExceptionHandler {
             String message = err.getDefaultMessage();
             errors.put(field, message);
         });
-        body.put("error", "Validation failed");
-        body.put("details", errors);
+        body.put(ERROR_KEY, "Validation failed");
+        body.put(DETAILS_KEY, errors);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex, WebRequest request) {
         Map<String, Object> body = baseBody(HttpStatus.BAD_REQUEST, request);
-        body.put("error", ex.getMessage());
+        body.put(ERROR_KEY, ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException ex, WebRequest request) {
         Map<String, Object> body = baseBody(HttpStatus.NOT_FOUND, request);
-        body.put("error", ex.getMessage());
+        body.put(ERROR_KEY, ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 
     @ExceptionHandler(NatsRequestException.class)
     public ResponseEntity<Map<String, Object>> handleNatsRequest(NatsRequestException ex, WebRequest request) {
         Map<String, Object> body = baseBody(HttpStatus.INTERNAL_SERVER_ERROR, request);
-        body.put("error", "Messaging backend unavailable");
-        body.put("details", "The RSU Management service could not get a response from the messaging broker (NATS). " +
+        body.put(ERROR_KEY, "Messaging backend unavailable");
+        body.put(DETAILS_KEY, "The RSU Management service could not get a response from the messaging broker (NATS). " +
                 "Please ensure the NATS server is running and reachable, then try again.");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
@@ -73,8 +76,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex, WebRequest request) {
         Map<String, Object> body = baseBody(HttpStatus.INTERNAL_SERVER_ERROR, request);
-        body.put("error", "Unexpected error");
-        body.put("details", ex.getMessage());
+        body.put(ERROR_KEY, "Unexpected error");
+        body.put(DETAILS_KEY, ex.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 
