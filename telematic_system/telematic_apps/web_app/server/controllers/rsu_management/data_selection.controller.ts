@@ -111,15 +111,15 @@ export class DataSelectionController {
                         )
                         : [];
 
-                    const rsuEndpoint = rsuTopic.rsuEndpoint
+                    const rsu = rsuTopic.rsu
                         ? new RSUEndpoint(
-                            rsuTopic.rsuEndpoint.ip ?? '',
-                            rsuTopic.rsuEndpoint.port ?? 0,
-                            rsuTopic.rsuEndpoint.timestamp
+                            rsuTopic.rsu.ip ?? '',
+                            rsuTopic.rsu.port ?? 0,
+                            rsuTopic.rsu.timestamp
                         )
                         : {} as RSUEndpoint;
 
-                    return new RSUTopicsMessage(topics, rsuEndpoint);
+                    return new RSUTopicsMessage(topics, rsu);
                 })
                 : [];
 

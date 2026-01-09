@@ -84,9 +84,9 @@ curl -s -X POST "$WEB_APP_URL/api/data-selection/confirm-topics" \
   -d '{
     "unitId": "'$UNIT_ID'",
     "rsuTopics": [{
-      "rsuEndpoint": {
-        "IP": "192.168.1.10",
-        "Port": 502
+    "rsu": {
+    "ip": "192.168.1.10",
+    "port": 502
       },
       "topics": [
         {"name": "spat", "selected": true},
@@ -94,10 +94,10 @@ curl -s -X POST "$WEB_APP_URL/api/data-selection/confirm-topics" \
       ]
     },
     {
-      "rsuEndpoint": {
-        "IP": "192.168.1.11",
-        "Port": 502
-      },
+    "rsu": {
+    "ip": "192.168.1.11",
+    "port": 502
+    },
       "topics": [
         {"name": "tim", "selected": true}
       ]

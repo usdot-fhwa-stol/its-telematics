@@ -41,11 +41,11 @@ def mark_selected_true(payload: Any) -> Any:
 
 
 # Fallback RSU endpoint definitions used only when the request
-# does not provide rsuEndpoint information. This keeps the mock
+# does not provide rsu information. This keeps the mock
 # compatible with the rest of the service expectations.
 DEFAULT_RSU_ENDPOINTS: List[Dict[str, Any]] = [
-    {"IP": "192.168.1.10", "Port": 502},
-    {"IP": "192.168.1.11", "Port": 502},
+    {"ip": "192.168.1.10", "port": 502},
+    {"ip": "192.168.1.11", "port": 502},
 ]
 
 
@@ -61,10 +61,10 @@ def ensure_rsu_endpoints(payload: Any) -> Any:
     for rsu in rsutopics:
         if not isinstance(rsu, dict):
             continue
-        endpoint = rsu.get("rsuEndpoint")
+        endpoint = rsu.get("rsu")
         if endpoint is None and default_idx < len(DEFAULT_RSU_ENDPOINTS):
             # Assign a default endpoint only when none is provided
-            rsu["rsuEndpoint"] = DEFAULT_RSU_ENDPOINTS[default_idx]
+            rsu["rsu"] = DEFAULT_RSU_ENDPOINTS[default_idx]
             default_idx += 1
     return payload
 

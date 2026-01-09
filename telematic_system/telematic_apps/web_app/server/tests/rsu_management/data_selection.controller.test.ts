@@ -46,7 +46,7 @@ describe('DataSelectionController', () => {
         unitId: 'Unit001',
         rsuTopics: [
           {
-            rsuEndpoint: {
+            rsu: {
               ip: '192.168.0.10',
               port: 502,
               timestamp: 111,
@@ -89,7 +89,7 @@ describe('DataSelectionController', () => {
         unitId: 'Unit001',
         rsuTopics: [
           {
-            rsuEndpoint: {
+            rsu: {
               ip: '192.168.0.10',
               port: 502,
               timestamp: 111,

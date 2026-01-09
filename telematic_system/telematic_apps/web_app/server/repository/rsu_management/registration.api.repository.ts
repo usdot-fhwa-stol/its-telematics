@@ -96,18 +96,18 @@ export class RegistrationApiRepository implements RegistrationRepository {
             const rsuArray = item.rsuConfigs || [];
             const rsuConfigs: RSUConfigStatus[] = Array.isArray(rsuArray)
                 ? rsuArray.map((rsuConfig: any) => {
-                      const rsuJson = rsuConfig.rsu || rsuConfig.rsuEndpoint || {};
-                      const rsuEndpoint = rsuJson
+                      const rsuJson = rsuConfig.rsu || {};
+                      const rsu = rsuJson
                           ? new RSUEndpoint(
                                     rsuJson.ip,
                                     rsuJson.port,
-                                rsuJson.timestamp,
-                            )
+								rsuJson.timestamp,
+							)
                           : ({} as RSUEndpoint);
 
                       return new RSUConfigStatus(
                           rsuConfig.event,
-                          rsuEndpoint,
+                          rsu,
                           rsuConfig.status,
                           rsuConfig.timestamp,
                           rsuConfig.id,

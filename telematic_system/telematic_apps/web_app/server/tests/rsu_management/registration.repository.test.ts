@@ -112,8 +112,8 @@ describe('RegistrationApiRepository', () => {
     expect(result[0]).toBeInstanceOf(TruConfigStatus);
     expect(result[0].unitConfig.unitId).toBe('Unit002');
     expect(result[0].rsuConfigs).toHaveLength(3);
-    expect(result[0].rsuConfigs[0].rsuEndpoint.ip).toBe('192.168.1.11');
-    expect(result[0].rsuConfigs[1].rsuEndpoint.ip).toBe('192.168.1.12');
-    expect(result[0].rsuConfigs[2].rsuEndpoint.ip).toBe('192.168.1.10');
+    expect(result[0].rsuConfigs[0].rsu.ip).toBe('192.168.1.11');
+    expect(result[0].rsuConfigs[1].rsu.ip).toBe('192.168.1.12');
+    expect(result[0].rsuConfigs[2].rsu.ip).toBe('192.168.1.10');
   });
 });

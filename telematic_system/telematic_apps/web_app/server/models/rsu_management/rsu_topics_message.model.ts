@@ -19,10 +19,10 @@ import { TopicMessage } from './topic_message.model';
 // RSUTopicsMessage model
 export class RSUTopicsMessage {
     topics: TopicMessage[];
-    rsuEndpoint: RSUEndpoint;
+    rsu: RSUEndpoint;
 
-    constructor(topics: TopicMessage[], rsuEndpoint: RSUEndpoint) {
+    constructor(topics: TopicMessage[], rsu: RSUEndpoint) {
         this.topics = topics;
-        this.rsuEndpoint = rsuEndpoint;
+        this.rsu = rsu;
     }
 }

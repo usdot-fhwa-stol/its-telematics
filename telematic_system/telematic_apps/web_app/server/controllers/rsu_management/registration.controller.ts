@@ -168,17 +168,15 @@ export class RegistrationController {
         // Map RSU Configs
         const rsuConfigs: RsuConfigItemMessage[] = Array.isArray(data.rsuConfigs)
             ? data.rsuConfigs.map((rsuConfig: any) => {
-                const rsuEndpoint = rsuConfig.rsuEndpoint ? new RSUEndpoint(
-                    rsuConfig.rsuEndpoint.ip,
-                    rsuConfig.rsuEndpoint.port,
-                    rsuConfig.rsuEndpoint.timestamp
-                ) : rsuConfig.rsu ? new RSUEndpoint(
-                    rsuConfig.rsu.ip,
-                    rsuConfig.rsu.port,
-                    rsuConfig.rsu.timestamp
-                ) : null;
+                const rsu = rsuConfig.rsu
+                    ? new RSUEndpoint(
+                        rsuConfig.rsu.ip,
+                        rsuConfig.rsu.port,
+                        rsuConfig.rsu.timestamp
+                    )
+                    : null;
 
-                if (!rsuEndpoint) {
+                if (!rsu) {
                     throw new Error('RSU endpoint is required for each RSU config');
                 }
 
@@ -195,7 +193,7 @@ export class RegistrationController {
                 return new RsuConfigItemMessage(
                     rsuConfig.action,
                     rsuConfig.event,
-                    rsuEndpoint,
+                    rsu,
                     snmpConfig
                 );
             })

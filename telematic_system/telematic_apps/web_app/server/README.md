@@ -161,7 +161,7 @@ On failure, this endpoint uses the common error format shown above.
 				{
 					"id": 2,
 					"event": "test event",
-					"rsuEndpoint": {
+					"rsu": {
 						"ip": "192.168.1.11",
 						"port": 502,
 						"timestamp": null
@@ -172,7 +172,7 @@ On failure, this endpoint uses the common error format shown above.
 				{
 					"id": 3,
 					"event": "test event",
-					"rsuEndpoint": {
+					"rsu": {
 						"ip": "192.168.1.12",
 						"port": 502,
 						"timestamp": null
@@ -183,7 +183,7 @@ On failure, this endpoint uses the common error format shown above.
 				{
 					"id": 56,
 					"event": "test event updated",
-					"rsuEndpoint": {
+					"rsu": {
 						"ip": "192.168.1.10",
 						"port": 502,
 						"timestamp": null

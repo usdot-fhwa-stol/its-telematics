@@ -52,7 +52,7 @@ describe("RSU management models", () => {
     const status = new RSUConfigStatus("event", endpoint, "ACTIVE", 222, 10);
 
     expect(status.event).toBe("event");
-    expect(status.rsuEndpoint).toBe(endpoint);
+    expect(status.rsu).toBe(endpoint);
     expect(status.status).toBe("ACTIVE");
     expect(status.timestamp).toBe(222);
     expect(status.id).toBe(10);
@@ -86,8 +86,8 @@ describe("RSU management models", () => {
 
     expect(item.action).toBe("add");
     expect(item.event).toBe("test event");
-    expect(item.rsuEndpoint).toBe(endpoint);
-    expect(item.snmpConfig).toBe(snmp);
+    expect(item.rsu).toBe(endpoint);
+    expect(item.snmp).toBe(snmp);
   });
 
   test("TruConfigMessage constructor assigns fields", () => {
@@ -141,6 +141,6 @@ describe("RSU management models", () => {
     const msg = new RSUTopicsMessage(topics, endpoint);
 
     expect(msg.topics).toBe(topics);
-    expect(msg.rsuEndpoint).toBe(endpoint);
+    expect(msg.rsu).toBe(endpoint);
   });
 });

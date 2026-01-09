@@ -29,9 +29,9 @@ NATS_URL = os.getenv("NATS_URL", "nats://127.0.0.1:4222")
 def build_response(unit_id: str) -> Dict[str, Any]:
     return {
         "unitId": unit_id,
-        "rsuTopics": [
-            {
-                "rsuEndpoint": {"IP": "192.168.1.10", "Port": 502},
+                "rsuTopics": [
+                        {
+                "rsu": {"ip": "192.168.1.10", "port": 502},
                 "topics": [
                     {"name": "bsm", "selected": False},
                     {"name": "spat", "selected": False},
@@ -39,7 +39,7 @@ def build_response(unit_id: str) -> Dict[str, Any]:
                 ],
             },
             {
-                "rsuEndpoint": {"IP": "192.168.1.11", "Port": 502},
+                "rsu": {"ip": "192.168.1.11", "port": 502},
                 "topics": [
                     {"name": "bsm", "selected": False},
                     {"name": "tim", "selected": False},

@@ -107,8 +107,8 @@ export class DataSelectionApiRepository implements DataSelectionRepository {
                     )
                     : [];
 
-                const endpoint = rsuTopic.rsuEndpoint;
-                const rsuEndpoint = endpoint
+                const endpoint = rsuTopic.rsu;
+                const rsu = endpoint
                     ? new RSUEndpoint(
                         endpoint.ip ?? endpoint.IP ?? '',
                         endpoint.port ?? endpoint.Port ?? 0,
@@ -116,7 +116,7 @@ export class DataSelectionApiRepository implements DataSelectionRepository {
                     )
                     : {} as RSUEndpoint;
 
-                return new RSUTopicsMessage(topics, rsuEndpoint);
+                return new RSUTopicsMessage(topics, rsu);
             })
             : [];
 

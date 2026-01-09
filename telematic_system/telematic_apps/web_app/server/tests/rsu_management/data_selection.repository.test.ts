@@ -20,7 +20,7 @@ describe('DataSelectionApiRepository', () => {
       unitId: 'Unit001',
       rsuTopics: [
         {
-          rsuEndpoint: {
+          rsu: {
             ip: '192.168.0.10',
             port: 502,
             timestamp: 111
@@ -46,7 +46,7 @@ describe('DataSelectionApiRepository', () => {
     expect(result).toBeInstanceOf(TRUTopicsMessage);
     expect(result.unitId).toBe('Unit001');
     expect(result.rsuTopics).toHaveLength(1);
-    expect(result.rsuTopics[0].rsuEndpoint.ip).toBe('192.168.0.10');
+    expect(result.rsuTopics[0].rsu.ip).toBe('192.168.0.10');
     expect(result.rsuTopics[0].topics[0].name).toBe('bsm');
     expect(result.rsuTopics[0].topics[0].selected).toBe(true);
   });
@@ -120,7 +120,7 @@ describe('DataSelectionApiRepository', () => {
       unitId: 'Unit001',
       rsuTopics: [
         {
-          rsuEndpoint: {
+          rsu: {
             IP: '192.168.0.20',
             Port: 601,
             timestamp: 222,
@@ -138,8 +138,8 @@ describe('DataSelectionApiRepository', () => {
     const result = await repo.getAvailableTopics(request);
 
     expect(result.rsuTopics).toHaveLength(1);
-    expect(result.rsuTopics[0].rsuEndpoint.ip).toBe('192.168.0.20');
-    expect(result.rsuTopics[0].rsuEndpoint.port).toBe(601);
+    expect(result.rsuTopics[0].rsu.ip).toBe('192.168.0.20');
+    expect(result.rsuTopics[0].rsu.port).toBe(601);
     expect(result.rsuTopics[0].topics[0].name).toBe('mapme');
     expect(result.rsuTopics[0].topics[0].selected).toBe(false);
   });
