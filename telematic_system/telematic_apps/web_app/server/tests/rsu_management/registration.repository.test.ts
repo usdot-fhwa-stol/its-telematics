@@ -158,6 +158,23 @@ describe('RegistrationApiRepository', () => {
     );
   });
 
+  test('getAllTruConfig throws rich error when backend returns error and details', async () => {
+    (axios.get as jest.Mock).mockRejectedValueOnce({
+      response: {
+        status: 502,
+        data: {
+          error: 'Upstream error',
+          details: 'RSU management dependency failed',
+        },
+      },
+      message: 'Bad gateway',
+    });
+
+    await expect(repo.getAllTruConfig()).rejects.toThrow(
+      'Failed to get all TRU configs (502): Upstream error - RSU management dependency failed'
+    );
+  });
+
   test('registerRsu throws generic error message when request fails without response', async () => {
     const payload = { unitConfig: { unitId: 'Unit001' }, rsuConfigs: [] };
 
@@ -183,6 +200,43 @@ describe('RegistrationApiRepository', () => {
     await expect(repo.registerRsu(payload)).rejects.toThrow(
       'Failed to register RSU (400): Invalid configuration'
     );
+  });
+
+  test('registerRsu error message includes HTTP status when no backend fields', async () => {
+    const payload = { unitConfig: { unitId: 'Unit001' }, rsuConfigs: [] };
+
+    (axios.post as jest.Mock).mockRejectedValueOnce({
+      response: {
+        status: 503,
+        data: {},
+      },
+      message: 'Service unavailable',
+    });
+
+    await expect(repo.registerRsu(payload)).rejects.toThrow(
+      'Failed to register RSU (503): Service unavailable'
+    );
+  });
+
+  test('registerRsu handleAxiosError logs constructed message', async () => {
+    const payload = { unitConfig: { unitId: 'Unit001' }, rsuConfigs: [] };
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    (axios.post as jest.Mock).mockRejectedValueOnce({
+      response: {
+        status: 500,
+        data: {
+          error: 'Backend failure',
+        },
+      },
+    });
+
+    await expect(repo.registerRsu(payload)).rejects.toThrow(
+      'Failed to register RSU (500): Backend failure'
+    );
+
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
   });
 
   test('getAllTruConfig handles non-array rsuConfigs by returning empty rsu list', async () => {
@@ -218,5 +272,42 @@ describe('RegistrationApiRepository', () => {
     expect(status.unitConfig.unitId).toBe('UnitNonArray');
     expect(status.rsuConfigs).toHaveLength(0);
     expect(status.pluginConfigStatus.bridgePluginStatus).toBe('UP');
+  });
+
+  test('getAllTruConfig throws with backend details only and no status', async () => {
+    (axios.get as jest.Mock).mockRejectedValueOnce({
+      response: {
+        data: {
+          details: 'TRU configs not available',
+        },
+      },
+    });
+
+    await expect(repo.getAllTruConfig()).rejects.toThrow(
+      'Failed to get all TRU configs: TRU configs not available'
+    );
+  });
+
+  test('getAllTruConfig throws generic prefix-only error when no response or message', async () => {
+    // No response and no message property
+    (axios.get as jest.Mock).mockRejectedValueOnce({});
+
+    await expect(repo.getAllTruConfig()).rejects.toThrow(
+      'Failed to get all TRU configs'
+    );
+  });
+
+  test('getAllTruConfig error message includes HTTP status when no backend fields', async () => {
+    (axios.get as jest.Mock).mockRejectedValueOnce({
+      response: {
+        status: 503,
+        data: {},
+      },
+      message: 'Service unavailable',
+    });
+
+    await expect(repo.getAllTruConfig()).rejects.toThrow(
+      'Failed to get all TRU configs (503): Service unavailable'
+    );
   });
 });
