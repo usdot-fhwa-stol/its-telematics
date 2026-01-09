@@ -11,8 +11,8 @@ RUN apk add --no-cache bash dos2unix
 RUN printf '#!/bin/sh\nif [ "$1" = "-t" ]; then shift; fi\nexec /usr/bin/timeout "$@"\n' > /usr/local/bin/timeout \
     && chmod +x /usr/local/bin/timeout
 
-RUN npm install -g nodemon node-wait-for-it && \
-    npm install && \
+RUN npm install --ignore-scripts -g nodemon node-wait-for-it && \
+    npm install --ignore-scripts && \
     npm cache clean --force
 
 COPY . .
