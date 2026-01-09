@@ -311,7 +311,7 @@ jobs:
           web_app_server.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/server
           web_app_server.sonar.sources=.
           web_app_server.sonar.tests=tests
-          web_app_server.sonar.exclusions=tests/**
+          web_app_server.sonar.exclusions=tests/**,scripts/**
           EOF
           cp /tmp/sonar-scanner.properties $GITHUB_WORKSPACE/sonar-project.properties
       - name: Run SonarScanner
