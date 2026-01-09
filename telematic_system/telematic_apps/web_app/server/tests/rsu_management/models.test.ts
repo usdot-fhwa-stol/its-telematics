@@ -143,4 +143,5 @@ describe("RSU management models", () => {
     expect(msg.topics).toBe(topics);
     expect(msg.rsu).toBe(endpoint);
   });
-});
+  });
+  export {};

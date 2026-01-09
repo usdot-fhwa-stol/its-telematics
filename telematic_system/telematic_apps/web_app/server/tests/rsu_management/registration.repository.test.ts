@@ -311,3 +311,4 @@ describe('RegistrationApiRepository', () => {
     );
   });
 });
+export {};

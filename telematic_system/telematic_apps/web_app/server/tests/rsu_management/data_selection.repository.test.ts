@@ -333,4 +333,5 @@ describe('DataSelectionApiRepository', () => {
     expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
-});
+  });
+  export {};
