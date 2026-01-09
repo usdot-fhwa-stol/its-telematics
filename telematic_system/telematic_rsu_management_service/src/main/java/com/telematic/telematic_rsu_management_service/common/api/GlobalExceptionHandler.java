@@ -15,6 +15,7 @@
  */
 package com.telematic.telematic_rsu_management_service.common.api;
 
+import com.telematic.telematic_rsu_management_service.messaging.nats.NatsRequestException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -58,6 +59,15 @@ public class GlobalExceptionHandler {
         Map<String, Object> body = baseBody(HttpStatus.NOT_FOUND, request);
         body.put("error", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    @ExceptionHandler(NatsRequestException.class)
+    public ResponseEntity<Map<String, Object>> handleNatsRequest(NatsRequestException ex, WebRequest request) {
+        Map<String, Object> body = baseBody(HttpStatus.INTERNAL_SERVER_ERROR, request);
+        body.put("error", "Messaging backend unavailable");
+        body.put("details", "The RSU Management service could not get a response from the messaging broker (NATS). " +
+                "Please ensure the NATS server is running and reachable, then try again.");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 
     @ExceptionHandler(Exception.class)

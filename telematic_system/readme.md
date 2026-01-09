@@ -46,6 +46,11 @@ docker-compose -f docker-compose.dbs.yml down
 docker-compose -f docker-compose.units.yml down
 ```
 
+## Secrets for influxDB v3
+Sample secrets influx_admin_token.txt
+```
+{"name":"dev-admin","token":"apiv3_YOUR_ADMIN_TOKEN_VALUE","hashed":false,"description":"dev-admin"}
+```
 ## Open a browser to view influxDB UI
 http://<amazone ec2 instance url>:8086/orgs/04cb75631ee68b28
 

@@ -22,25 +22,25 @@ import lombok.Data;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Data
 public class SnmpConfigMessage {
-    @JsonProperty("PrivacyProtocol")
+    @JsonProperty("privacyProtocol")
     private String privacyProtocol;
 
-    @JsonProperty("SecurityLevel")
+    @JsonProperty("securityLevel")
     private String securityLevel;
 
-    @JsonProperty("AuthProtocol")
+    @JsonProperty("authProtocol")
     private String authProtocol;
 
-    @JsonProperty("AuthPassPhrase")
+    @JsonProperty("authPassPhrase")
     private String authPassPhrase;
 
-    @JsonProperty("User")
+    @JsonProperty("user")
     private String user;
 
-    @JsonProperty("PrivacyPassPhrase")
+    @JsonProperty("privacyPassPhrase")
     private String privacyPassPhrase;
 
-    @JsonProperty("RSUMIBVersion")
+    @JsonProperty("rsuMibVersion")
     private String rsuMibVersion;
 
 }

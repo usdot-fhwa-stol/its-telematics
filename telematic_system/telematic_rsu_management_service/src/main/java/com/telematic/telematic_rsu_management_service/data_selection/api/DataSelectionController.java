@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.telematic.telematic_rsu_management_service.data_selection.dto.TRUTopicsMessage;
 import com.telematic.telematic_rsu_management_service.data_selection.service.DataSelectionService;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/api/data-selection")
 public class DataSelectionController {
@@ -34,13 +36,13 @@ public class DataSelectionController {
     }
 
     @GetMapping("/available-topics")
-    public ResponseEntity<?> getAvailableTopics(@RequestBody TRUTopicsMessage truTopicsMessage) {
+    public ResponseEntity<?> getAvailableTopics(@Valid @RequestBody TRUTopicsMessage truTopicsMessage) {
          TRUTopicsMessage response = dataSelectionService.requestAvailableTopics(truTopicsMessage);
          return ResponseEntity.ok().body(response);
     }
 
     @PostMapping("/confirm-topics")
-    public ResponseEntity<?> confirmDataSelection(@RequestBody TRUTopicsMessage truTopicsMessage) {
+    public ResponseEntity<?> confirmDataSelection(@Valid @RequestBody TRUTopicsMessage truTopicsMessage) {
         TRUTopicsMessage response = dataSelectionService.requestDataSelection(truTopicsMessage);
         return ResponseEntity.ok().body(response);
     }

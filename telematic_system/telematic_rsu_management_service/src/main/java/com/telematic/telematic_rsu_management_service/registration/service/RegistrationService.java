@@ -25,6 +25,8 @@ import org.springframework.stereotype.Service;
 import com.telematic.telematic_rsu_management_service.messaging.Message;
 import com.telematic.telematic_rsu_management_service.messaging.MessagingClient;
 import com.telematic.telematic_rsu_management_service.messaging.Serializer;
+import com.telematic.telematic_rsu_management_service.model.RSUConfigStatus;
+import com.telematic.telematic_rsu_management_service.model.RSUEndpoint;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
 import com.telematic.telematic_rsu_management_service.registration.depositor.TRUConfigMessageDepositor;
 import com.telematic.telematic_rsu_management_service.registration.dto.TruConfigMessage;
@@ -42,8 +44,10 @@ public class RegistrationService {
     private final TRUConfigMessageDepositor truConfigMessageDepositor;
     private final TRUConfigStatusRepository truConfigStatusRepository;
     private final Serializer serializer;
-    
-    public RegistrationService(MessagingClient messagingClient, TRUAutoConfigMessageHandler truAutoConfigMessageHandler, Serializer serializer, TRUConfigMessageDepositor truConfigMessageDepositor, TRUConfigStatusRepository truConfigStatusRepository) {
+
+    public RegistrationService(MessagingClient messagingClient, TRUAutoConfigMessageHandler truAutoConfigMessageHandler,
+            Serializer serializer, TRUConfigMessageDepositor truConfigMessageDepositor,
+            TRUConfigStatusRepository truConfigStatusRepository) {
         this.messagingClient = messagingClient;
         this.truAutoConfigMessageHandler = truAutoConfigMessageHandler;
         this.serializer = serializer;
@@ -51,16 +55,13 @@ public class RegistrationService {
         this.truConfigStatusRepository = truConfigStatusRepository;
     }
 
-    public void publishTruConfig(String subject, TruConfigMessage message) {
-        byte[] payload = serializer.encode(message);
-        Map<String, String> headers = new HashMap<>();
-        headers.put("content-type", "application/json");
-        messagingClient.publish(subject, payload, headers);
-    }
-
     public Message requestTruConfig(String truConfigSubject, TruConfigMessage truConfigMessage, long timeout) {
         byte[] payload = serializer.encode(truConfigMessage);
         log.info("Request for RSU configuration update on subject '{}': {}", truConfigSubject, truConfigMessage);
+        if (isAddAction(truConfigMessage.getRsuConfigs().get(0).getAction()) && isRSUAssignedToTRU(truConfigMessage)) {
+            log.info("RSU is already assigned to TRU Unit ID: {}, skipping request", truConfigMessage.getUnitConfig().getUnitId());
+            throw new IllegalStateException("RSU is already assigned to TRU");
+        }
         Message message = messagingClient.request(truConfigSubject, payload, Duration.ofSeconds(timeout));
         truConfigMessageDepositor.processTruConfigMessage(truConfigMessage);
         return message;
@@ -70,8 +71,28 @@ public class RegistrationService {
         log.info("Subscribing to TRU auto configuration on subject: '{}'", subject);
         messagingClient.reply(subject, truAutoConfigMessageHandler);
     }
-    
+
     public List<TRUConfigStatus> getAllTruConfigs() {
         return truConfigStatusRepository.findAll();
+    }
+
+    private boolean isAddAction(String action) {
+        return action.equalsIgnoreCase("add") || action.equalsIgnoreCase("create");
+    }
+
+    private boolean isRSUAssignedToTRU(TruConfigMessage truConfigMessage) {
+        TRUConfigStatus truConfigStatus = truConfigStatusRepository
+                .findByUnitId(truConfigMessage.getUnitConfig().getUnitId());
+        RSUEndpoint rsuEndpointToCheck = truConfigMessage.getRsuConfigs().get(0).getRsuEndpoint();
+        if (truConfigStatus != null) {
+            for (RSUEndpoint rsuEndpoint : truConfigStatus.getRsuConfigs().stream().map(RSUConfigStatus::getRsuEndpoint)
+                    .toList()) {
+                if (rsuEndpoint.getIp().equals(rsuEndpointToCheck.getIp())
+                        && rsuEndpoint.getPort().equals(rsuEndpointToCheck.getPort())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

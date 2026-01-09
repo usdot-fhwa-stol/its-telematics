@@ -47,7 +47,7 @@ public class NatsRequester implements Requester {
             CompletableFuture<io.nats.client.Message> future = connection.requestWithTimeout(subject, payload, timeout);
             return new Message(subject, future.get(timeout.toSeconds(), TimeUnit.SECONDS).getData(), null);
         }catch(ExecutionException | InterruptedException | CancellationException | TimeoutException e){
-            throw new RuntimeException("Failed to get response from NATS request", e);
+            throw new NatsRequestException("Failed to get response from NATS request", e);
         }       
     }
     

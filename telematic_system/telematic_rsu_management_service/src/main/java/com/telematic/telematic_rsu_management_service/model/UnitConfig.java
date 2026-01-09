@@ -23,6 +23,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -35,22 +36,23 @@ public class UnitConfig {
     @Column(name = "unit_config_id")
      private int id;
     
-    @JsonProperty("UnitID")
+    @JsonProperty("unitId")
+    @NotBlank
     private String unitId;
 
-    @JsonProperty("Name")
+    @JsonProperty("name")
     private String name;
 
-    @JsonProperty("MaxConnections")
+    @JsonProperty("maxConnections")
     private Integer maxConnections;
 
-    @JsonProperty("BridgePluginHeartbeatInterval")
+    @JsonProperty("pluginHeartbeatInterval")
     private Integer pluginHeartbeatInterval;
 
-    @JsonProperty("HealthMonitorPluginHeartbeatInterval")
+    @JsonProperty("healthMonitorPluginHeartbeatInterval")
     private Integer healthMonitorPluginHeartbeatInterval;
 
-    @JsonProperty("RSUStatusMonitorInterval")
+    @JsonProperty("rsuStatusMonitorInterval")
     private Integer rsuStatusMonitorInterval;
 
     @JsonProperty("timestamp")
