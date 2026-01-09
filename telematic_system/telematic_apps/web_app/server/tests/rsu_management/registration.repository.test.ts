@@ -116,4 +116,55 @@ describe('RegistrationApiRepository', () => {
     expect(result[0].rsuConfigs[1].rsu.ip).toBe('192.168.1.12');
     expect(result[0].rsuConfigs[2].rsu.ip).toBe('192.168.1.10');
   });
+
+  test('getAllTruConfig returns empty array when response data is not an array', async () => {
+    (axios.get as jest.Mock).mockResolvedValueOnce({ data: null });
+
+    const result = await repo.getAllTruConfig();
+
+    expect(axios.get).toHaveBeenCalledWith(
+      `${baseUrl}/api/registration/all-tru-registration-status`
+    );
+    expect(result).toEqual([]);
+  });
+
+  test('getAllTruConfig maps minimal item without optional sections', async () => {
+    const responsePayload = [
+      {
+        id: 42,
+        // no unitConfig, rsuConfigs, or pluginConfigStatus
+        timestamp: 1234567890,
+      },
+    ];
+
+    (axios.get as jest.Mock).mockResolvedValueOnce({ data: responsePayload });
+
+    const result = await repo.getAllTruConfig();
+
+    expect(result).toHaveLength(1);
+    const status = result[0] as typeof TruConfigStatus.prototype;
+    expect(status.unitConfig.unitId).toBeUndefined();
+    expect(status.rsuConfigs).toHaveLength(0);
+    expect(status.pluginConfigStatus.bridgePluginStatus).toBeUndefined();
+    expect(status.timestamp).toBe(1234567890);
+    expect(status.id).toBe(42);
+  });
+
+  test('getAllTruConfig throws generic error message when request fails without response', async () => {
+    (axios.get as jest.Mock).mockRejectedValueOnce(new Error('Network down'));
+
+    await expect(repo.getAllTruConfig()).rejects.toThrow(
+      'Failed to get all TRU configs: Network down'
+    );
+  });
+
+  test('registerRsu throws generic error message when request fails without response', async () => {
+    const payload = { unitConfig: { unitId: 'Unit001' }, rsuConfigs: [] };
+
+    (axios.post as jest.Mock).mockRejectedValueOnce(new Error('Network down'));
+
+    await expect(repo.registerRsu(payload)).rejects.toThrow(
+      'Failed to register RSU: Network down'
+    );
+  });
 });
