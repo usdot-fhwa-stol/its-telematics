@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 LEIDOS.
+ * Copyright (C) 2026 LEIDOS.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -114,8 +114,7 @@ export class DataSelectionController {
                     const rsu = rsuTopic.rsu
                         ? new RSUEndpoint(
                             rsuTopic.rsu.ip ?? '',
-                            rsuTopic.rsu.port ?? 0,
-                            rsuTopic.rsu.timestamp
+                            rsuTopic.rsu.port ?? 0
                         )
                         : {} as RSUEndpoint;
 

@@ -31,31 +31,28 @@ describe("RSU management models", () => {
   });
 
   test("UnitPluginStatus constructor assigns fields", () => {
-    const status = new UnitPluginStatus("OK", 111, 222, 1);
+    const status = new UnitPluginStatus("OK", 111, 222);
 
     expect(status.bridgePluginStatus).toBe("OK");
     expect(status.lastCommunicationTimestamp).toBe(111);
     expect(status.timestamp).toBe(222);
-    expect(status.id).toBe(1);
   });
 
   test("RSUEndpoint constructor assigns fields", () => {
-    const endpoint = new RSUEndpoint("192.168.0.10", 502, 111);
+    const endpoint = new RSUEndpoint("192.168.0.10", 502);
 
     expect(endpoint.ip).toBe("192.168.0.10");
     expect(endpoint.port).toBe(502);
-    expect(endpoint.timestamp).toBe(111);
   });
 
   test("RSUConfigStatus constructor assigns fields", () => {
-    const endpoint = new RSUEndpoint("192.168.0.10", 502, 111);
-    const status = new RSUConfigStatus("event", endpoint, "ACTIVE", 222, 10);
+    const endpoint = new RSUEndpoint("192.168.0.10", 502);
+    const status = new RSUConfigStatus("event", endpoint, "ACTIVE", 222);
 
     expect(status.event).toBe("event");
     expect(status.rsu).toBe(endpoint);
     expect(status.status).toBe("ACTIVE");
     expect(status.timestamp).toBe(222);
-    expect(status.id).toBe(10);
   });
 
   test("SnmpConfigMessage constructor assigns fields", () => {
@@ -79,7 +76,7 @@ describe("RSU management models", () => {
   });
 
   test("RsuConfigItemMessage constructor assigns fields", () => {
-    const endpoint = new RSUEndpoint("192.168.0.10", 502, 111);
+    const endpoint = new RSUEndpoint("192.168.0.10", 502);
     const snmp = new SnmpConfigMessage("AES128", "authPriv", "SHA", "authPass", "user", "privPass", "v3");
 
     const item = new RsuConfigItemMessage("add", "test event", endpoint, snmp);
@@ -92,7 +89,7 @@ describe("RSU management models", () => {
 
   test("TruConfigMessage constructor assigns fields", () => {
     const unit = new UnitConfig("Unit001", "Test Unit", 10, 30, 60, 120, 1234567890);
-    const endpoint = new RSUEndpoint("192.168.0.10", 502, 111);
+    const endpoint = new RSUEndpoint("192.168.0.10", 502);
     const snmp = new SnmpConfigMessage("AES128", "authPriv", "SHA", "authPass", "user", "privPass", "v3");
     const rsuItem = new RsuConfigItemMessage("add", "event", endpoint, snmp);
 
@@ -106,9 +103,9 @@ describe("RSU management models", () => {
 
   test("TruConfigStatus constructor assigns fields", () => {
     const unit = new UnitConfig("Unit001", "Test Unit", 10, 30, 60, 120, 1234567890);
-    const endpoint = new RSUEndpoint("192.168.0.10", 502, 111);
-    const rsuStatus = new RSUConfigStatus("event", endpoint, "ACTIVE", 222, 10);
-    const pluginStatus = new UnitPluginStatus("OK", 333, 444, 2);
+    const endpoint = new RSUEndpoint("192.168.0.10", 502);
+    const rsuStatus = new RSUConfigStatus("event", endpoint, "ACTIVE", 222);
+    const pluginStatus = new UnitPluginStatus("OK", 333, 444);
 
     const status = new TruConfigStatus(unit, [rsuStatus], 555, pluginStatus, 99);
 
@@ -135,7 +132,7 @@ describe("RSU management models", () => {
   });
 
   test("RSUTopicsMessage constructor assigns fields", () => {
-    const endpoint = new RSUEndpoint("192.168.0.10", 502, 111);
+    const endpoint = new RSUEndpoint("192.168.0.10", 502);
     const topics = [new TopicMessage("bsm", true), new TopicMessage("spat", false)];
 
     const msg = new RSUTopicsMessage(topics, endpoint);

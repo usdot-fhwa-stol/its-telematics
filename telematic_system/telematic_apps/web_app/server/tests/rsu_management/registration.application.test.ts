@@ -133,14 +133,14 @@ describe('RSU management application services', () => {
     const unit1 = new UnitConfig('Unit001', 'Test Unit 1', 10, 30, 60, 120, 111);
     const unit2 = new UnitConfig('Unit002', 'Test Unit 2', 20, 40, 70, 130, 222);
 
-    const rsuEndpoint1 = new RSUEndpoint('192.168.0.10', 502, 333);
-    const rsuEndpoint2 = new RSUEndpoint('192.168.0.11', 502, 444);
+    const rsuEndpoint1 = new RSUEndpoint('192.168.0.10', 502);
+    const rsuEndpoint2 = new RSUEndpoint('192.168.0.11', 502);
 
-    const rsuStatus1 = new RSUConfigStatus('test event', rsuEndpoint1, 'operational', 1767908748103, 10);
-    const rsuStatus2 = new RSUConfigStatus('test event', rsuEndpoint2, 'fault', 1767908748103, 11);
+    const rsuStatus1 = new RSUConfigStatus('test event', rsuEndpoint1, 'operational', 1767908748103);
+    const rsuStatus2 = new RSUConfigStatus('test event', rsuEndpoint2, 'fault', 1767908748103);
 
-    const pluginStatus1 = new UnitPluginStatus('running', 777, 1767908748103, 1767908748103);
-    const pluginStatus2 = new UnitPluginStatus('offline', 999, 1767908748103, 1767908748103);
+    const pluginStatus1 = new UnitPluginStatus('running', 777, 1767908748103);
+    const pluginStatus2 = new UnitPluginStatus('offline', 999, 1767908748103);
 
     const expected = [
       new TruConfigStatus(unit1, [rsuStatus1], 1234, pluginStatus1, 1),

@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2026 LEIDOS.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 import axios from 'axios';
 import { RegistrationRepository } from '../../application/rsu_management/ports/registration.repository';
 import { TruConfigMessage } from '../../models/rsu_management/tru_config_message.model';
@@ -100,17 +115,15 @@ export class RegistrationApiRepository implements RegistrationRepository {
                       const rsu = rsuJson
                           ? new RSUEndpoint(
                                     rsuJson.ip,
-                                    rsuJson.port,
-								rsuJson.timestamp,
-							)
+                                    rsuJson.port
+                                )
                           : ({} as RSUEndpoint);
 
                       return new RSUConfigStatus(
                           rsuConfig.event,
                           rsu,
                           rsuConfig.status,
-                          rsuConfig.timestamp,
-                          rsuConfig.id,
+                          rsuConfig.timestamp
                       );
                   })
                 : [];
@@ -121,8 +134,7 @@ export class RegistrationApiRepository implements RegistrationRepository {
                 ? new UnitPluginStatus(
 					  pluginJson.bridgePluginStatus,
 					  pluginJson.lastCommunicationTimestamp,
-                      pluginJson.timestamp,
-                      pluginJson.id,
+                      pluginJson.timestamp
                   )
                 : ({} as UnitPluginStatus);
 

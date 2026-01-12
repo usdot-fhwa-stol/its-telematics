@@ -8,7 +8,7 @@ import { RSUEndpoint } from '../../models/rsu_management/rsu_endpoint.model';
 
 describe('Data selection application services', () => {
   const makeTruTopics = (): TRUTopicsMessage => {
-    const endpoint = new RSUEndpoint('192.168.0.10', 502, Date.now());
+    const endpoint = new RSUEndpoint('192.168.0.10', 502);
     const topics = [new TopicMessage('bsm', true)];
     const rsuTopic = new RSUTopicsMessage(topics, endpoint);
     return new TRUTopicsMessage('Unit001', [rsuTopic], Date.now());

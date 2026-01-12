@@ -171,8 +171,7 @@ export class RegistrationController {
                 const rsu = rsuConfig.rsu
                     ? new RSUEndpoint(
                         rsuConfig.rsu.ip,
-                        rsuConfig.rsu.port,
-                        rsuConfig.rsu.timestamp
+                        rsuConfig.rsu.port
                     )
                     : null;
 

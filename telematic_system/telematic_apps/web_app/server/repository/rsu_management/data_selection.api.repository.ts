@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 LEIDOS.
+ * Copyright (C) 2026 LEIDOS.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -111,8 +111,7 @@ export class DataSelectionApiRepository implements DataSelectionRepository {
                 const rsu = endpoint
                     ? new RSUEndpoint(
                         endpoint.ip ?? endpoint.IP ?? '',
-                        endpoint.port ?? endpoint.Port ?? 0,
-                        endpoint.timestamp
+                        endpoint.port ?? endpoint.Port ?? 0
                     )
                     : {} as RSUEndpoint;
 

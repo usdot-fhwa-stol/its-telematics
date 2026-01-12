@@ -1,5 +1,4 @@
 export class UnitPluginStatus {
-    id?: number;
     bridgePluginStatus: string;
     lastCommunicationTimestamp: number;
     timestamp: number;
@@ -7,10 +6,8 @@ export class UnitPluginStatus {
     constructor(
         bridgePluginStatus: string,
         lastCommunicationTimestamp: number,
-        timestamp: number,
-    id?: number
+        timestamp: number
     ) {
-        this.id = id;
         this.bridgePluginStatus = bridgePluginStatus;
         this.lastCommunicationTimestamp = lastCommunicationTimestamp;
         this.timestamp = timestamp;
