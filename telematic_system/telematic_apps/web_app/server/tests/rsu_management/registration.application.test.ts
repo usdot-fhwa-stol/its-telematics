@@ -143,8 +143,8 @@ describe('RSU management application services', () => {
     const pluginStatus2 = new UnitPluginStatus('offline', 999, 1767908748103);
 
     const expected = [
-      new TruConfigStatus(unit1, [rsuStatus1], 1234, pluginStatus1, 1),
-      new TruConfigStatus(unit2, [rsuStatus2], 2345, pluginStatus2, 2),
+      new TruConfigStatus(unit1, [rsuStatus1], 1234, pluginStatus1),
+      new TruConfigStatus(unit2, [rsuStatus2], 2345, pluginStatus2),
     ];
     const repo = { getAllTruConfig: jest.fn().mockResolvedValue(expected) };
     const app = new AllRsuRegistrationStatus(repo);

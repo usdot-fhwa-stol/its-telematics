@@ -142,8 +142,7 @@ export class RegistrationApiRepository implements RegistrationRepository {
                 unitConfig,
                 rsuConfigs,
                 item.timestamp,
-                pluginConfigStatus,
-                item.id
+                pluginConfigStatus
             );
         });
     }

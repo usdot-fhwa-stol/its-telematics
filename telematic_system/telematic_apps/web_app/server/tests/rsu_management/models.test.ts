@@ -107,14 +107,13 @@ describe("RSU management models", () => {
     const rsuStatus = new RSUConfigStatus("event", endpoint, "ACTIVE", 222);
     const pluginStatus = new UnitPluginStatus("OK", 333, 444);
 
-    const status = new TruConfigStatus(unit, [rsuStatus], 555, pluginStatus, 99);
+    const status = new TruConfigStatus(unit, [rsuStatus], 555, pluginStatus);
 
     expect(status.unitConfig).toBe(unit);
     expect(status.rsuConfigs).toHaveLength(1);
     expect(status.rsuConfigs[0]).toBe(rsuStatus);
     expect(status.timestamp).toBe(555);
     expect(status.pluginConfigStatus).toBe(pluginStatus);
-    expect(status.id).toBe(99);
   });
 
   test("TopicMessage constructor assigns fields", () => {

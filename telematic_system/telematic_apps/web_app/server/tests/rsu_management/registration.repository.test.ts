@@ -147,7 +147,6 @@ describe('RegistrationApiRepository', () => {
     expect(status.rsuConfigs).toHaveLength(0);
     expect(status.pluginConfigStatus.bridgePluginStatus).toBeUndefined();
     expect(status.timestamp).toBe(1234567890);
-    expect(status.id).toBe(42);
   });
 
   test('getAllTruConfig throws generic error message when request fails without response', async () => {

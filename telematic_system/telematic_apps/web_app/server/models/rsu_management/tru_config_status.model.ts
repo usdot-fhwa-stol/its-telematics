@@ -4,7 +4,6 @@ import { UnitPluginStatus } from './unit_plugin_status.model';
 
 // TRU Config Status definition
 export class TruConfigStatus {
-    id?: number;
     unitConfig: UnitConfig;
     rsuConfigs: RSUConfigStatus[];
     timestamp: number;
@@ -14,10 +13,8 @@ export class TruConfigStatus {
         unitConfig: UnitConfig,
         rsuConfigs: RSUConfigStatus[],
         timestamp: number,
-        pluginConfigStatus: UnitPluginStatus,
-        id?: number
+        pluginConfigStatus: UnitPluginStatus
     ) {
-        this.id = id;
         this.unitConfig = unitConfig;
         this.rsuConfigs = rsuConfigs;
         this.timestamp = timestamp;
