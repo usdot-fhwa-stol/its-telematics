@@ -23,6 +23,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -38,11 +40,13 @@ public class RSUEndpoint {
     private int id;
     
     @EqualsAndHashCode.Include
-    @JsonProperty("IP")
+    @JsonProperty("ip")
+    @NotBlank
     private String ip;
 
     @EqualsAndHashCode.Include
-    @JsonProperty("Port")
+    @JsonProperty("port")
+    @NotNull
     private Integer port;
 
     @JsonProperty("timestamp")

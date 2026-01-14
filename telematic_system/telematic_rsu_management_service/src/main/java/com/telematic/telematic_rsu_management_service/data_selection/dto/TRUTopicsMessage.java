@@ -20,12 +20,14 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TRUTopicsMessage {
     @JsonProperty("unitId")
+    @NotBlank
     public String unitId;
 
     @JsonProperty("rsuTopics")

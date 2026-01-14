@@ -112,6 +112,7 @@ services:
       depends_on:
         - mysqldb
         - grafana
+        - rsu_management_service
       env_file:
         - .env
       command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:3000 && /app/service.sh'
@@ -193,6 +194,8 @@ services:
         max-file: "1"
     network_mode: host
     command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:4222 && wait-for-it localhost:8181 && java -jar /rsu_management_service/app.jar'
+    volumes:
+      - /opt/telematics/logs:/workspace/logs
     env_file:
       - .env
 

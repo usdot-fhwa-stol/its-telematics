@@ -1,4 +1,10 @@
-const { user, Sequelize } = require("../models");
+// Mock the Sequelize models module to avoid real MySQL connections during tests.
+jest.mock("../models", () => {
+    const user = { findAll: jest.fn() };
+    return { user };
+});
+
+const { user } = require("../models");
 const manager = require('htpasswd-mgr');
 const user_controller = require('../controllers/user.controller')
 const saltHash = require('password-salt-and-hash')

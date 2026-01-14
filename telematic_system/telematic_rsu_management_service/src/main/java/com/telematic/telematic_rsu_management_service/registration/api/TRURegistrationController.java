@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 import com.telematic.telematic_rsu_management_service.messaging.Message;
 import com.telematic.telematic_rsu_management_service.messaging.Serializer;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
@@ -52,7 +54,7 @@ public class TRURegistrationController {
     }
 
     @PostMapping(path = "/update-tru-config")
-    public ResponseEntity<?> updateTruConfig(@RequestBody TruConfigMessage rsuConfigItemMessage) {
+    public ResponseEntity<?> updateTruConfig(@Valid @RequestBody TruConfigMessage rsuConfigItemMessage) {
         Message message = registrationService.requestTruConfig(truConfigSubject, rsuConfigItemMessage,
                 requestTimeout);
         return ResponseEntity.ok().body(message);

@@ -42,9 +42,21 @@ public class DataSelectionDepositor {
         this.truConfigStatusRepository = truConfigStatusRepository;
     }
 
-    public void processDataSelection(TRUTopicsMessage truTopicMessage) {
+        public boolean processDataSelection(TRUTopicsMessage truTopicMessage) {
         TRUConfigStatus truConfigStatus = truConfigStatusRepository.findByUnitId(truTopicMessage.getUnitId());
+
+        if (truConfigStatus == null) {
+            log.warn("No TRUConfigStatus found for unitId '{}'. Skipping data selection persistence.",
+                    truTopicMessage.getUnitId());
+            return false;
+        }
+
         List<RSUConfigStatus> rsuConfigs = truConfigStatus.getRsuConfigs();
+        if (rsuConfigs == null || rsuConfigs.isEmpty()) {
+            log.warn("No RSUConfigStatus entries found for unitId '{}'. Skipping data selection persistence.",
+                    truTopicMessage.getUnitId());
+            return false;
+        }
         Map<RSUEndpoint, List<String>> topicsByEndpoint = truTopicMessage.getRsuTopics().stream()
             .collect(Collectors.toMap(
                 RSUTopicsMessage::getRsuEndpoint,
@@ -62,11 +74,15 @@ public class DataSelectionDepositor {
             }
             
             // Replace existing rules with new ones
-            Iterator<DataSelectionRuleConfig> iter = rsuConfig.getDataSelectionRuleConfigs().iterator();
-            while (iter.hasNext()) {
-                var existing = iter.next();
-                existing.setRsuConfigStatus(null);
-                iter.remove();
+            if (rsuConfig.getDataSelectionRuleConfigs() != null) {
+                Iterator<DataSelectionRuleConfig> iter = rsuConfig.getDataSelectionRuleConfigs().iterator();
+                while (iter.hasNext()) {
+                    var existing = iter.next();
+                    existing.setRsuConfigStatus(null);
+                    iter.remove();
+                }
+            } else {
+                rsuConfig.setDataSelectionRuleConfigs(new ArrayList<>());
             }
 
             for (String topic : topics) {
@@ -77,5 +93,6 @@ public class DataSelectionDepositor {
             }
         }
         truConfigStatusRepository.save(truConfigStatus);
+        return true;
     }
 }

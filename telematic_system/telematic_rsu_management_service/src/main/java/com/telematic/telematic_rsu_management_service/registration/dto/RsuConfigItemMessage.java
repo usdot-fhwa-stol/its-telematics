@@ -19,18 +19,25 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.telematic.telematic_rsu_management_service.model.RSUEndpoint;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Data
 public class RsuConfigItemMessage {
     @JsonProperty("action")
+    @NotBlank
     private String action;
 
     @JsonProperty("event")
+    @NotBlank
     private String event;
 
     @JsonProperty("rsu")
+    @NotNull
+    @Valid
     private RSUEndpoint rsuEndpoint;
 
     @JsonProperty("snmp")

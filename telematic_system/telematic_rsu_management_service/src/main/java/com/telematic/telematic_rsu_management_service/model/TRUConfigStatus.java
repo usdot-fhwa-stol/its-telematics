@@ -41,12 +41,12 @@ public class TRUConfigStatus {
     @Column(name = "tru_config_status_id")
      private int id;
     
-    @JsonProperty("Unit")
+    @JsonProperty("unitConfig")
     @OneToOne(cascade = jakarta.persistence.CascadeType.ALL)
     @JoinColumn(name = "unit_config_id")
     private UnitConfig unitConfig;
 
-    @JsonProperty("RSUConfigs")
+    @JsonProperty("rsuConfigs")
     @OneToMany(mappedBy = "truConfigStatus", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<RSUConfigStatus> rsuConfigs;
@@ -54,7 +54,7 @@ public class TRUConfigStatus {
     @JsonProperty("timestamp")
     private Long timestamp;
 
-    @JsonProperty("PluginConfigStatus")
+    @JsonProperty("pluginConfigStatus")
     @OneToOne(cascade = jakarta.persistence.CascadeType.ALL)
     @JoinColumn(name = "tru_plugin_config_status_id")
     private UnitPluginStatus pluginConfigStatus;   

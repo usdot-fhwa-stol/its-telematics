@@ -15,21 +15,28 @@
  */
 package com.telematic.telematic_rsu_management_service.registration.dto;
 
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.telematic.telematic_rsu_management_service.model.UnitConfig;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-
-import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Data
 public class TruConfigMessage {
-    @JsonProperty("Unit")
+    @JsonProperty("unitConfig")
+	@NotNull
+    @Valid
     private UnitConfig unitConfig;
 
-    @JsonProperty("RSUConfigs")
+    @JsonProperty("rsuConfigs")
+    @NotEmpty
+    @Valid
     private List<RsuConfigItemMessage> rsuConfigs;
 
     @JsonProperty("timestamp")
