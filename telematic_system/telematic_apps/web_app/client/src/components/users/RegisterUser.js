@@ -6,9 +6,11 @@ import { Box } from '@mui/system';
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import * as Yup from 'yup';
+import { Capacitor } from '@capacitor/core';
 import { listOrgs } from '../../api/api-org';
 import { registerNewUser } from '../../api/api-user';
 import { SEVERITY } from './UserMetadata';
+import { getMobileWrapperStyles, getMobileContainerStyles, getMobileBoxStyles, getTextFieldStyles } from '../../utils/mobileStyles';
 
 const RegisterUser = () => {
     const [open, setOpen] = useState(false);
@@ -21,6 +23,7 @@ const RegisterUser = () => {
     const [selectedOrg, setSelectedOrg] = useState('');
     const [allOrgs, setAllOrgs] = useState([]);
     const [adminEmails, setAdminEmails] = useState(['Ankur.Tyagi@leidos.com', 'dan.du@leidos.com', 'abey.yoseph@leidos.com', 'anish.deva@leidos.com']);
+    const [isMobile] = useState(Capacitor.isNativePlatform());
     const handleClose = () => {
         setErrorMsg('')
         setOpen(false);
@@ -140,18 +143,19 @@ const RegisterUser = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-            <Container component="main" maxWidth="xs">
-                <Box
-                    sx={{
-                        marginTop: 8,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                    }} >
+            <Box sx={getMobileWrapperStyles(isMobile)}>
+                <Container 
+                    component="main" 
+                    maxWidth="xs"
+                    sx={getMobileContainerStyles(isMobile)}
+                >
+                    <Box
+                        sx={getMobileBoxStyles(isMobile)}
+                    >
                     <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}>
                         <PersonAddIcon />
                     </Avatar>
-                    <Box component="form">
+                    <Box component="form" sx={{ width: '100%' }}>
                         <FormControl fullWidth>
                             <TextField
                                 {...register('username')}
@@ -162,7 +166,8 @@ const RegisterUser = () => {
                                 variant='outlined'
                                 fullWidth
                                 margin="normal"
-                                onChange={handleusername} />
+                                onChange={handleusername}
+                                sx={getTextFieldStyles(isMobile)} />
                         </FormControl>
 
                         <FormControl fullWidth>
@@ -175,7 +180,8 @@ const RegisterUser = () => {
                                 variant='outlined'
                                 fullWidth
                                 margin="normal"
-                                onChange={handleEmail} />
+                                onChange={handleEmail}
+                                sx={getTextFieldStyles(isMobile)} />
                         </FormControl>
 
                         <FormControl fullWidth>
@@ -189,12 +195,14 @@ const RegisterUser = () => {
                                 margin="normal"
                                 type="password"
                                 variant='outlined'
-                                onChange={handleCurrentPassword} />
+                                onChange={handleCurrentPassword}
+                                sx={getTextFieldStyles(isMobile)} />
                         </FormControl>
                         <FormControl
                             size='small'
                             fullWidth
-                            margin='normal'>
+                            margin='normal'
+                            sx={getTextFieldStyles(isMobile)}>
                             <InputLabel id="org-selection-label">All Organizations *</InputLabel>
                             <Select
                                 {...register('selectedOrg')}
@@ -212,18 +220,25 @@ const RegisterUser = () => {
                                 }
                             </Select>
                         </FormControl>
-                        <Box>
-                            <Grid container>
+                        <Box sx={{ width: '100%' }}>
+                            <Grid container spacing={isMobile ? 0 : 0}>
                                 <Grid item xs={6}>
-                                    <Button sx={{ float: 'left' }} href="/telematic/login" variant='outlined'>
-                                        <KeyboardDoubleArrowLeftIcon />
-                                        Back To Login</Button>
+                                    <Button 
+                                        sx={{ float: 'left', fontSize: isMobile ? '0.75rem' : 'inherit' }} 
+                                        href="/telematic/login" 
+                                        variant='outlined'
+                                        size={isMobile ? 'small' : 'medium'}
+                                    >
+                                        <KeyboardDoubleArrowLeftIcon fontSize="small" />
+                                        {isMobile ? 'Back' : 'Back To Login'}
+                                    </Button>
                                 </Grid>
                                 <Grid item xs={6} >
                                     <Button
-                                        sx={{ float: 'right' }}
+                                        sx={{ float: 'right', fontSize: isMobile ? '0.75rem' : 'inherit' }}
                                         variant='contained'
                                         margin="normal"
+                                        size={isMobile ? 'small' : 'medium'}
                                         onClick={handleSubmit(saveUser)}>
                                         Create User
                                     </Button>
@@ -233,6 +248,7 @@ const RegisterUser = () => {
                     </Box>
                 </Box>
             </Container>
+            </Box>
         </React.Fragment >
     )
 }

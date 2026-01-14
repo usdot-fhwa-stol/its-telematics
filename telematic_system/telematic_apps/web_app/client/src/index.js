@@ -17,6 +17,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { Capacitor } from '@capacitor/core';
 
 /*
  * Copyright (C) 2019-2024 LEIDOS.
@@ -38,6 +39,16 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthContextProvider } from './context/auth-context';
 import { TopicContextProvider } from './context/topic-context';
 import {ROS2RosbagContextProvider} from './context/ros2-rosbag-context';
+
+// Import mobile-specific CSS
+import './mobile.css';
+
+// Detect if running in Capacitor and add class to html and body
+if (Capacitor.isNativePlatform()) {
+  document.documentElement.classList.add('mobile-app');
+  document.body.classList.add('mobile-app');
+}
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
@@ -54,4 +65,3 @@ root.render(
     </BrowserRouter>
   </React.StrictMode>
 );
-
