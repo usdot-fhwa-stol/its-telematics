@@ -1,5 +1,12 @@
 {
   "appId": "com.telematic_app",
   "appName": "telematic_mobile_app",
-  "webDir": "../web_app/client/build"
+  "webDir": "../web_app/client/build",
+  "android": {
+    "allowMixedContent": true
+  },
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  }
 }
