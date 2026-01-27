@@ -22,9 +22,11 @@ import Container from '@mui/material/Container';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import TextField from '@mui/material/TextField';
 import * as React from 'react';
+import { Capacitor } from '@capacitor/core';
 import { getOrgsByUser, listOrgs } from '../api/api-org';
 import { loginUser } from '../api/api-user';
 import AuthContext from '../context/auth-context';
+import { getMobileWrapperStyles, getMobileContainerStyles, getMobileBoxStyles, getTextFieldStyles } from '../utils/mobileStyles';
 
 const theme = createTheme();
 
@@ -32,6 +34,8 @@ const Login = React.memo(() => {
     const authContext = React.useContext(AuthContext);
     const [loginState, setLoginState] = React.useState(true);
     const [loginErrMsg, setLoginErrMsg] = React.useState('');
+    // Initialize isMobile immediately, not in useEffect
+    const [isMobile] = React.useState(Capacitor.isNativePlatform());
 
     const handleSubmit = (event) => {
         event.preventDefault();
@@ -105,70 +109,75 @@ const Login = React.memo(() => {
                     open={!loginState}
                     onClose={handleClose}
                     autoHideDuration={6000}
-                    key="Login">
+                    key="Login"
+                    sx={{ zIndex: 9999 }}>
                     <Alert data-testid='alert-msg' onClose={handleClose} severity="error" sx={{ width: '100%' }}>
                         {loginErrMsg}
                     </Alert>
                 </Snackbar>
-                <Container component="main" maxWidth="xs">
-                    <Box
-                        sx={{
-                            marginTop: 8,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                        }} >
-                        <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}>
-                            <LockOutlinedIcon />
-                        </Avatar>
-                        <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1 }}>
-                            <FormControl fullWidth>
-                                <TextField
-                                    margin="normal"
-                                    required
-                                    id="username"
-                                    inputProps={ {'data-testid':'username'}}
-                                    label="User Name"
-                                    name="username"
-                                    autoComplete="username"
-                                    autoFocus />
-                            </FormControl>
-                            <FormControl fullWidth>
-                                <TextField
-                                    margin="normal"
-                                    required
-                                    name="password"
-                                    inputProps={{'data-testid':'password'}}
-                                    label="Password"
-                                    type="password"
-                                    id="password"
-                                    autoComplete="current-password" />
-                            </FormControl>
-                            <Box>
-                                <Grid container spacing={1} >
-                                    <Grid item xs={6}></Grid>
-                                    <Grid item xs={6}>
-                                        <Link href="/telematic/forget/password" sx={{ float: 'right' }}>Forgot Password?</Link>
+                <Box sx={getMobileWrapperStyles(isMobile)}>
+                    <Container 
+                        component="main" 
+                        maxWidth="xs"
+                        sx={getMobileContainerStyles(isMobile)}
+                    >
+                        <Box
+                            sx={getMobileBoxStyles(isMobile)}
+                        >
+                            <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}>
+                                <LockOutlinedIcon />
+                            </Avatar>
+                            <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1, width: '100%' }}>
+                                <FormControl fullWidth>
+                                    <TextField
+                                        margin="normal"
+                                        required
+                                        id="username"
+                                        inputProps={ {'data-testid':'username'}}
+                                        label="User Name"
+                                        name="username"
+                                        autoComplete="username"
+                                        autoFocus
+                                        sx={getTextFieldStyles(isMobile)} />
+                                </FormControl>
+                                <FormControl fullWidth>
+                                    <TextField
+                                        margin="normal"
+                                        required
+                                        name="password"
+                                        inputProps={{'data-testid':'password'}}
+                                        label="Password"
+                                        type="password"
+                                        id="password"
+                                        autoComplete="current-password"
+                                        sx={getTextFieldStyles(isMobile)} />
+                                </FormControl>
+                                <Box>
+                                    <Grid container spacing={isMobile ? 0 : 1} >
+                                        <Grid item xs={6}></Grid>
+                                        <Grid item xs={6}>
+                                            <Link href="/telematic/forget/password" sx={{ float: 'right', fontSize: isMobile ? '0.85rem' : 'inherit' }}>Forgot Password?</Link>
+                                        </Grid>
+                                    </Grid>
+                                </Box>
+                                <Button
+                                    type="submit"
+                                    fullWidth
+                                    variant="contained"
+                                    sx={{ mt: 3, mb: 2 }}>
+                                    Sign In
+                                </Button>
+                            </Box>
+                            <Box component="div">
+                                <Grid container spacing={isMobile ? 0 : 1} >
+                                    <Grid item xs={12}>
+                                        <Link href="/telematic/register/user" sx={{ fontSize: isMobile ? '0.85rem' : 'inherit' }}>Register user</Link>
                                     </Grid>
                                 </Grid>
                             </Box>
-                            <Button
-                                type="submit"
-                                fullWidth
-                                variant="contained"
-                                sx={{ mt: 3, mb: 2 }}>
-                                Sign In
-                            </Button>
                         </Box>
-                        <Box component="div">
-                            <Grid container spacing={1} >
-                                <Grid item xs={12}>
-                                    <Link href="/telematic/register/user">Register user</Link>
-                                </Grid>
-                            </Grid>
-                        </Box>
-                    </Box>
-                </Container>
+                    </Container>
+                </Box>
             </ThemeProvider>
         </React.Fragment >
     );
