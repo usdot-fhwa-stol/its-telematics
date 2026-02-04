@@ -14,8 +14,7 @@
  * the License.
  */
 
-import React from 'react';
-import { AppBar, Toolbar, Typography, Box } from '@mui/material';
+import { AppBar, Box, Toolbar, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
 /**

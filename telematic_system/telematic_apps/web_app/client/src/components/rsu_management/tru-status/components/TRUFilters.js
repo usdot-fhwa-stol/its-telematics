@@ -14,17 +14,16 @@
  * the License.
  */
 
-import React from 'react';
+import SearchIcon from '@mui/icons-material/Search';
 import {
   Box,
-  TextField,
   FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Grid,
+  InputLabel,
+  MenuItem,
+  Select,
+  TextField,
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
 
 /**
  * TRU Filters Component

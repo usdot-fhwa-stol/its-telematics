@@ -14,18 +14,16 @@
  * the License.
  */
 
-import React from 'react';
+import RouterIcon from '@mui/icons-material/Router';
 import {
-  Box,
-  Typography,
+  Chip,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
   Paper,
-  Chip,
+  Typography
 } from '@mui/material';
-import RouterIcon from '@mui/icons-material/Router';
 
 /**
  * TRU Selector Component

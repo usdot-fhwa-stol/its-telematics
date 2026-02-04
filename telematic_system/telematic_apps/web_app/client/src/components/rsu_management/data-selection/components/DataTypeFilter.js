@@ -14,33 +14,56 @@
  * the License.
  */
 
-import React from 'react';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import {
-  Box,
-  Typography,
   FormControl,
   InputLabel,
-  Select,
+  ListSubheader,
   MenuItem,
   Paper,
+  Select,
+  Typography
 } from '@mui/material';
-import FilterListIcon from '@mui/icons-material/FilterList';
 
 /**
  * Data Type Filter Component
- * Allows filtering topics by data type
+ * Allows filtering topics by data type, organized by RSU
  */
-const DataTypeFilter = ({ value, onChange, disabled }) => {
-  const dataTypes = [
-    { value: 'all', label: 'All Topics' },
-    { value: 'bsm', label: 'BSM (Basic Safety Message)' },
-    { value: 'tim', label: 'TIM (Traveler Information Message)' },
-    { value: 'spat', label: 'SPaT (Signal Phase and Timing)' },
-    { value: 'map', label: 'MAP (Map Data)' },
-    { value: 'psm', label: 'PSM (Personal Safety Message)' },
-    { value: 'srm', label: 'SRM (Signal Request Message)' },
-    { value: 'ssm', label: 'SSM (Signal Status Message)' },
-  ];
+const DataTypeFilter = ({ value, onChange, disabled, availableDataTypes = [] }) => {
+  const handleChange = (event) => {
+    const newValue = event.target.value;
+    
+    // If "all" is selected, clear other selections and only keep "all"
+    if (newValue.includes('all') && !value.includes('all')) {
+      onChange(['all']);
+    }
+    // If any other option is selected while "all" is present, remove "all"
+    else if (newValue.includes('all') && value.includes('all') && newValue.length > 1) {
+      onChange(newValue.filter(v => v !== 'all'));
+    }
+    // If all selections are removed, default to "all"
+    else if (newValue.length === 0) {
+      onChange(['all']);
+    }
+    // Otherwise, use the new value as is
+    else {
+      onChange(newValue);
+    }
+  };
+
+  const renderSelectedValue = (selected) => {
+    if (selected.includes('all')) {
+      return 'All Topics';
+    }
+    // Extract and display unique topic names from RSU-specific values
+    const topicNames = selected
+      .filter(v => v !== 'all')
+      .map(v => {
+        const parts = v.split('-');
+        return parts.length > 1 ? parts.slice(1).join('-').toUpperCase() : v.toUpperCase();
+      });
+    return topicNames.length > 0 ? topicNames.join(', ') : 'All Topics';
+  };
 
   return (
     <Paper elevation={2} sx={{ p: 2 }}>
@@ -52,15 +75,24 @@ const DataTypeFilter = ({ value, onChange, disabled }) => {
       <FormControl fullWidth disabled={disabled}>
         <InputLabel>Data Type</InputLabel>
         <Select
+          multiple
           value={value}
           label="Data Type"
-          onChange={(e) => onChange(e.target.value)}
-        >
-          {dataTypes.map((type) => (
-            <MenuItem key={type.value} value={type.value}>
-              {type.label}
-            </MenuItem>
-          ))}
+          onChange={handleChange}
+          renderValue={renderSelectedValue}>
+          <MenuItem key="all" value="all">
+            All Topics
+          </MenuItem>
+          {availableDataTypes.map((rsuGroup) => [
+            <ListSubheader key={`header-${rsuGroup.rsuKey}`}>
+              {rsuGroup.rsuKey}
+            </ListSubheader>,
+            ...rsuGroup.topics.map((topic) => (
+              <MenuItem key={`${rsuGroup.rsuKey}-${topic}`} value={`${rsuGroup.rsuKey}-${topic}`} sx={{ pl: 4 }}>
+                {topic.toUpperCase()}
+              </MenuItem>
+            ))
+          ])}
         </Select>
       </FormControl>
       

@@ -16,19 +16,19 @@
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import EventIcon from '@mui/icons-material/Event';
 import LogoutIcon from '@mui/icons-material/Logout';
-import StreamIcon from '@mui/icons-material/Stream';
 import SettingsInputAntennaIcon from '@mui/icons-material/SettingsInputAntenna';
+import StreamIcon from '@mui/icons-material/Stream';
 import WorkHistorySharpIcon from '@mui/icons-material/WorkHistorySharp';
 import { List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Tooltip } from '@mui/material';
 import MuiDrawer from '@mui/material/Drawer';
 import { styled } from '@mui/material/styles';
+import { withStyles } from '@mui/styles';
 import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { getUserRole } from '../../api/api-org';
 import { checkServerSession, deleteUser } from '../../api/api-user';
 import AuthContext from '../../context/auth-context';
 import { USER_ROLES } from '../users/UserMetadata';
-import { withStyles } from '@mui/styles';
 
 const NavMenu = React.memo(() => {
     const authCtx = React.useContext(AuthContext);

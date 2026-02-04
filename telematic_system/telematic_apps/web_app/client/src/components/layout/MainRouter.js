@@ -17,15 +17,15 @@ import React, { useContext } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AuthContext from '../../context/auth-context';
 import AdminPage from '../../pages/AdminPage';
+import Dashboard from '../../pages/Dashboard';
 import EventPage from '../../pages/EventPage';
 import ForgetPasswordPage from '../../pages/ForgetPasswordPage';
-import Dashboard from '../../pages/Dashboard';
 import Login from '../../pages/Login';
 import RegisterUserPage from '../../pages/RegisterUserPage';
-import TopicPage from '../../pages/TopicPage';
-import { USER_ROLES } from '../users/UserMetadata';
 import ROS2RosbagPage from '../../pages/ROS2RosbagPage';
 import RSUManagementPage from '../../pages/RSUManagementPage';
+import TopicPage from '../../pages/TopicPage';
+import { USER_ROLES } from '../users/UserMetadata';
 
 const MainRouter = React.memo(() => {
   const authContext = useContext(AuthContext);
@@ -44,6 +44,7 @@ const MainRouter = React.memo(() => {
         {authContext.sessionToken !== null && <Route path="/telematic/login" element={<Navigate to="/telematic/events" replace></Navigate>}></Route>}
         {authContext.sessionToken === null && <Route path="/telematic/forget/password" element={<ForgetPasswordPage />} />}
         {authContext.sessionToken === null && <Route path="/telematic/register/user" element={<RegisterUserPage />} />}
+        {authContext.sessionToken === null && <Route path="/telematic/rsu-management" element={<RSUManagementPage />} />}
         {authContext.sessionToken === null && <Route path="*" element={<Navigate to="/telematic/login" replace></Navigate>}></Route>}
       </Routes>
     </React.Fragment>

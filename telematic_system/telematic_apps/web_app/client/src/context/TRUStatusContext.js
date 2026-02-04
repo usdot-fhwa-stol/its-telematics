@@ -14,8 +14,7 @@
  * the License.
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import rsuService from '../api/rsuService';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 const TRUStatusContext = createContext();
 

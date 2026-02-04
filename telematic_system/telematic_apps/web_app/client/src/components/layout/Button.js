@@ -14,7 +14,6 @@
  * the License.
  */
 
-import React from 'react';
 import { Button as MuiButton } from '@mui/material';
 
 /**

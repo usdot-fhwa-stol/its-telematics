@@ -14,44 +14,73 @@
  * the License.
  */
 
-import React from 'react';
+import ClearAllIcon from '@mui/icons-material/ClearAll';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import SelectAllIcon from '@mui/icons-material/SelectAll';
+import TopicIcon from '@mui/icons-material/Topic';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Box,
-  Typography,
+  Button,
+  Checkbox,
+  Chip,
+  Divider,
   List,
   ListItem,
   ListItemIcon,
   ListItemText,
-  Checkbox,
   Paper,
-  Button,
   Stack,
-  Divider,
+  Typography,
 } from '@mui/material';
-import TopicIcon from '@mui/icons-material/Topic';
-import SelectAllIcon from '@mui/icons-material/SelectAll';
-import ClearAllIcon from '@mui/icons-material/ClearAll';
 
 /**
  * Topic Selection List Component
- * Displays available topics and allows selection
+ * Displays available topics grouped by RSU and allows selection
  */
 const TopicSelectionList = ({
-  topics,
-  selectedTopics,
+  topicsByRSU = [],
+  selectedTopics = {},
   onToggle,
   onSelectAll,
   onClearAll,
   disabled,
 }) => {
-  const isTopicSelected = (topicName) => {
-    return selectedTopics.includes(topicName);
+  const isTopicSelected = (rsuKey, topicName) => {
+    return selectedTopics[rsuKey]?.includes(topicName) || false;
   };
 
   const getSelectionSummary = () => {
-    const selected = selectedTopics.length;
-    const total = topics.length;
-    return `${selected} of ${total} selected`;
+    const totalSelected = Object.values(selectedTopics).reduce(
+      (sum, topics) => sum + topics.length,
+      0
+    );
+    const totalAvailable = topicsByRSU.reduce(
+      (sum, rsuGroup) => sum + rsuGroup.topics.length,
+      0
+    );
+    return `${totalSelected} of ${totalAvailable} selected`;
+  };
+
+  const getRSUSelectionCount = (rsuKey) => {
+    const rsuGroup = topicsByRSU.find(g => g.rsuKey === rsuKey);
+    const selected = selectedTopics[rsuKey]?.length || 0;
+    const total = rsuGroup?.topics.length || 0;
+    return { selected, total };
+  };
+
+  const handleSelectAllForRSU = (rsuKey) => {
+    const rsuGroup = topicsByRSU.find(g => g.rsuKey === rsuKey);
+    if (rsuGroup) {
+      const topicNames = rsuGroup.topics.map(t => t.name);
+      onSelectAll({ [rsuKey]: topicNames });
+    }
+  };
+
+  const handleClearAllForRSU = (rsuKey) => {
+    onSelectAll({ [rsuKey]: [] });
   };
 
   return (
@@ -66,15 +95,20 @@ const TopicSelectionList = ({
         </Typography>
       </Box>
 
-      {/* Action Buttons */}
-      {!disabled && topics.length > 0 && (
+      {/* Global Action Buttons */}
+      {!disabled && topicsByRSU.length > 0 && (
         <>
           <Stack direction="row" spacing={1} mb={2}>
             <Button
               size="small"
               startIcon={<SelectAllIcon />}
-              onClick={onSelectAll}
-              disabled={selectedTopics.length === topics.length}
+              onClick={() => {
+                const allTopics = {};
+                topicsByRSU.forEach(rsuGroup => {
+                  allTopics[rsuGroup.rsuKey] = rsuGroup.topics.map(t => t.name);
+                });
+                onSelectAll(allTopics);
+              }}
             >
               Select All
             </Button>
@@ -82,7 +116,7 @@ const TopicSelectionList = ({
               size="small"
               startIcon={<ClearAllIcon />}
               onClick={onClearAll}
-              disabled={selectedTopics.length === 0}
+              disabled={Object.keys(selectedTopics).length === 0}
             >
               Clear All
             </Button>
@@ -91,46 +125,87 @@ const TopicSelectionList = ({
         </>
       )}
 
-      {/* Topics List */}
+      {/* Topics List Grouped by RSU */}
       {disabled ? (
         <Typography variant="body2" color="textSecondary" sx={{ py: 2 }}>
-          Please select TRU and RSU to view available topics
+          Please select TRU and RSU(s) to view available topics
         </Typography>
-      ) : topics.length === 0 ? (
+      ) : topicsByRSU.length === 0 ? (
         <Typography variant="body2" color="textSecondary" sx={{ py: 2 }}>
-          No topics available for the selected RSU
+          No topics available for the selected RSU(s)
         </Typography>
       ) : (
-        <List sx={{ maxHeight: 400, overflow: 'auto' }}>
-          {topics.map((topic) => {
-            const labelId = `topic-list-label-${topic.name}`;
-            const isSelected = isTopicSelected(topic.name);
-
+        <Box sx={{ maxHeight: 500, overflow: 'auto' }}>
+          {topicsByRSU.map((rsuGroup) => {
+            const { selected, total } = getRSUSelectionCount(rsuGroup.rsuKey);
+            
             return (
-              <ListItem
-                key={topic.name}
-                disablePadding
-                dense
-              >
-                <ListItemIcon>
-                  <Checkbox
-                    edge="start"
-                    checked={isSelected}
-                    tabIndex={-1}
-                    disableRipple
-                    inputProps={{ 'aria-labelledby': labelId }}
-                    onChange={() => onToggle(topic.name)}
-                  />
-                </ListItemIcon>
-                <ListItemText
-                  id={labelId}
-                  primary={topic.name}
-                  secondary={isSelected ? 'Selected' : 'Not selected'}
-                />
-              </ListItem>
+              <Accordion key={rsuGroup.rsuKey} defaultExpanded>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
+                    <Typography variant="subtitle2">
+                      {rsuGroup.rsuKey}
+                    </Typography>
+                    <Chip
+                      label={`${selected}/${total}`}
+                      size="small"
+                      color={selected > 0 ? 'primary' : 'default'}
+                      sx={{ mr: 2 }}
+                    />
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  {/* RSU-specific action buttons */}
+                  <Stack direction="row" spacing={1} mb={1}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => handleSelectAllForRSU(rsuGroup.rsuKey)}
+                      disabled={selected === total}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => handleClearAllForRSU(rsuGroup.rsuKey)}
+                      disabled={selected === 0}
+                    >
+                      Clear
+                    </Button>
+                  </Stack>
+                  
+                  <List dense>
+                    {rsuGroup.topics.map((topic) => {
+                      const labelId = `topic-list-label-${rsuGroup.rsuKey}-${topic.name}`;
+                      const isSelected = isTopicSelected(rsuGroup.rsuKey, topic.name);
+
+                      return (
+                        <ListItem key={topic.name} disablePadding dense>
+                          <ListItemIcon>
+                            <Checkbox
+                              edge="start"
+                              checked={isSelected}
+                              tabIndex={-1}
+                              disableRipple
+                              inputProps={{ 'aria-labelledby': labelId }}
+                              onChange={() => onToggle(rsuGroup.rsuKey, topic.name)}
+                            />
+                          </ListItemIcon>
+                          <ListItemText
+                            id={labelId}
+                            primary={topic.name}
+                            secondary={isSelected ? 'Selected' : 'Not selected'}
+                          />
+                        </ListItem>
+                      );
+                    })}
+                  </List>
+                </AccordionDetails>
+              </Accordion>
             );
           })}
-        </List>
+        </Box>
       )}
     </Paper>
   );

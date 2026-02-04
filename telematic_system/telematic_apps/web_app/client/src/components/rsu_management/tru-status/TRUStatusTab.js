@@ -14,19 +14,18 @@
  * the License.
  */
 
-import React from 'react';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import {
   Box,
-  Typography,
-  IconButton,
-  Tooltip,
   Chip,
+  IconButton,
   Stack,
+  Tooltip,
+  Typography,
 } from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import StatusTable from '../../common/StatusTable';
-import TRUFilters from './components/TRUFilters';
+import StatusTable from '../common/StatusTable';
 import useHardwareStatus from '../hooks/useHardwareStatus';
+import TRUFilters from './components/TRUFilters';
 
 /**
  * TRU Status Tab Component

@@ -14,15 +14,8 @@
  * the License.
  */
 
-import React from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import Button from '../../layout/Button';
-
-/**
- * Base Management Dialog Component
- * Wrapper for Register/Edit/Delete modals
- */
+import { Dialog, DialogActions, DialogContent, DialogTitle, IconButton } from '@mui/material';
 const ManagementDialog = ({
   open,
   onClose,

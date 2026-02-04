@@ -14,26 +14,26 @@
  * the License.
  */
 
-import React, { useState } from 'react';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import {
   Box,
-  Typography,
-  IconButton,
-  Tooltip,
-  Stack,
   Chip,
+  IconButton,
+  Stack,
+  Tooltip,
+  Typography,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import StatusTable from '../../common/StatusTable';
-import Button from '../../../layout/Button';
+import { useState } from 'react';
+import Button from '../../layout/Button';
+import StatusTable from '../common/StatusTable';
+import useHardwareStatus from '../hooks/useHardwareStatus';
+import DeleteRSUAlert from './components/DeleteRSUAlert';
+import EditRSUDialog from './components/EditRSUDialog';
 import RSUFilters from './components/RSUFilters';
 import RegisterRSUDialog from './components/RegisterRSUDialog';
-import EditRSUDialog from './components/EditRSUDialog';
-import DeleteRSUAlert from './components/DeleteRSUAlert';
-import useHardwareStatus from '../hooks/useHardwareStatus';
 
 /**
  * RSU Status Tab Component

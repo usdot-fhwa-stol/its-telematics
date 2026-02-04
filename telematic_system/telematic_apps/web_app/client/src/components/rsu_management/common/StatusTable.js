@@ -14,18 +14,17 @@
  * the License.
  */
 
-import React from 'react';
 import {
+  Box,
+  CircularProgress,
+  Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   Typography,
-  CircularProgress,
-  Box,
 } from '@mui/material';
 import StatusBadge from './StatusBadge';
 

@@ -14,8 +14,8 @@
  * the License.
  */
 import { AppBar, Button, CssBaseline, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, List, ListItemButton, ListItemText, Toolbar } from '@mui/material';
-import { Box } from '@mui/system';
 import { withStyles } from '@mui/styles';
+import { Box } from '@mui/system';
 import React, { useContext, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { checkServerSession, deleteUser } from '../../api/api-user';
@@ -75,7 +75,7 @@ const Layout = React.memo((props) => {
 
     return (
         <React.Fragment>
-            {authContext.sessionToken !== null &&
+            {authContext.sessionToken === null &&
                 <Box sx={{ display: 'flex' }}>
                     <CssBaseline />
                     <AppBar position="fixed" style={{ background: '#fff' }} sx={{ zIndex: (theme) => theme.zIndex.drawer + 1, marginBottom: 0 }}>

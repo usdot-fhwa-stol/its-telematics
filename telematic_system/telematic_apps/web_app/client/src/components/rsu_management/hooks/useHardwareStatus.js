@@ -14,8 +14,7 @@
  * the License.
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import rsuService from '../../../api/rsuService';
+import { useCallback, useEffect, useState } from 'react';
 
 // Dummy RSU status data for local testing
 const DUMMY_RSU_STATUSES = [

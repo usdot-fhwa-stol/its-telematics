@@ -14,29 +14,53 @@
  * the License.
  */
 
-import React from 'react';
+import SettingsInputAntennaIcon from '@mui/icons-material/SettingsInputAntenna';
 import {
   Box,
-  Typography,
+  Checkbox,
   List,
   ListItem,
-  ListItemButton,
+  ListItemIcon,
   ListItemText,
   Paper,
+  Typography
 } from '@mui/material';
-import SettingsInputAntennaIcon from '@mui/icons-material/SettingsInputAntenna';
 
 /**
  * RSU Selector Component
- * Allows users to select an RSU within the selected TRU
+ * Allows users to select multiple RSUs within the selected TRU
  */
-const RSUSelector = ({ rsuList, selectedRSU, onSelect, disabled }) => {
+const RSUSelector = ({ rsuList, selectedRSUs = [], onSelect, disabled }) => {
+  const isRSUSelected = (rsu) => {
+    return selectedRSUs.some(selected => 
+      selected.ip === rsu.ip && selected.port === rsu.port
+    );
+  };
+
+  const handleToggle = (rsu) => {
+    const isSelected = isRSUSelected(rsu);
+    if (isSelected) {
+      // Remove RSU from selection
+      onSelect(selectedRSUs.filter(selected => 
+        !(selected.ip === rsu.ip && selected.port === rsu.port)
+      ));
+    } else {
+      // Add RSU to selection
+      onSelect([...selectedRSUs, rsu]);
+    }
+  };
+
   return (
     <Paper elevation={2} sx={{ p: 2 }}>
-      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <SettingsInputAntennaIcon color="primary" />
-        Select RSU
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <SettingsInputAntennaIcon color="primary" />
+          Select RSU(s)
+        </Typography>
+        <Typography variant="caption" color="textSecondary">
+          {selectedRSUs.length} of {rsuList.length} selected
+        </Typography>
+      </Box>
       
       {disabled ? (
         <Typography variant="body2" color="textSecondary" sx={{ py: 2 }}>
@@ -47,24 +71,26 @@ const RSUSelector = ({ rsuList, selectedRSU, onSelect, disabled }) => {
           No RSUs available for this TRU
         </Typography>
       ) : (
-        <List>
-          {rsuList.map((rsu, index) => {
+        <List sx={{ maxHeight: 300, overflow: 'auto' }}>
+          {rsuList.map((rsu) => {
             const rsuKey = `${rsu.ip}:${rsu.port}`;
-            const isSelected = selectedRSU && 
-              selectedRSU.ip === rsu.ip && 
-              selectedRSU.port === rsu.port;
+            const isSelected = isRSUSelected(rsu);
               
             return (
-              <ListItem key={rsuKey} disablePadding>
-                <ListItemButton
-                  selected={isSelected}
-                  onClick={() => onSelect(rsu)}
-                >
-                  <ListItemText
-                    primary={rsuKey}
-                    secondary={`IP: ${rsu.ip} | Port: ${rsu.port}`}
+              <ListItem key={rsuKey} disablePadding dense>
+                <ListItemIcon>
+                  <Checkbox
+                    edge="start"
+                    checked={isSelected}
+                    tabIndex={-1}
+                    disableRipple
+                    onChange={() => handleToggle(rsu)}
                   />
-                </ListItemButton>
+                </ListItemIcon>
+                <ListItemText
+                  primary={rsuKey}
+                  secondary={`IP: ${rsu.ip} | Port: ${rsu.port}`}
+                />
               </ListItem>
             );
           })}

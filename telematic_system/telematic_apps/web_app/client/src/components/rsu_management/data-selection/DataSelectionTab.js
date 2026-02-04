@@ -14,26 +14,26 @@
  * the License.
  */
 
-import React, { useState } from 'react';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import SaveIcon from '@mui/icons-material/Save';
 import {
-  Box,
-  Typography,
-  Grid,
   Alert,
-  Snackbar,
+  Box,
+  Grid,
   Paper,
-  Stepper,
+  Snackbar,
   Step,
   StepLabel,
+  Stepper,
+  Typography,
 } from '@mui/material';
-import SaveIcon from '@mui/icons-material/Save';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import Button from '../../../layout/Button';
-import TRUSelector from './components/TRUSelector';
-import RSUSelector from './components/RSUSelector';
-import DataTypeFilter from './components/DataTypeFilter';
-import TopicSelectionList from './components/TopicSelectionList';
+import { useState } from 'react';
+import Button from '../../layout/Button';
 import useTopicConfiguration from '../hooks/useTopicConfiguration';
+import DataTypeFilter from './components/DataTypeFilter';
+import RSUSelector from './components/RSUSelector';
+import TopicSelectionList from './components/TopicSelectionList';
+import TRUSelector from './components/TRUSelector';
 
 /**
  * Data Selection Tab Component
@@ -42,19 +42,20 @@ import useTopicConfiguration from '../hooks/useTopicConfiguration';
 const DataSelectionTab = () => {
   const {
     selectedTRU,
-    selectedRSU,
+    selectedRSUs,
+    selectedTopics,
     dataTypeFilter,
-    filteredTopics,
+    filteredTopicsByRSU,
     loading,
     error,
     getTRUList,
     getRSUList,
+    getAvailableDataTypes,
     handleSelectTRU,
-    handleSelectRSU,
+    handleSelectRSUs,
     handleToggleTopic,
     handleSelectAll,
     handleClearAll,
-    isTopicSelected,
     handleDataTypeFilterChange,
     getSelectionSummary,
     handleSave,
@@ -64,16 +65,13 @@ const DataSelectionTab = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const summary = getSelectionSummary();
-  const selectedTopics = filteredTopics
-    .filter(topic => isTopicSelected(topic.name))
-    .map(topic => topic.name);
 
   const steps = ['Select TRU', 'Select RSU', 'Filter Topics', 'Select Topics'];
 
   const getActiveStep = () => {
     if (!selectedTRU) return 0;
-    if (!selectedRSU) return 1;
-    if (dataTypeFilter === 'all' && filteredTopics.length > 0) return 2;
+    if (selectedRSUs.length === 0) return 1;
+    if ((dataTypeFilter.includes('all') || dataTypeFilter.length === 0) && filteredTopicsByRSU.length > 0) return 2;
     return 3;
   };
 
@@ -106,11 +104,6 @@ const DataSelectionTab = () => {
 
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
-  };
-
-  const handleSelectAllFiltered = () => {
-    const topicNames = filteredTopics.map(t => t.name);
-    handleSelectAll(topicNames);
   };
 
   return (
@@ -151,7 +144,7 @@ const DataSelectionTab = () => {
             {summary.rsuSelected && (
               <>
                 {' | '}
-                <strong>Selected RSU:</strong> {selectedRSU.ip}:{selectedRSU.port}
+                <strong>Selected RSUs:</strong> {summary.rsuCount} RSU(s)
               </>
             )}
             {summary.topicCount > 0 && (
@@ -179,8 +172,8 @@ const DataSelectionTab = () => {
         <Grid item xs={12} md={3}>
           <RSUSelector
             rsuList={getRSUList()}
-            selectedRSU={selectedRSU}
-            onSelect={handleSelectRSU}
+            selectedRSUs={selectedRSUs}
+            onSelect={handleSelectRSUs}
             disabled={!selectedTRU}
           />
         </Grid>
@@ -190,19 +183,20 @@ const DataSelectionTab = () => {
           <DataTypeFilter
             value={dataTypeFilter}
             onChange={handleDataTypeFilterChange}
-            disabled={!selectedRSU}
+            disabled={selectedRSUs.length === 0}
+            availableDataTypes={getAvailableDataTypes()}
           />
         </Grid>
 
         {/* Column 4: Topic Selection List */}
         <Grid item xs={12} md={3}>
           <TopicSelectionList
-            topics={filteredTopics}
+            topicsByRSU={filteredTopicsByRSU}
             selectedTopics={selectedTopics}
             onToggle={handleToggleTopic}
-            onSelectAll={handleSelectAllFiltered}
+            onSelectAll={handleSelectAll}
             onClearAll={handleClearAll}
-            disabled={!selectedRSU}
+            disabled={selectedRSUs.length === 0}
           />
         </Grid>
       </Grid>
@@ -220,7 +214,7 @@ const DataSelectionTab = () => {
         <Button
           startIcon={<SaveIcon />}
           onClick={handleSaveConfiguration}
-          disabled={!selectedRSU || summary.topicCount === 0 || loading}
+          disabled={selectedRSUs.length === 0 || summary.topicCount === 0 || loading}
         >
           {loading ? 'Saving...' : 'Save Configuration'}
         </Button>

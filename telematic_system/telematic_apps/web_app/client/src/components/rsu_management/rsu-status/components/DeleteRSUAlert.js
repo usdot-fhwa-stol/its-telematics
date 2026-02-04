@@ -14,18 +14,18 @@
  * the License.
  */
 
-import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Typography,
-  Alert,
-} from '@mui/material';
 import WarningIcon from '@mui/icons-material/Warning';
-import Button from '../../../layout/Button';
+import {
+  Alert,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Typography,
+} from '@mui/material';
+import { useState } from 'react';
 import rsuService from '../../../../api/rsuService';
+import Button from '../../../layout/Button';
 
 /**
  * Delete RSU Alert Component

@@ -14,9 +14,8 @@
  * the License.
  */
 
-import React from 'react';
-import { Chip } from '@mui/material';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import { Chip } from '@mui/material';
 
 /**
  * Status Badge Component

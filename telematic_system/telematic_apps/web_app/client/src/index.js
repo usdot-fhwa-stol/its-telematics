@@ -13,11 +13,11 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
+import { Capacitor } from '@capacitor/core';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { Capacitor } from '@capacitor/core';
 
 /*
  * Copyright (C) 2019-2024 LEIDOS.
@@ -37,8 +37,8 @@ import { Capacitor } from '@capacitor/core';
 import { CookiesProvider } from "react-cookie";
 import { BrowserRouter } from 'react-router-dom';
 import { AuthContextProvider } from './context/auth-context';
+import { ROS2RosbagContextProvider } from './context/ros2-rosbag-context';
 import { TopicContextProvider } from './context/topic-context';
-import {ROS2RosbagContextProvider} from './context/ros2-rosbag-context';
 
 // Import mobile-specific CSS
 import './mobile.css';

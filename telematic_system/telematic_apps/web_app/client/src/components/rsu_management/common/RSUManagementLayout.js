@@ -14,11 +14,11 @@
  * the License.
  */
 
-import React, { useState } from 'react';
-import { Box, Tabs, Tab, Paper } from '@mui/material';
+import { Box, Paper, Tab, Tabs } from '@mui/material';
+import { useState } from 'react';
+import DataSelectionTab from '../data-selection/DataSelectionTab';
 import RSUStatusTab from '../rsu-status/RSUStatusTab';
 import TRUStatusTab from '../tru-status/TRUStatusTab';
-import DataSelectionTab from '../data-selection/DataSelectionTab';
 
 /**
  * RSU Management Layout Component
@@ -43,14 +43,14 @@ const RSUManagementLayout = () => {
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
           <Tab label="RSU Status" />
-          <Tab label="TRU Status" />
           <Tab label="Data Selection" />
+          <Tab label="TRU Status" />
         </Tabs>
 
         <Box sx={{ p: 3 }}>
           {activeTab === 0 && <RSUStatusTab />}
-          {activeTab === 1 && <TRUStatusTab />}
-          {activeTab === 2 && <DataSelectionTab />}
+          {activeTab === 1 && <DataSelectionTab />}
+          {activeTab === 2 && <TRUStatusTab />}
         </Box>
       </Paper>
     </Box>

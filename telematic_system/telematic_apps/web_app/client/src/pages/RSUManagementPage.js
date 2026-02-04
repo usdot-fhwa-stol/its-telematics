@@ -14,11 +14,11 @@
  * the License.
  */
 
-import React from 'react';
-import { Grid } from '@mui/material';
 import SettingsInputAntennaIcon from '@mui/icons-material/SettingsInputAntenna';
-import { PageAvatar } from '../components/ui/PageAvatar';
+import { Grid } from '@mui/material';
+import React from 'react';
 import RSUManagementLayout from '../components/rsu_management/common/RSUManagementLayout';
+import { PageAvatar } from '../components/ui/PageAvatar';
 
 const RSUManagementPage = React.memo(() => {
   return (
