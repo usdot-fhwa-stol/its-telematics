@@ -17,6 +17,7 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import EventIcon from '@mui/icons-material/Event';
 import LogoutIcon from '@mui/icons-material/Logout';
 import StreamIcon from '@mui/icons-material/Stream';
+import SettingsInputAntennaIcon from '@mui/icons-material/SettingsInputAntenna';
 import WorkHistorySharpIcon from '@mui/icons-material/WorkHistorySharp';
 import { List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Tooltip } from '@mui/material';
 import MuiDrawer from '@mui/material/Drawer';
@@ -126,6 +127,20 @@ const NavMenu = React.memo(() => {
                                 </ListItemIcon>
                             </Tooltip>
                             <ListItemText primary="Topics" />
+                        </StyledListItemButton>
+                    </ListItem>
+                    }
+                    { location.pathname.includes("/telematic") && 
+                    <ListItem key="RSU Management" disablePadding sx={{ display: 'block' }}>
+                        <StyledListItemButton
+                            component={Link} to="/telematic/rsu-management"
+                            selected={"/telematic/rsu-management" === location.pathname}>
+                            <Tooltip title="RSU Management" placement="right-start" arrow>
+                                <ListItemIcon>
+                                    <SettingsInputAntennaIcon />
+                                </ListItemIcon>
+                            </Tooltip>
+                            <ListItemText primary="RSU Management" />
                         </StyledListItemButton>
                     </ListItem>
                     }

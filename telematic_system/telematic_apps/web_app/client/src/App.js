@@ -17,12 +17,21 @@
 import React from 'react';
 import MainRouter from './components/layout/MainRouter';
 import Layout from './components/layout/Layout';
+import { TRUConfigProvider } from './context/TRUConfigContext';
+import { TRUStatusProvider } from './context/TRUStatusContext';
+import { TRUTopicsProvider } from './context/TRUTopicsContext';
 
 function App() {
   return (
-      <Layout>
-        <MainRouter />
-      </Layout>
+    <TRUConfigProvider>
+      <TRUStatusProvider>
+        <TRUTopicsProvider>
+          <Layout>
+            <MainRouter />
+          </Layout>
+        </TRUTopicsProvider>
+      </TRUStatusProvider>
+    </TRUConfigProvider>
   );
 }
 
