@@ -14,7 +14,7 @@
  * the License.
  */
 import React from 'react';
-import { useClearSessionStorage, useSessionStorageNumber, useSessionStorageString } from "react-use-window-sessionstorage";
+import { useStorageString, useStorageNumber, useClearStorage } from "../hooks/useStorage";
 
 const AuthContext = React.createContext({
   isAuth: false,
@@ -37,40 +37,40 @@ const AuthContext = React.createContext({
 })
 
 export const AuthContextProvider = (props) => {
-  const [isAuthenticated, setIsAuthenticated] = useSessionStorageString("isAuth", false);
-  const [username, setUsername] = useSessionStorageString("username", null);
-  const [email, setEmail] = useSessionStorageString("email", null);
-  const [role, setRole] = useSessionStorageString("role", null);
-  const [is_admin, setIsAdmin] = useSessionStorageString("is_admin", null);
-  const [user_id, setUserId] = useSessionStorageString("user_id", null);
-  const [last_seen_at, setLastSeenAt] = useSessionStorageString("last_seen_at", null);
-  const [org_id, setOrgId] = useSessionStorageString("org_id", null);
-  const [org_name, setOrgName] = useSessionStorageString("org_name", null);
-  const [name, setName] = useSessionStorageString("name", null);
-  const [sessionToken, setSessionToken] = useSessionStorageString("sessionToken", null);
-  const clearSessionStorage = useClearSessionStorage();
-  const [sessionExpiredAt, setSessionExpiredAt] = useSessionStorageNumber("sessionExpiredAt",0);
+  const [isAuthenticated, setIsAuthenticated] = useStorageString("isAuth", false);
+  const [username, setUsername] = useStorageString("username", null);
+  const [email, setEmail] = useStorageString("email", null);
+  const [role, setRole] = useStorageString("role", null);
+  const [is_admin, setIsAdmin] = useStorageString("is_admin", null);
+  const [user_id, setUserId] = useStorageString("user_id", null);
+  const [last_seen_at, setLastSeenAt] = useStorageString("last_seen_at", null);
+  const [org_id, setOrgId] = useStorageString("org_id", null);
+  const [org_name, setOrgName] = useStorageString("org_name", null);
+  const [name, setName] = useStorageString("name", null);
+  const [sessionToken, setSessionToken] = useStorageString("sessionToken", null);
+  const clearStorage = useClearStorage();
+  const [sessionExpiredAt, setSessionExpiredAt] = useStorageNumber("sessionExpiredAt",0);
 
   const loginHandler = (user_id, username, sessionToken, sessionExpiredAt, email, last_seen_at, org_id,org_name, name, is_admin) => {
     if (username !== undefined && username !== ""
-      && sessionToken !== undefined && sessionToken !== "") {
-      setUserId(user_id);
-      setIsAuthenticated(true);
-      setUsername(username);
-      setEmail(email);
-      setSessionToken(sessionToken);
-      setSessionExpiredAt(sessionExpiredAt);
-      setLastSeenAt(last_seen_at);
-      setOrgId(org_id);
-      setOrgName(org_name)
-      setName(name);
-      setIsAdmin(is_admin);
-      return true;
+        && sessionToken !== undefined && sessionToken !== "") {
+        setUserId(user_id);
+        setIsAuthenticated(true);
+        setUsername(username);
+        setEmail(email);
+        setSessionToken(sessionToken);
+        setSessionExpiredAt(sessionExpiredAt);
+        setLastSeenAt(last_seen_at);
+        setOrgId(org_id);
+        setOrgName(org_name)
+        setName(name);
+        setIsAdmin(is_admin);
+        return true;
     } else {
-      setIsAuthenticated(false);
-      return false;
+        setIsAuthenticated(false);
+        return false;
     }
-  }
+}
 
   const logoutHandler = () => {
     setIsAuthenticated(false);
@@ -83,7 +83,7 @@ export const AuthContextProvider = (props) => {
     setOrgId(null);
     setName(null);
     setIsAdmin(null);
-    clearSessionStorage();
+    clearStorage();
   }
 
   const updateRoleHandler = (role) => {

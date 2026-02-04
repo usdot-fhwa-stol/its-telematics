@@ -22,3 +22,4 @@ export class RSUConfigStatus {
         this.timestamp = timestamp;
     }
 }
+

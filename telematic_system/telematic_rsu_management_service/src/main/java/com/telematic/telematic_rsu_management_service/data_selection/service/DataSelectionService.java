@@ -112,7 +112,11 @@ public class DataSelectionService {
                 Duration.ofSeconds(confirmTopicRequestTimeoutSeconds));   
         TRUTopicsMessage truTopicsMessageRResponse = serializer.decode(message.payload(), TRUTopicsMessage.class);
         log.info("Received confirm topics response: {}", truTopicsMessageRResponse);
-        dataSelectionDepositor.processDataSelection(truTopicsMessageRResponse);
+        boolean persisted = dataSelectionDepositor.processDataSelection(truTopicsMessageRResponse);
+        if (!persisted) {
+            log.warn("Data selection persistence skipped due to missing configuration for TRU ID '{}'.", truTopicsMessage.getUnitId());
+            throw new IllegalArgumentException("No TRU/RSU configuration found for unitId=" + truTopicsMessage.getUnitId());
+        }
         return truTopicsMessageRResponse;
     }
 }

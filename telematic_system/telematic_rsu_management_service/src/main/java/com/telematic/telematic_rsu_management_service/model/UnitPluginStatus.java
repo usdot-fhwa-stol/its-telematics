@@ -36,10 +36,10 @@ public class UnitPluginStatus {
     @Column(name = "unit_plugin_status_id")
     private int id;
     
-    @JsonProperty("BridgePluginStatus")
+    @JsonProperty("bridgePluginStatus")
     private String bridgePluginStatus;
-    
-    @JsonProperty("LastCommunicationTimestamp")
+	
+    @JsonProperty("lastCommunicationTimestamp")
     private Long lastCommunicationTimestamp;
     
     @JsonProperty("timestamp")

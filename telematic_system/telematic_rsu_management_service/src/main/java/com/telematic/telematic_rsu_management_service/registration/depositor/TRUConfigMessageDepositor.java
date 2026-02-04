@@ -63,6 +63,10 @@ public class TRUConfigMessageDepositor {
                                                             existingTruConfig.getId());
                 }else if (rsuConfigItemMessage.getAction().equalsIgnoreCase("update") || rsuConfigItemMessage.getAction().equalsIgnoreCase("modify")) {
                     for (RSUConfigStatus rsuConfigStatus : existingRsuConfigStatusList) {
+                        if (rsuConfigStatus.getRsuEndpoint() == null) {
+                            log.warn("Skipping RSUConfigStatus with null RSUEndpoint for TRU ID: {}", existingTruConfig.getId());
+                            continue;
+                        }
                         if (rsuConfigStatus.getRsuEndpoint().getIp().equals(rsuConfigItemMessage.getRsuEndpoint().getIp())
                                 && rsuConfigStatus.getRsuEndpoint().getPort().equals(rsuConfigItemMessage.getRsuEndpoint().getPort())) {
                             rsuConfigStatus.setEvent(rsuConfigItemMessage.getEvent());
@@ -78,6 +82,10 @@ public class TRUConfigMessageDepositor {
                     }
                 }else if (rsuConfigItemMessage.getAction().equalsIgnoreCase("remove") || rsuConfigItemMessage.getAction().equalsIgnoreCase("delete")) {
                     existingRsuConfigStatusList.removeIf(rsuConfigStatus -> {
+                        if (rsuConfigStatus.getRsuEndpoint() == null) {
+                            log.warn("Skipping RSUConfigStatus with null RSUEndpoint during remove for TRU ID: {}", existingTruConfig.getId());
+                            return false;
+                        }
                         boolean match = rsuConfigStatus.getRsuEndpoint().getIp().equals(rsuConfigItemMessage.getRsuEndpoint().getIp())
                                 && rsuConfigStatus.getRsuEndpoint().getPort().equals(rsuConfigItemMessage.getRsuEndpoint().getPort());
                         if (match) {

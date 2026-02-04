@@ -194,8 +194,10 @@ exports.loginUser = (req, res) => {
             //Checking if user password match
             let is_pwd_match = saltHash.verifySaltHash(data[0].salt, data[0].password, req.body.password);
             if (is_pwd_match) {
+                console.log("User authenticated successfully.");
                 //Update user credential file
                 htpasswordManager.upsertUser(req.body.username, req.body.password).then((status) => {
+                    console.log("User credential file updated.");
                     //get org name
                     org.findAll({ where: { id: data[0].org_id } }).then(org_data => {
                         if (org_data.length > 0) {

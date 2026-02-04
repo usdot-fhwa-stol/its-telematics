@@ -6,8 +6,10 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import * as Yup from 'yup';
+import { Capacitor } from '@capacitor/core';
 import { updatePassword } from '../api/api-user';
 import { SEVERITY } from '../components/users/UserMetadata';
+import { getMobileWrapperStyles, getMobileContainerStyles, getMobileBoxStyles, getTextFieldStyles } from '../utils/mobileStyles';
 
 const ForgetPasswordPage = React.memo(() => {
   const [open, setOpen] = useState(false);
@@ -17,6 +19,7 @@ const ForgetPasswordPage = React.memo(() => {
   const [errorMsg, setErrorMsg] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [isMobile] = useState(Capacitor.isNativePlatform());
   const theme = createTheme();
   const handleClose = () => {
     setErrorMsg('')
@@ -110,18 +113,19 @@ const ForgetPasswordPage = React.memo(() => {
             {errorMsg}
           </Alert>
         </Snackbar>
-        <Container component="main" maxWidth="xs">
-          <Box
-            sx={{
-              marginTop: 12,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-            }} >
+        <Box sx={getMobileWrapperStyles(isMobile)}>
+          <Container 
+            component="main" 
+            maxWidth="xs"
+            sx={getMobileContainerStyles(isMobile)}
+          >
+            <Box
+              sx={getMobileBoxStyles(isMobile, 12)}
+            >
             <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}>
               <PasswordIcon />
             </Avatar>
-            <Box component="form" sx={{ mt: 1 }}>
+            <Box component="form" sx={{ mt: 1, width: '100%' }}>
               <FormControl fullWidth>
                 <TextField id="name"
                   label="User Name *"
@@ -132,7 +136,8 @@ const ForgetPasswordPage = React.memo(() => {
                   error={errors.name ? true : false}
                   margin="normal"
                   value={username}
-                  onChange={handleName} />
+                  onChange={handleName}
+                  sx={getTextFieldStyles(isMobile)} />
               </FormControl>
 
               <FormControl fullWidth>
@@ -145,7 +150,8 @@ const ForgetPasswordPage = React.memo(() => {
                   {...register('email')}
                   value={email}
                   error={errors.email ? true : false}
-                  onChange={handleEmail} />
+                  onChange={handleEmail}
+                  sx={getTextFieldStyles(isMobile)} />
               </FormControl>
 
               <FormControl fullWidth>
@@ -161,7 +167,8 @@ const ForgetPasswordPage = React.memo(() => {
                   variant='outlined'
                   {...register('new_password')}
                   error={errors.new_password ? true : false}
-                  onChange={handleNewPassword} />
+                  onChange={handleNewPassword}
+                  sx={getTextFieldStyles(isMobile)} />
               </FormControl>
 
               <FormControl fullWidth>
@@ -177,22 +184,30 @@ const ForgetPasswordPage = React.memo(() => {
                   error={errors.confirm_new_password ? true : false}
                   variant='outlined'
                   value={confirmNewPwd}
-                  onChange={handleConfirmPassword} />
+                  onChange={handleConfirmPassword}
+                  sx={getTextFieldStyles(isMobile)} />
               </FormControl>
-              <Box>
-                <Grid container>
+              <Box sx={{ width: '100%' }}>
+                <Grid container spacing={isMobile ? 0 : 0}>
                   <Grid item xs={6}>
-                    <Button sx={{ float: 'left' }} href="/telematic/login" variant='outlined'>
-                    <KeyboardDoubleArrowLeftIcon/>
-                    Back To Login</Button>
+                    <Button 
+                      sx={{ float: 'left', fontSize: isMobile ? '0.75rem' : 'inherit' }} 
+                      href="/telematic/login" 
+                      variant='outlined'
+                      size={isMobile ? 'small' : 'medium'}
+                    >
+                      <KeyboardDoubleArrowLeftIcon fontSize="small"/>
+                      {isMobile ? 'Back' : 'Back To Login'}
+                    </Button>
                   </Grid>
                   <Grid item xs={6} >
                     <Button
-                      sx={{ float: 'right' }}
+                      sx={{ float: 'right', fontSize: isMobile ? '0.75rem' : 'inherit' }}
                       variant='contained'
                       margin="normal"
+                      size={isMobile ? 'small' : 'medium'}
                       onClick={handleSubmit(changePassword)}>
-                      Reset Password
+                      Reset {isMobile ? 'Pwd' : 'Password'}
                     </Button>
                   </Grid>
                 </Grid>
@@ -200,6 +215,7 @@ const ForgetPasswordPage = React.memo(() => {
             </Box>
           </Box>
         </Container>
+        </Box>
       </ThemeProvider>
     </React.Fragment >
   )
