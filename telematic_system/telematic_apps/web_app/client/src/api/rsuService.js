@@ -15,8 +15,9 @@
  */
 
 import axios from 'axios';
+import { env } from "../env";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+const API_BASE_URL = `${env.REACT_APP_WEB_SERVER_URI}/api`
 
 /**
  * API Service for RSU/TRU Management
@@ -24,58 +25,15 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
  */
 const rsuService = {
   /**
-   * Get all TRU (Telematic Roadside Unit) configurations
-   * @returns {Promise} TruConfigMessage array
-   */
-  getTRUConfigs: async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/tru/configs`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching TRU configs:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get TRU configuration by unit ID
-   * @param {string} unitId - The TRU unit ID
-   * @returns {Promise} TruConfigMessage
-   */
-  getTRUConfigById: async (unitId) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/tru/configs/${unitId}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching TRU config for ${unitId}:`, error);
-      throw error;
-    }
-  },
-
-  /**
-   * Update TRU configuration
-   * @param {string} unitId - The TRU unit ID
-   * @param {Object} configData - TruConfigMessage data
-   * @returns {Promise}
-   */
-  updateTRUConfig: async (unitId, configData) => {
-    try {
-      const response = await axios.put(`${API_BASE_URL}/tru/configs/${unitId}`, configData);
-      return response.data;
-    } catch (error) {
-      console.error(`Error updating TRU config for ${unitId}:`, error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get all TRU status information
-   * @returns {Promise} Array of TRU status objects
+   * Get all TRU status information (TruConfigStatus)
+   * @returns {Promise} Array of TruConfigStatus objects
    */
   getTRUStatuses: async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/tru/status`);
-      return response.data;
+      const response = await axios.get(`${API_BASE_URL}/rsu-registration/all-tru-config`, { withCredentials: true });
+      console.log('Fetched TRU statuses:', response.data);
+      // API returns {message, data, count} - extract the data array
+      return response.data.data || response.data;
     } catch (error) {
       console.error('Error fetching TRU statuses:', error);
       throw error;
@@ -83,202 +41,85 @@ const rsuService = {
   },
 
   /**
-   * Get TRU status by unit ID
-   * @param {string} unitId - The TRU unit ID
-   * @returns {Promise} TRU status object
-   */
-  getTRUStatusById: async (unitId) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/tru/status/${unitId}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching TRU status for ${unitId}:`, error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get all TRU topics
-   * @returns {Promise} Array of TRUTopicsMessage
-   */
-  getTRUTopics: async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/tru/topics`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching TRU topics:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get TRU topics by unit ID
-   * @param {string} unitId - The TRU unit ID
-   * @returns {Promise} TRUTopicsMessage
-   */
-  getTRUTopicsById: async (unitId) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/tru/topics/${unitId}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching TRU topics for ${unitId}:`, error);
-      throw error;
-    }
-  },
-
-  /**
-   * Update TRU topics configuration
-   * @param {string} unitId - The TRU unit ID
-   * @param {Object} topicsData - TRUTopicsMessage data
+   * Assign/Register RSU to a TRU
+   * @param {Object} truConfigMessage - TruConfigMessage with unitConfig and rsuConfigs
    * @returns {Promise}
    */
-  updateTRUTopics: async (unitId, topicsData) => {
+  assignRSU: async (truConfigMessage) => {
     try {
-      const response = await axios.put(`${API_BASE_URL}/tru/topics/${unitId}`, topicsData);
-      return response.data;
+      const response = await axios.post(`${API_BASE_URL}/rsu-registration/assign-rsu`, truConfigMessage, { withCredentials: true });
+      console.log('RSU assigned successfully:', response.data);
+      return response.data.data || response.data;
     } catch (error) {
-      console.error(`Error updating TRU topics for ${unitId}:`, error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get all RSU (Roadside Unit) configurations
-   * @returns {Promise} Array of RSU configurations
-   */
-  getRSUConfigs: async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/rsu/configs`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching RSU configs:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get RSU configuration by IP and port
-   * @param {string} ip - RSU IP address
-   * @param {number} port - RSU port
-   * @returns {Promise} RSU configuration
-   */
-  getRSUConfigById: async (ip, port) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/rsu/configs/${ip}/${port}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching RSU config for ${ip}:${port}:`, error);
-      throw error;
-    }
-  },
-
-  /**
-   * Register a new RSU
-   * @param {Object} rsuData - RSU configuration data including RSUEndpoint
-   * @returns {Promise}
-   */
-  registerRSU: async (rsuData) => {
-    try {
-      const response = await axios.post(`${API_BASE_URL}/rsu/configs`, rsuData);
-      return response.data;
-    } catch (error) {
-      console.error('Error registering RSU:', error);
+      console.error('Error assigning RSU:', error);
       throw error;
     }
   },
 
   /**
    * Update RSU configuration
-   * @param {string} ip - RSU IP address
-   * @param {number} port - RSU port
-   * @param {Object} rsuData - Updated RSU configuration data
+   * @param {Object} truConfigMessage - TruConfigMessage with unitConfig and rsuConfigs
    * @returns {Promise}
    */
-  updateRSU: async (ip, port, rsuData) => {
+  updateRSUConfig: async (truConfigMessage) => {
     try {
-      const response = await axios.put(`${API_BASE_URL}/rsu/configs/${ip}/${port}`, rsuData);
-      return response.data;
+      const response = await axios.post(`${API_BASE_URL}/rsu-registration/update-rsu-config`, truConfigMessage, { withCredentials: true });
+      console.log('RSU config updated successfully:', response.data);
+      return response.data.data || response.data;
     } catch (error) {
-      console.error(`Error updating RSU ${ip}:${port}:`, error);
+      console.error('Error updating RSU config:', error);
       throw error;
     }
   },
 
   /**
-   * Delete RSU
-   * @param {string} ip - RSU IP address
-   * @param {number} port - RSU port
+   * Remove RSU assignment from TRU
+   * @param {Object} truConfigMessage - TruConfigMessage with unitConfig and rsuConfigs to remove
    * @returns {Promise}
    */
-  deleteRSU: async (ip, port) => {
+  removeRSU: async (truConfigMessage) => {
     try {
-      const response = await axios.delete(`${API_BASE_URL}/rsu/configs/${ip}/${port}`);
-      return response.data;
+      const response = await axios.post(`${API_BASE_URL}/rsu-registration/remove-rsu`, truConfigMessage, { withCredentials: true });
+      console.log('RSU removed successfully:', response.data);
+      return response.data.data || response.data;
     } catch (error) {
-      console.error(`Error deleting RSU ${ip}:${port}:`, error);
+      console.error('Error removing RSU:', error);
       throw error;
     }
   },
 
   /**
-   * Get RSU status information
-   * @returns {Promise} Array of RSU status objects
+   * Get available topics for data selection
+   * @param {Object} truTopicsMessage - TRUTopicsMessage with unitId and rsuTopics
+   * @returns {Promise} TRUTopicsMessage with available topics
    */
-  getRSUStatuses: async () => {
+  getAvailableTopics: async (truTopicsMessage) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/rsu/status`);
-      return response.data;
+      console.log('Fetching available topics with message:', truTopicsMessage);
+      const response = await axios.post(`${API_BASE_URL}/data-selection/available-topics`, truTopicsMessage, {
+        withCredentials: true
+      });
+      console.log('Fetched available topics:', response.data);
+      return response.data.data || response.data;
     } catch (error) {
-      console.error('Error fetching RSU statuses:', error);
+      console.error('Error fetching available topics:', error);
       throw error;
     }
   },
 
   /**
-   * Get RSU status by IP and port
-   * @param {string} ip - RSU IP address
-   * @param {number} port - RSU port
-   * @returns {Promise} RSU status object
+   * Confirm data selection for topics
+   * @param {Object} truTopicsMessage - TRUTopicsMessage with unitId and selected rsuTopics
+   * @returns {Promise} TRUTopicsMessage
    */
-  getRSUStatusById: async (ip, port) => {
+  confirmDataSelection: async (truTopicsMessage) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/rsu/status/${ip}/${port}`);
-      return response.data;
+      console.log('Confirming data selection with message:', truTopicsMessage);
+      const response = await axios.post(`${API_BASE_URL}/data-selection/confirm-topics`, truTopicsMessage, { withCredentials: true });
+      console.log('Data selection confirmed:', response.data);
+      return response.data.data || response.data;
     } catch (error) {
-      console.error(`Error fetching RSU status for ${ip}:${port}:`, error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get RSU topics configuration
-   * @param {string} ip - RSU IP address
-   * @param {number} port - RSU port
-   * @returns {Promise} RSUTopicsMessage
-   */
-  getRSUTopics: async (ip, port) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/rsu/topics/${ip}/${port}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching RSU topics for ${ip}:${port}:`, error);
-      throw error;
-    }
-  },
-
-  /**
-   * Update RSU topics configuration
-   * @param {string} ip - RSU IP address
-   * @param {number} port - RSU port
-   * @param {Object} topicsData - RSUTopicsMessage data
-   * @returns {Promise}
-   */
-  updateRSUTopics: async (ip, port, topicsData) => {
-    try {
-      const response = await axios.put(`${API_BASE_URL}/rsu/topics/${ip}/${port}`, topicsData);
-      return response.data;
-    } catch (error) {
-      console.error(`Error updating RSU topics for ${ip}:${port}:`, error);
+      console.error('Error confirming data selection:', error);
       throw error;
     }
   },

@@ -14,15 +14,17 @@
  * the License.
  */
 
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import RouterIcon from '@mui/icons-material/Router';
 import {
-  Chip,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  Paper,
-  Typography
+    Chip,
+    List,
+    ListItem,
+    ListItemButton,
+    ListItemText,
+    Paper,
+    Tooltip,
+    Typography
 } from '@mui/material';
 
 /**
@@ -33,8 +35,11 @@ const TRUSelector = ({ truList, selectedTRU, onSelect }) => {
   return (
     <Paper elevation={2} sx={{ p: 2 }}>
       <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <RouterIcon color="primary" />
+        <RouterIcon sx={{ color: '#748c93' }} />
         Select TRU
+        <Tooltip title="Telematic Recording Unit (TRU) - A device that collects and manages data from multiple RSUs" arrow>
+          <InfoOutlinedIcon sx={{ fontSize: 18, color: 'text.secondary', cursor: 'help' }} />
+        </Tooltip>
       </Typography>
       
       {truList.length === 0 ? (
@@ -56,7 +61,10 @@ const TRUSelector = ({ truList, selectedTRU, onSelect }) => {
                 <Chip
                   label={`${tru.rsuCount} RSU${tru.rsuCount !== 1 ? 's' : ''}`}
                   size="small"
-                  color={tru.rsuCount > 0 ? 'primary' : 'default'}
+                  sx={{ 
+                    backgroundColor: tru.rsuCount > 0 ? '#748c93' : undefined,
+                    color: tru.rsuCount > 0 ? 'white' : undefined
+                  }}
                 />
               </ListItemButton>
             </ListItem>

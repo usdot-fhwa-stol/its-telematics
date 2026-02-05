@@ -14,7 +14,8 @@
  * the License.
  */
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useState } from 'react';
+import rsuService from '../api/rsuService';
 
 const TRUConfigContext = createContext();
 
@@ -118,98 +119,147 @@ export const TRUConfigProvider = ({ children }) => {
   const [lastUpdated, setLastUpdated] = useState(null);
 
   /**
-   * Fetch all TRU configurations
+   * Build a TruConfigMessage for API requests
+   * @param {string} unitId - The TRU unit ID
+   * @param {string} action - The action: 'add', 'update', or 'remove'
+   * @param {string} event - The event name
+   * @param {object} rsu - RSU endpoint {ip, port}
+   * @param {object} snmp - SNMP configuration (optional for remove action)
+   * @returns {object} TruConfigMessage
    */
-  const fetchTRUConfigs = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Use dummy data for local testing
-      // Uncomment below to use real API:
-      // const configs = await rsuService.getTRUConfigs();
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-      const configs = DUMMY_TRU_CONFIGS;
-      setTruConfigs(configs);
-      setLastUpdated(new Date());
-    } catch (err) {
-      setError(err.message || 'Failed to fetch TRU configurations');
-      console.error('Error fetching TRU configs:', err);
-    } finally {
-      setLoading(false);
+  const buildTruConfigMessage = useCallback((unitId, action, event, rsu, snmp = null) => {
+    const rsuConfigItem = {
+      action,
+      event,
+      rsu: {
+        ip: rsu.ip,
+        port: rsu.port
+      }
+    };
+
+    // Add SNMP config if provided (not needed for remove action)
+    if (snmp) {
+      rsuConfigItem.snmp = snmp;
     }
+
+    return {
+      unitConfig: {
+        unitId
+      },
+      rsuConfigs: [rsuConfigItem],
+      timestamp: Date.now()
+    };
   }, []);
 
   /**
-   * Fetch TRU config by unit ID
+   * Register a new RSU
+   * @param {object} rsuData - RSU data {unitId, action, event, rsu: {ip, port}, snmp}
    */
-  const fetchTRUConfigById = useCallback(async (unitId) => {
+  const registerRSU = useCallback(async (rsuData) => {
     setLoading(true);
     setError(null);
     try {
-      // Use dummy data for local testing
-      // Uncomment below to use real API:
-      // const config = await rsuService.getTRUConfigById(unitId);
-      await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
-      const config = DUMMY_TRU_CONFIGS.find(c => c.unitConfig.unitId === unitId);
-      return config;
+      // Use the builder if rsuData doesn't have the full TruConfigMessage structure
+      let truConfigMessage;
+      if (rsuData.unitConfig && rsuData.rsuConfigs) {
+        // Already a complete TruConfigMessage
+        truConfigMessage = rsuData;
+      } else {
+        // Build from individual fields
+        truConfigMessage = buildTruConfigMessage(
+          rsuData.unitId,
+          rsuData.action || 'add',
+          rsuData.event,
+          rsuData.rsu,
+          rsuData.snmp
+        );
+      }
+      
+      const result = await rsuService.assignRSU(truConfigMessage);
+      return { success: true, message: 'RSU registered successfully', data: result };
     } catch (err) {
-      setError(err.message || `Failed to fetch TRU config for ${unitId}`);
-      console.error(`Error fetching TRU config for ${unitId}:`, err);
+      setError(err.message || 'Failed to register RSU');
+      console.error('Error registering RSU:', err);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [buildTruConfigMessage]);
 
   /**
-   * Update TRU configuration
+   * Update an existing RSU
+   * @param {object} rsuData - RSU data {unitId, action, event, rsu: {ip, port}, snmp}
    */
-  const updateTRUConfig = useCallback(async (unitId, configData) => {
+  const updateRSU = useCallback(async (rsuData) => {
     setLoading(true);
     setError(null);
     try {
-      // Use dummy data for local testing
-      // Uncomment below to use real API:
-      // const result = await rsuService.updateTRUConfig(unitId, configData);
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+      // Use the builder if rsuData doesn't have the full TruConfigMessage structure
+      let truConfigMessage;
+      if (rsuData.unitConfig && rsuData.rsuConfigs) {
+        // Already a complete TruConfigMessage
+        truConfigMessage = rsuData;
+      } else {
+        // Build from individual fields
+        truConfigMessage = buildTruConfigMessage(
+          rsuData.unitId,
+          rsuData.action || 'update',
+          rsuData.event,
+          rsuData.rsu,
+          rsuData.snmp
+        );
+      }
       
-      // Update local dummy data
-      const updatedConfigs = truConfigs.map(config =>
-        config.unitConfig.unitId === unitId ? { ...config, ...configData } : config
+      const result = await rsuService.updateRSUConfig(truConfigMessage);
+      return { success: true, message: 'RSU configuration updated successfully', data: result };
+    } catch (err) {
+      setError(err.message || 'Failed to update RSU configuration');
+      console.error('Error updating RSU:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [buildTruConfigMessage]);
+
+  /**
+   * Delete an RSU
+   * @param {string} ip - RSU IP address
+   * @param {number} port - RSU port
+   * @param {string} unitId - TRU unit ID
+   */
+  const deleteRSU = useCallback(async (ip, port, unitId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Use the builder to construct message
+      const truConfigMessage = buildTruConfigMessage(
+        unitId,
+        'remove',
+        'delete',
+        { ip, port },
+        null // No SNMP config needed for delete
       );
-      setTruConfigs(updatedConfigs);
       
-      return { success: true };
+      const result = await rsuService.removeRSU(truConfigMessage);
+      return { success: true, message: 'RSU deleted successfully', data: result };
     } catch (err) {
-      setError(err.message || `Failed to update TRU config for ${unitId}`);
-      console.error(`Error updating TRU config for ${unitId}:`, err);
+      setError(err.message || 'Failed to delete RSU');
+      console.error('Error deleting RSU:', err);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [truConfigs]);
-
-  /**
-   * Refresh TRU configurations
-   */
-  const refresh = useCallback(async () => {
-    await fetchTRUConfigs();
-  }, [fetchTRUConfigs]);
-
-  // Initial data fetch
-  useEffect(() => {
-    fetchTRUConfigs();
-  }, [fetchTRUConfigs]);
+  }, [buildTruConfigMessage]);
 
   const value = {
     truConfigs,
     loading,
     error,
     lastUpdated,
-    fetchTRUConfigs,
-    fetchTRUConfigById,
-    updateTRUConfig,
-    refresh,
+    buildTruConfigMessage,
+    registerRSU,
+    updateRSU,
+    deleteRSU,
   };
 
   return <TRUConfigContext.Provider value={value}>{children}</TRUConfigContext.Provider>;

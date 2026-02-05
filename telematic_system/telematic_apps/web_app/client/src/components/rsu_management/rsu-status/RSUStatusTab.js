@@ -27,9 +27,9 @@ import {
   Typography,
 } from '@mui/material';
 import { useState } from 'react';
+import { useTRUStatus } from '../../../context/TRUStatusContext';
 import Button from '../../layout/Button';
 import StatusTable from '../common/StatusTable';
-import useHardwareStatus from '../hooks/useHardwareStatus';
 import DeleteRSUAlert from './components/DeleteRSUAlert';
 import EditRSUDialog from './components/EditRSUDialog';
 import RSUFilters from './components/RSUFilters';
@@ -41,14 +41,13 @@ import RegisterRSUDialog from './components/RegisterRSUDialog';
  */
 const RSUStatusTab = () => {
   const {
-    filteredList,
+    filteredRSUStatuses,
     loading,
-    filters,
-    updateFilters,
-    getOnlineCount,
-    getOfflineCount,
+    rsuFilters,
+    updateRSUFilters,
+    getRSUStatusCount,
     refresh,
-  } = useHardwareStatus('rsu');
+  } = useTRUStatus();
 
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -77,17 +76,29 @@ const RSUStatusTab = () => {
     {
       field: 'ip',
       headerName: 'IP Address',
-      flex: 1,
+      flex: 0.9,
     },
     {
       field: 'port',
       headerName: 'Port',
-      flex: 0.5,
+      flex: 0.4,
     },
     {
-      field: 'online',
+      field: 'unitId',
+      headerName: 'Associated TRU ID',
+      flex: 0.9,
+      render: (row) => row.unitId || '-',
+    },
+    {
+      field: 'eventName',
+      headerName: 'Event Name',
+      flex: 1.2,
+      render: (row) => row.event || '-',
+    },
+    {
+      field: 'status',
       headerName: 'Status',
-      flex: 0.7,
+      flex: 0.6,
     },
     {
       field: 'lastSeen',
@@ -102,14 +113,14 @@ const RSUStatusTab = () => {
     {
       field: 'actions',
       headerName: 'Actions',
-      flex: 0.8,
+      flex: 0.7,
       align: 'center',
       render: (row) => (
         <Stack direction="row" spacing={1} justifyContent="center">
           <Tooltip title="Edit">
             <IconButton
               size="small"
-              color="primary"
+              sx={{ color: '#748c93' }}
               onClick={(e) => {
                 e.stopPropagation();
                 handleEdit(row);
@@ -138,27 +149,40 @@ const RSUStatusTab = () => {
   return (
     <Box>
       {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Box>
           <Typography variant="h5" gutterBottom>
             RSU Status Management
           </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+            A Roadside Unit (RSU) is a field device that provides V2X (Vehicle-to-Everything) communication capabilities, broadcasting safety messages and collecting data from connected vehicles.
+          </Typography>
           <Stack direction="row" spacing={1}>
             <Chip
-              label={`Online: ${getOnlineCount()}`}
+              label={`Operate: ${getRSUStatusCount('operate')}`}
               color="success"
               size="small"
             />
             <Chip
-              label={`Offline: ${getOfflineCount()}`}
+              label={`Standby: ${getRSUStatusCount('standby')}`}
+              color="warning"
+              size="small"
+            />
+            <Chip
+              label={`Fault: ${getRSUStatusCount('fault')}`}
               color="error"
+              size="small"
+            />
+            <Chip
+              label={`Other: ${getRSUStatusCount('other')}`}
+              color="default"
               size="small"
             />
           </Stack>
         </Box>
         <Stack direction="row" spacing={2}>
           <Tooltip title="Refresh">
-            <IconButton color="primary" onClick={refresh}>
+            <IconButton sx={{ color: '#748c93' }} onClick={refresh}>
               <RefreshIcon />
             </IconButton>
           </Tooltip>
@@ -172,11 +196,11 @@ const RSUStatusTab = () => {
       </Box>
 
       {/* Filters */}
-      <RSUFilters filters={filters} onFilterChange={updateFilters} />
+      <RSUFilters filters={rsuFilters} onFilterChange={updateRSUFilters} />
 
       {/* Table */}
       <StatusTable
-        data={filteredList}
+        data={filteredRSUStatuses}
         columns={columns}
         loading={loading}
         emptyMessage="No RSUs found. Click 'Register RSU' to add one."

@@ -15,75 +15,24 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import rsuService from '../api/rsuService';
 
 const TRUStatusContext = createContext();
 
-// Dummy data for local testing - TruConfigStatus
-const DUMMY_TRU_STATUSES = [
-  {
-    unitConfig: {
-      unitId: 'unit_12345',
-      bridgePluginStatus: 'Running',
-      lastUpdatedTimestamp: Date.now() - 30000,
-      timestamp: Date.now() - 30000
-    },
-    rsuConfigs: [
-      {
-        rsu: { ip: '192.168.1.100', port: 1516 },
-        Status: 'operation',
-        event: 'RSU_ADDED'
-      },
-      {
-        rsu: { ip: '192.168.1.101', port: 1516 },
-        Status: 'operation',
-        event: 'RSU_ADDED'
-      }
-    ],
-    timestamp: (Date.now() - 30000).toString()
-  },
-  {
-    unitConfig: {
-      unitId: 'unit_67890',
-      bridgePluginStatus: 'Running',
-      lastUpdatedTimestamp: Date.now() - 45000,
-      timestamp: Date.now() - 45000
-    },
-    rsuConfigs: [
-      {
-        rsu: { ip: '192.168.2.100', port: 1516 },
-        Status: 'operation',
-        event: 'RSU_UPDATED'
-      },
-      {
-        rsu: { ip: '192.168.2.101', port: 1516 },
-        Status: 'fault',
-        event: 'RSU_CONNECTION_LOST'
-      },
-      {
-        rsu: { ip: '192.168.2.102', port: 1516 },
-        Status: 'operation',
-        event: 'RSU_ADDED'
-      }
-    ],
-    timestamp: (Date.now() - 45000).toString()
-  },
-  {
-    unitConfig: {
-      unitId: 'unit_99999',
-      bridgePluginStatus: 'Stopped',
-      lastUpdatedTimestamp: Date.now() - 300000,
-      timestamp: Date.now() - 300000
-    },
-    rsuConfigs: [
-      {
-        rsu: { ip: '192.168.3.100', port: 1516 },
-        Status: 'fault',
-        event: 'RSU_OFFLINE'
-      }
-    ],
-    timestamp: (Date.now() - 300000).toString()
-  }
-];
+const RSU_MODE_MAP = {
+  /**
+   * rsuModeStatus OBJECT-TYPE
+    SYNTAX INTEGER { 
+      other (1),
+      standby (2),
+      operate (3),
+      fault (4)
+  }*/
+  1: 'other',
+  2: 'standby',
+  3: 'operate',
+  4: 'fault'
+};
 
 /**
  * Context provider for TRU Status management
@@ -91,9 +40,20 @@ const DUMMY_TRU_STATUSES = [
  */
 export const TRUStatusProvider = ({ children }) => {
   const [truStatuses, setTruStatuses] = useState([]);
+  const [filteredStatuses, setFilteredStatuses] = useState([]);
+  const [rsuStatuses, setRsuStatuses] = useState([]);
+  const [filteredRSUStatuses, setFilteredRSUStatuses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [filters, setFilters] = useState({
+    search: '',
+    status: 'all', // 'all', 'running', 'error'
+  });
+  const [rsuFilters, setRsuFilters] = useState({
+    search: '',
+    status: 'all', // 'all', 'operate', 'standby', 'fault', 'other'
+  });
 
   /**
    * Fetch all TRU statuses
@@ -102,12 +62,55 @@ export const TRUStatusProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      // Use dummy data for local testing
-      // Uncomment below to use real API:
-      // const statuses = await rsuService.getTRUStatuses();
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-      const statuses = DUMMY_TRU_STATUSES;
-      setTruStatuses(statuses);
+      const statuses = await rsuService.getTRUStatuses();
+      // Ensure statuses is an array
+      const statusArray = Array.isArray(statuses) ? statuses : [];
+      
+      // Normalize TRU data to ensure unitConfig and pluginConfigStatus are properly extracted
+      const normalizedStatuses = statusArray.map(tru => ({
+        unitConfig: {
+          unitId: tru.unitConfig?.unitId || '',
+          name: tru.unitConfig?.name || null,
+          maxConnections: tru.unitConfig?.maxConnections || 0,
+          pluginHeartbeatInterval: tru.unitConfig?.pluginHeartbeatInterval || 0,
+          healthMonitorPluginHeartbeatInterval: tru.unitConfig?.healthMonitorPluginHeartbeatInterval || 0,
+          rsuStatusMonitorInterval: tru.unitConfig?.rsuStatusMonitorInterval || 0,
+          timestamp: tru.unitConfig?.timestamp || null,
+          lastUpdatedTimestamp: tru.unitConfig?.timestamp || tru.timestamp || null
+        },
+        pluginConfigStatus: {
+          bridgePluginStatus: tru.pluginConfigStatus?.bridgePluginStatus || 'unknown',
+          lastCommunicationTimestamp: tru.pluginConfigStatus?.lastCommunicationTimestamp || null,
+          timestamp: tru.pluginConfigStatus?.timestamp || null
+        },
+        rsuConfigs: tru.rsuConfigs || [],
+        timestamp: tru.timestamp || Date.now()
+      }));
+      
+      setTruStatuses(normalizedStatuses);
+      setFilteredStatuses(normalizedStatuses);
+      
+      // Extract all RSUs from TRU statuses
+      const allRSUs = normalizedStatuses.flatMap(tru => 
+        tru.rsuConfigs?.map(rsuConfig => {
+          // Convert numeric status to string using RSU_MODE_MAP
+          let statusValue = 'other';
+          if (rsuConfig.status !== null && rsuConfig.status !== undefined) {
+            statusValue = RSU_MODE_MAP[Number.parseInt(rsuConfig.status)] || 'other';
+          }
+          
+          return {
+            ...rsuConfig.rsu,
+            status: statusValue,
+            event: rsuConfig.event,
+            unitId: tru.unitConfig?.unitId,
+            lastSeen: rsuConfig.timestamp || null
+          };
+        }) || []
+      );
+      setRsuStatuses(allRSUs);
+      setFilteredRSUStatuses(allRSUs);
+      
       setLastUpdated(new Date());
     } catch (err) {
       setError(err.message || 'Failed to fetch TRU statuses');
@@ -118,52 +121,12 @@ export const TRUStatusProvider = ({ children }) => {
   }, []);
 
   /**
-   * Fetch TRU status by unit ID
-   */
-  const fetchTRUStatusById = useCallback(async (unitId) => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Use dummy data for local testing
-      // Uncomment below to use real API:
-      // const status = await rsuService.getTRUStatusById(unitId);
-      await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
-      const status = DUMMY_TRU_STATUSES.find(s => s.unitConfig.unitId === unitId);
-      return status;
-    } catch (err) {
-      setError(err.message || `Failed to fetch TRU status for ${unitId}`);
-      console.error(`Error fetching TRU status for ${unitId}:`, err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  /**
-   * Get online TRUs (based on plugin status)
-   */
-  const getOnlineTRUs = useCallback(() => {
-    return truStatuses.filter(status => 
-      status.unitConfig?.bridgePluginStatus === 'Running'
-    );
-  }, [truStatuses]);
-
-  /**
-   * Get offline TRUs (based on plugin status)
-   */
-  const getOfflineTRUs = useCallback(() => {
-    return truStatuses.filter(status => 
-      status.unitConfig?.bridgePluginStatus !== 'Running'
-    );
-  }, [truStatuses]);
-
-  /**
    * Filter TRUs by plugin status
    */
   const filterByStatus = useCallback((isActive) => {
-    const statusFilter = isActive ? 'Running' : 'Stopped';
+    const statusFilter = isActive ? 'running' : 'error';
     return truStatuses.filter(status => 
-      status.unitConfig?.bridgePluginStatus === statusFilter
+      status.pluginConfigStatus?.bridgePluginStatus?.toLowerCase() === statusFilter
     );
   }, [truStatuses]);
 
@@ -176,12 +139,90 @@ export const TRUStatusProvider = ({ children }) => {
   }, [truStatuses]);
 
   /**
-   * Get online RSU count for a TRU
+   * Apply filters to TRU list
    */
-  const getOnlineRSUCount = useCallback((unitId) => {
-    const status = truStatuses.find(s => s.unitConfig.unitId === unitId);
-    return status?.rsuConfigs?.filter(rsu => rsu.Status === 'operation').length || 0;
+  const applyFilters = useCallback(() => {
+    let filtered = [...truStatuses];
+
+    // Apply search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter(item => 
+        item.unitConfig?.unitId?.toLowerCase().includes(searchLower) ||
+        item.unitConfig?.name?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply status filter
+    if (filters.status !== 'all') {
+      filtered = filtered.filter(item => {
+        const pluginStatus = item.pluginConfigStatus?.bridgePluginStatus?.toLowerCase() || 'unknown';
+        return filters.status === pluginStatus;
+      });
+    }
+
+    setFilteredStatuses(filtered);
+  }, [truStatuses, filters]);
+
+  /**
+   * Update filters
+   */
+  const updateFilters = useCallback((newFilters) => {
+    setFilters(prev => ({ ...prev, ...newFilters }));
+  }, []);
+
+  /**
+   * Get count by specific status
+   */
+  const getStatusCount = useCallback((statusValue) => {
+    return truStatuses.filter(item => {
+      const pluginStatus = item.pluginConfigStatus?.bridgePluginStatus?.toLowerCase() || 'unknown';
+      return pluginStatus === statusValue.toLowerCase();
+    }).length;
   }, [truStatuses]);
+
+  /**
+   * Apply filters to RSU list
+   */
+  const applyRSUFilters = useCallback(() => {
+    let filtered = [...rsuStatuses];
+
+    // Apply search filter
+    if (rsuFilters.search) {
+      const searchLower = rsuFilters.search.toLowerCase();
+      filtered = filtered.filter(item => 
+        item.ip?.toLowerCase().includes(searchLower) ||
+        item.port?.toString().includes(searchLower)
+      );
+    }
+
+    // Apply status filter
+    if (rsuFilters.status !== 'all') {
+      filtered = filtered.filter(item => {
+        const itemStatus = item.status?.toLowerCase() || 'unknown';
+        return rsuFilters.status === itemStatus;
+      });
+    }
+
+    setFilteredRSUStatuses(filtered);
+  }, [rsuStatuses, rsuFilters]);
+
+  /**
+   * Update RSU filters
+   */
+  const updateRSUFilters = useCallback((newFilters) => {
+    setRsuFilters(prev => ({ ...prev, ...newFilters }));
+  }, []);
+
+  /**
+   * Get count by specific RSU status
+   */
+  const getRSUStatusCount = useCallback((statusValue) => {
+    return rsuStatuses.filter(item => {
+      const status = item.status?.toLowerCase() || 'unknown';
+      return status === statusValue.toLowerCase();
+    }).length;
+  }, [rsuStatuses]);
 
   /**
    * Refresh TRU statuses
@@ -195,18 +236,33 @@ export const TRUStatusProvider = ({ children }) => {
     fetchTRUStatuses();
   }, [fetchTRUStatuses]);
 
+  // Apply filters when they or truStatuses change
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
+
+  // Apply RSU filters when they or rsuStatuses change
+  useEffect(() => {
+    applyRSUFilters();
+  }, [applyRSUFilters]);
+
   const value = {
     truStatuses,
+    filteredStatuses,
+    rsuStatuses,
+    filteredRSUStatuses,
     loading,
     error,
     lastUpdated,
+    filters,
+    rsuFilters,
     fetchTRUStatuses,
-    fetchTRUStatusById,
-    getOnlineTRUs,
-    getOfflineTRUs,
     filterByStatus,
     getRSUCount,
-    getOnlineRSUCount,
+    updateFilters,
+    updateRSUFilters,
+    getStatusCount,
+    getRSUStatusCount,
     refresh,
   };
 

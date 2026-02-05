@@ -31,8 +31,27 @@ const Button = ({
   endIcon,
   onClick,
   type = 'button',
+  sx,
   ...props
 }) => {
+  const buttonSx = {
+    ...(variant === 'contained' && color === 'primary' && {
+      backgroundColor: '#748c93',
+      '&:hover': {
+        backgroundColor: '#5f7379',
+      },
+    }),
+    ...(variant === 'outlined' && color === 'primary' && {
+      borderColor: '#748c93',
+      color: '#748c93',
+      '&:hover': {
+        borderColor: '#5f7379',
+        backgroundColor: 'rgba(116, 140, 147, 0.04)',
+      },
+    }),
+    ...sx,
+  };
+
   return (
     <MuiButton
       variant={variant}
@@ -44,6 +63,7 @@ const Button = ({
       endIcon={endIcon}
       onClick={onClick}
       type={type}
+      sx={buttonSx}
       {...props}
     >
       {children}

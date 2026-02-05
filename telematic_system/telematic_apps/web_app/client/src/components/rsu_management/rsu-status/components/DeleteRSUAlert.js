@@ -24,7 +24,8 @@ import {
   Typography,
 } from '@mui/material';
 import { useState } from 'react';
-import rsuService from '../../../../api/rsuService';
+import { useTRUConfig } from '../../../../context/TRUConfigContext';
+import { useTRUStatus } from '../../../../context/TRUStatusContext';
 import Button from '../../../layout/Button';
 
 /**
@@ -32,6 +33,8 @@ import Button from '../../../layout/Button';
  * Confirmation dialog for deleting an RSU
  */
 const DeleteRSUAlert = ({ open, onClose, rsu, onSuccess }) => {
+  const { deleteRSU } = useTRUConfig();
+  const { refresh: refreshStatus } = useTRUStatus();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -42,7 +45,8 @@ const DeleteRSUAlert = ({ open, onClose, rsu, onSuccess }) => {
     setError(null);
 
     try {
-      await rsuService.deleteRSU(rsu.ip, rsu.port);
+      await deleteRSU(rsu.ip, rsu.port, rsu.unitId);
+      await refreshStatus(); // Refresh status after config change
       onSuccess && onSuccess();
       onClose();
     } catch (err) {

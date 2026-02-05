@@ -23,8 +23,8 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { useTRUStatus } from '../../../context/TRUStatusContext';
 import StatusTable from '../common/StatusTable';
-import useHardwareStatus from '../hooks/useHardwareStatus';
 import TRUFilters from './components/TRUFilters';
 
 /**
@@ -33,49 +33,65 @@ import TRUFilters from './components/TRUFilters';
  */
 const TRUStatusTab = () => {
   const {
-    filteredList,
+    filteredStatuses,
     loading,
     filters,
     updateFilters,
-    getOnlineCount,
-    getOfflineCount,
+    getStatusCount,
     refresh,
-  } = useHardwareStatus('tru');
+  } = useTRUStatus();
 
   const columns = [
     {
       field: 'unitId',
-      headerName: 'Unit ID',
-      flex: 1,
+      headerName: 'TRU ID',
+      flex: 0.8,
       render: (row) => row.unitConfig?.unitId || '-',
+    },
+    {
+      field: 'unitName',
+      headerName: 'Name',
+      flex: 1.2,
+      render: (row) => row.unitConfig?.name || '-',
     },
     {
       field: 'bridgePluginStatus',
       headerName: 'Bridge Status',
-      flex: 1,
-      render: (row) => (
-        <Chip
-          label={row.unitConfig?.bridgePluginStatus || 'Unknown'}
-          size="small"
-          color={row.unitConfig?.bridgePluginStatus === 'Running' ? 'success' : 'error'}
-        />
-      ),
-    },
-    {
-      field: 'rsuCount',
-      headerName: 'RSU Count',
-      flex: 0.7,
+      flex: 0.8,
       render: (row) => {
-        const count = row.rsuConfigs?.length || 0;
-        const operationalCount = row.rsuConfigs?.filter(rsu => rsu.Status === 'operation').length || 0;
+        const status = row.pluginConfigStatus?.bridgePluginStatus || 'unknown';
         return (
           <Chip
-            label={`${operationalCount}/${count}`}
+            label={status.charAt(0).toUpperCase() + status.slice(1)}
             size="small"
-            color={count > 0 ? 'primary' : 'default'}
+            color={status.toLowerCase() === 'running' ? 'success' : 'error'}
           />
         );
       },
+    },
+    {
+      field: 'rsuIPs',
+      headerName: 'Associated RSU IPs',
+      flex: 1.5,
+      render: (row) => {
+        const ips = row.rsuConfigs?.map(rsu => rsu.rsu?.ip).filter(Boolean) || [];
+        return ips.length > 0 ? ips.join(', ') : '-';
+      },
+    },
+    {
+      field: 'currentConnections',
+      headerName: 'Current RSU Connections',
+      flex: 1,
+      render: (row) => {
+        const count = row.rsuConfigs?.length || 0;
+        return count;
+      },
+    },
+    {
+      field: 'maxConnections',
+      headerName: 'Max Allowed RSU Connections',
+      flex: 1.2,
+      render: (row) => row.unitConfig?.maxConnections || '-',
     },
     {
       field: 'lastUpdated',
@@ -83,7 +99,7 @@ const TRUStatusTab = () => {
       type: 'timestamp',
       flex: 1,
       render: (row) => {
-        const timestamp = row.unitConfig?.lastUpdatedTimestamp;
+        const timestamp = row.pluginConfigStatus?.lastCommunicationTimestamp || null;
         if (!timestamp) return '-';
         return new Date(timestamp).toLocaleString();
       },
@@ -93,26 +109,29 @@ const TRUStatusTab = () => {
   return (
     <Box>
       {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Box>
           <Typography variant="h5" gutterBottom>
             TRU Status Monitoring
           </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+            A Telematic Roadside Unit (TRU) is a bridge software component that connects multiple RSUs to the cloud infrastructure, enabling data aggregation and centralized management.
+          </Typography>
           <Stack direction="row" spacing={1}>
             <Chip
-              label={`Online: ${getOnlineCount()}`}
+              label={`Running: ${getStatusCount('running')}`}
               color="success"
               size="small"
             />
             <Chip
-              label={`Offline: ${getOfflineCount()}`}
+              label={`Error: ${getStatusCount('error')}`}
               color="error"
               size="small"
             />
           </Stack>
         </Box>
         <Tooltip title="Refresh">
-          <IconButton color="primary" onClick={refresh}>
+          <IconButton sx={{ color: '#748c93' }} onClick={refresh}>
             <RefreshIcon />
           </IconButton>
         </Tooltip>
@@ -123,7 +142,7 @@ const TRUStatusTab = () => {
 
       {/* Table */}
       <StatusTable
-        data={filteredList}
+        data={filteredStatuses}
         columns={columns}
         loading={loading}
         emptyMessage="No TRUs found in the system."

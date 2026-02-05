@@ -69,7 +69,7 @@ const StatusTable = ({
 
     // Handle status badge
     if (column.field === 'online' || column.field === 'status') {
-      return <StatusBadge online={value} />;
+      return <StatusBadge online={row.online} status={row.status || value} />;
     }
 
     // Handle timestamp
@@ -99,7 +99,7 @@ const StatusTable = ({
               <TableCell
                 key={column.field}
                 align={column.align || 'left'}
-                sx={{ fontWeight: 'bold', backgroundColor: 'primary.light', color: 'white' }}
+                sx={{ fontWeight: 'bold', backgroundColor: '#748c93', color: 'white' }}
               >
                 {column.headerName}
               </TableCell>

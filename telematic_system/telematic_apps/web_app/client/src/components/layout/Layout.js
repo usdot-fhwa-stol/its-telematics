@@ -75,7 +75,7 @@ const Layout = React.memo((props) => {
 
     return (
         <React.Fragment>
-            {authContext.sessionToken === null &&
+            {authContext.sessionToken !== null &&
                 <Box sx={{ display: 'flex' }}>
                     <CssBaseline />
                     <AppBar position="fixed" style={{ background: '#fff' }} sx={{ zIndex: (theme) => theme.zIndex.drawer + 1, marginBottom: 0 }}>

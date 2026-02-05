@@ -15,7 +15,9 @@
  */
 
 import { Box, Paper, Tab, Tabs } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTRUStatus } from '../../../context/TRUStatusContext';
+import { useTRUTopics } from '../../../context/TRUTopicsContext';
 import DataSelectionTab from '../data-selection/DataSelectionTab';
 import RSUStatusTab from '../rsu-status/RSUStatusTab';
 import TRUStatusTab from '../tru-status/TRUStatusTab';
@@ -26,6 +28,25 @@ import TRUStatusTab from '../tru-status/TRUStatusTab';
  */
 const RSUManagementLayout = () => {
   const [activeTab, setActiveTab] = useState(0);
+  const { fetchTRUStatuses } = useTRUStatus();
+  const { resetSelection } = useTRUTopics();
+
+  // Fetch TRU statuses when component mounts
+  useEffect(() => {
+    fetchTRUStatuses();
+  }, [fetchTRUStatuses]);
+
+  // Fetch TRU statuses when tab changes
+  useEffect(() => {
+    fetchTRUStatuses();
+  }, [activeTab, fetchTRUStatuses]);
+
+  // Reset Data Selection when Data Selection tab is clicked
+  useEffect(() => {
+    if (activeTab === 1) {
+      resetSelection();
+    }
+  }, [activeTab, resetSelection]);
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -37,10 +58,20 @@ const RSUManagementLayout = () => {
         <Tabs
           value={activeTab}
           onChange={handleTabChange}
-          indicatorColor="primary"
-          textColor="primary"
+          sx={{ 
+            borderBottom: 1, 
+            borderColor: 'divider',
+            '& .MuiTabs-indicator': {
+              backgroundColor: '#748c93'
+            },
+            '& .MuiTab-root': {
+              color: '#748c93'
+            },
+            '& .Mui-selected': {
+              color: '#748c93'
+            }
+          }}
           variant="fullWidth"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
           <Tab label="RSU Status" />
           <Tab label="Data Selection" />

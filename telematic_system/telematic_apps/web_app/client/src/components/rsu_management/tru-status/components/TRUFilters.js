@@ -28,6 +28,7 @@ import {
 /**
  * TRU Filters Component
  * Provides search and status filtering for TRU list
+ * Note: TRU status is based on bridgePluginStatus (Running/Stopped), not RSU status
  */
 const TRUFilters = ({ filters, onFilterChange }) => {
   return (
@@ -53,8 +54,8 @@ const TRUFilters = ({ filters, onFilterChange }) => {
               onChange={(e) => onFilterChange({ status: e.target.value })}
             >
               <MenuItem value="all">All</MenuItem>
-              <MenuItem value="online">Online</MenuItem>
-              <MenuItem value="offline">Offline</MenuItem>
+              <MenuItem value="running">Running</MenuItem>
+              <MenuItem value="error">Error</MenuItem>
             </Select>
           </FormControl>
         </Grid>

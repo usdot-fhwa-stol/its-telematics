@@ -14,137 +14,44 @@
  * the License.
  */
 
-import { createContext, useCallback, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import rsuService from '../api/rsuService';
+import { useTRUStatus } from './TRUStatusContext';
 
 const TRUTopicsContext = createContext();
-
-// Dummy data for local testing
-const DUMMY_TRU_TOPICS = [
-  {
-    unitId: 'TRU-001',
-    rsuTopics: [
-      {
-        rsu: { ip: '192.168.1.100', port: 1516 },
-        topics: [
-          { name: 'bsm', selected: true },
-          { name: 'tim', selected: true },
-          { name: 'spat', selected: false },
-          { name: 'map', selected: true },
-          { name: 'psm', selected: false },
-          { name: 'srm', selected: false },
-          { name: 'ssm', selected: false }
-        ]
-      },
-      {
-        rsu: { ip: '192.168.1.101', port: 1516 },
-        topics: [
-          { name: 'bsm', selected: true },
-          { name: 'tim', selected: false },
-          { name: 'spat', selected: true },
-          { name: 'map', selected: true },
-          { name: 'psm', selected: true },
-          { name: 'srm', selected: false },
-          { name: 'ssm', selected: false }
-        ]
-      }
-    ],
-    timestamp: Date.now()
-  },
-  {
-    unitId: 'TRU-002',
-    rsuTopics: [
-      {
-        rsu: { ip: '192.168.2.100', port: 1516 },
-        topics: [
-          { name: 'bsm', selected: true },
-          { name: 'tim', selected: true },
-          { name: 'spat', selected: true },
-          { name: 'map', selected: false },
-          { name: 'psm', selected: false },
-          { name: 'srm', selected: true },
-          { name: 'ssm', selected: true }
-        ]
-      },
-      {
-        rsu: { ip: '192.168.2.101', port: 1516 },
-        topics: [
-          { name: 'bsm', selected: true },
-          { name: 'tim', selected: false },
-          { name: 'spat', selected: false },
-          { name: 'map', selected: true },
-          { name: 'psm', selected: false },
-          { name: 'srm', selected: false },
-          { name: 'ssm', selected: false }
-        ]
-      },
-      {
-        rsu: { ip: '192.168.2.102', port: 1516 },
-        topics: [
-          { name: 'bsm', selected: true },
-          { name: 'tim', selected: true },
-          { name: 'spat', selected: false },
-          { name: 'map', selected: false },
-          { name: 'psm', selected: true },
-          { name: 'srm', selected: false },
-          { name: 'ssm', selected: false }
-        ]
-      }
-    ],
-    timestamp: Date.now()
-  },
-  {
-    unitId: 'TRU-003',
-    rsuTopics: [
-      {
-        rsu: { ip: '192.168.3.100', port: 1516 },
-        topics: [
-          { name: 'bsm', selected: false },
-          { name: 'tim', selected: false },
-          { name: 'spat', selected: true },
-          { name: 'map', selected: true },
-          { name: 'psm', selected: false },
-          { name: 'srm', selected: false },
-          { name: 'ssm', selected: false }
-        ]
-      }
-    ],
-    timestamp: Date.now()
-  }
-];
 
 /**
  * Context provider for TRU Topics management
  * Manages topic selection and configuration for TRUs and their associated RSUs
  */
 export const TRUTopicsProvider = ({ children }) => {
+  const { truStatuses } = useTRUStatus();
   const [truTopics, setTruTopics] = useState([]);
   const [selectedTRU, setSelectedTRU] = useState(null);
   const [selectedRSUs, setSelectedRSUs] = useState([]);
   const [selectedTopics, setSelectedTopics] = useState({});
+  const [dataTypeFilter, setDataTypeFilter] = useState(['all']);
+  const [topicsByRSU, setTopicsByRSU] = useState([]);
+  const [filteredTopicsByRSU, setFilteredTopicsByRSU] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  /**
-   * Fetch all TRU topics
-   */
-  const fetchTRUTopics = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Use dummy data for local testing
-      // Uncomment below to use real API:
-      // const topics = await rsuService.getTRUTopics();
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-      const topics = DUMMY_TRU_TOPICS;
+  // Initialize truTopics from truStatuses
+  useEffect(() => {
+    if (Array.isArray(truStatuses) && truStatuses.length > 0) {
+      const topics = truStatuses.map(tru => ({
+        unitId: tru.unitConfig?.unitId || '',
+        rsuTopics: tru.rsuConfigs?.map(rsu => ({
+          rsu: {
+            ip: rsu.rsu?.ip || '',
+            port: rsu.rsu?.port || 0
+          },
+          topics: []
+        })) || []
+      }));
       setTruTopics(topics);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch TRU topics');
-      console.error('Error fetching TRU topics:', err);
-    } finally {
-      setLoading(false);
     }
-  }, []);
+  }, [truStatuses]);
 
   /**
    * Fetch TRU topics by unit ID
@@ -153,12 +60,15 @@ export const TRUTopicsProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      // Use dummy data for local testing
-      // Uncomment below to use real API:
-      // const topics = await rsuService.getTRUTopicsById(unitId);
-      await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
-      const topics = DUMMY_TRU_TOPICS.find(t => t.unitId === unitId);
-      return topics;
+      // Call API to get available topics for this TRU
+      const truTopicsMessage = {
+        unitId: unitId,
+        rsuTopics: [], // Empty for fetching available topics
+        timestamp: Date.now()
+      };
+      
+      const result = await rsuService.getAvailableTopics(truTopicsMessage);
+      return result;
     } catch (err) {
       setError(err.message || `Failed to fetch TRU topics for ${unitId}`);
       console.error(`Error fetching TRU topics for ${unitId}:`, err);
@@ -175,49 +85,30 @@ export const TRUTopicsProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await rsuService.updateTRUTopics(unitId, topicsData);
-      // Refresh topics list
-      await fetchTRUTopics();
-      return result;
+      // Call API to confirm data selection
+      const result = await rsuService.confirmDataSelection(topicsData);
+      
+      // Refresh the topics from backend to get the latest selection state
+      const updatedTopics = await fetchTRUTopicsById(unitId);
+      
+      // Update truTopics context with the fresh data
+      if (updatedTopics && updatedTopics.rsuTopics) {
+        setTruTopics(prev => {
+          const updated = [...prev];
+          const index = updated.findIndex(t => t.unitId === unitId);
+          if (index !== -1) {
+            updated[index] = updatedTopics;
+          } else {
+            updated.push(updatedTopics);
+          }
+          return updated;
+        });
+      }
+      
+      return { success: true, message: 'Topics configuration saved successfully', data: result };
     } catch (err) {
       setError(err.message || `Failed to update TRU topics for ${unitId}`);
       console.error(`Error updating TRU topics for ${unitId}:`, err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchTRUTopics]);
-
-  /**
-   * Fetch RSU topics for a specific RSU
-   */
-  const fetchRSUTopics = useCallback(async (ip, port) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const topics = await rsuService.getRSUTopics(ip, port);
-      return topics;
-    } catch (err) {
-      setError(err.message || `Failed to fetch RSU topics for ${ip}:${port}`);
-      console.error(`Error fetching RSU topics for ${ip}:${port}:`, err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  /**
-   * Update RSU topics configuration
-   */
-  const updateRSUTopics = useCallback(async (ip, port, topicsData) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await rsuService.updateRSUTopics(ip, port, topicsData);
-      return result;
-    } catch (err) {
-      setError(err.message || `Failed to update RSU topics for ${ip}:${port}`);
-      console.error(`Error updating RSU topics for ${ip}:${port}:`, err);
       throw err;
     } finally {
       setLoading(false);
@@ -231,20 +122,26 @@ export const TRUTopicsProvider = ({ children }) => {
     setSelectedTRU(unitId);
     setSelectedRSUs([]);
     setSelectedTopics({});
+    setTopicsByRSU([]);
+    setFilteredTopicsByRSU([]);
     
+    // Fetch available topics for this TRU and store in context
     if (unitId) {
       try {
         const topics = await fetchTRUTopicsById(unitId);
-        // Initialize selected topics based on current configuration
+        
+        // Update truTopics with the fetched data
         if (topics && topics.rsuTopics) {
-          const topicsByRSU = {};
-          topics.rsuTopics.forEach(rsuTopic => {
-            const rsuKey = `${rsuTopic.rsu.ip}:${rsuTopic.rsu.port}`;
-            topicsByRSU[rsuKey] = rsuTopic.topics
-              .filter(t => t.selected)
-              .map(t => t.name);
+          setTruTopics(prev => {
+            const updated = [...prev];
+            const index = updated.findIndex(t => t.unitId === unitId);
+            if (index >= 0) {
+              updated[index] = topics;
+            } else {
+              updated.push(topics);
+            }
+            return updated;
           });
-          setSelectedTopics(topicsByRSU);
         }
       } catch (err) {
         console.error(`Error loading topics for TRU ${unitId}:`, err);
@@ -254,56 +151,35 @@ export const TRUTopicsProvider = ({ children }) => {
 
   /**
    * Select RSUs within the selected TRU
+   * Fetches topic data from context (already loaded when TRU was selected)
    */
-  const selectRSUs = useCallback(async (rsuEndpoints) => {
+  const selectRSUs = useCallback((rsuEndpoints) => {
     setSelectedRSUs(rsuEndpoints);
     
-    // Preserve existing selections and only add default selections for newly added RSUs
-    setSelectedTopics(prev => {
-      const newSelectedTopics = { ...prev };
+    // If RSUs are selected, initialize selected topics from context
+    if (rsuEndpoints.length > 0 && selectedTRU) {
+      // Get topics from context (already fetched when TRU was selected)
+      const truData = truTopics.find(t => t.unitId === selectedTRU);
       
-      // Get list of new RSU keys
-      const newRsuKeys = rsuEndpoints.map(ep => `${ep.ip}:${ep.port}`);
-      
-      // Remove selections for RSUs that are no longer selected
-      Object.keys(newSelectedTopics).forEach(rsuKey => {
-        if (!newRsuKeys.includes(rsuKey)) {
-          delete newSelectedTopics[rsuKey];
-        }
-      });
-      
-      // Add default selections only for newly added RSUs
-      for (const rsuEndpoint of rsuEndpoints) {
-        const rsuKey = `${rsuEndpoint.ip}:${rsuEndpoint.port}`;
-        
-        // Skip if this RSU already has selections (preserve user's choices)
-        if (newSelectedTopics[rsuKey]) {
-          continue;
-        }
-        
-        // Initialize with default selections for new RSUs
-        try {
-          if (selectedTRU) {
-            const truData = truTopics.find(t => t.unitId === selectedTRU);
-            if (truData) {
-              const rsuData = truData.rsuTopics?.find(rt => 
-                rt.rsu.ip === rsuEndpoint.ip && rt.rsu.port === rsuEndpoint.port
-              );
-              if (rsuData) {
-                newSelectedTopics[rsuKey] = rsuData.topics
-                  .filter(t => t.selected)
-                  .map(t => t.name);
-              }
-            }
+      if (truData && truData.rsuTopics) {
+        const topicsByRSU = {};
+        truData.rsuTopics.forEach(rsuTopic => {
+          const rsuKey = `${rsuTopic.rsu.ip}:${rsuTopic.rsu.port}`;
+          // Only include topics for selected RSUs
+          if (rsuEndpoints.some(ep => ep.ip === rsuTopic.rsu.ip && ep.port === rsuTopic.rsu.port)) {
+            topicsByRSU[rsuKey] = rsuTopic.topics
+              .filter(t => t.selected)
+              .map(t => t.name);
           }
-        } catch (err) {
-          console.error(`Error loading topics for RSU ${rsuEndpoint.ip}:${rsuEndpoint.port}:`, err);
-          newSelectedTopics[rsuKey] = [];
-        }
+        });
+        setSelectedTopics(topicsByRSU);
       }
-      
-      return newSelectedTopics;
-    });
+    } else {
+      // Clear selections when no RSUs are selected
+      setSelectedTopics({});
+      setTopicsByRSU([]);
+      setFilteredTopicsByRSU([]);
+    }
   }, [selectedTRU, truTopics]);
 
   /**
@@ -386,67 +262,170 @@ export const TRUTopicsProvider = ({ children }) => {
   }, [selectedTRU, selectedRSUs, truTopics]);
 
   /**
-   * Get available topics for selected RSU (legacy single RSU support)
+   * Get TRU list for selection
    */
-  const getTopicsForSelectedRSU = useCallback(() => {
-    if (!selectedTRU || selectedRSUs.length === 0) return [];
-    
-    const truData = truTopics.find(t => t.unitId === selectedTRU);
-    const rsuData = truData?.rsuTopics?.find(
-      rt => rt.rsu.ip === selectedRSUs[0]?.ip && rt.rsu.port === selectedRSUs[0]?.port
-    );
-    
-    return rsuData?.topics || [];
-  }, [selectedTRU, selectedRSUs, truTopics]);
+  const getTRUList = useCallback(() => {
+    return truTopics.map(t => ({
+      unitId: t.unitId,
+      name: t.unitId,
+      rsuCount: t.rsuTopics?.length || 0
+    }));
+  }, [truTopics]);
 
   /**
+   * Get available data types from current topics grouped by RSU
+   */
+  const getAvailableDataTypes = useCallback(() => {
+    return topicsByRSU.map(rsuGroup => ({
+      rsuKey: rsuGroup.rsuKey,
+      rsu: rsuGroup.rsu,
+      topics: [...new Set(rsuGroup.topics.map(t => t.name.toLowerCase()))]
+    }));
+  }, [topicsByRSU]);
+
+  /**
+   * Handle data type filter change
+   */
+  const handleDataTypeFilterChange = useCallback((filterType) => {
+    setDataTypeFilter(filterType);
+  }, []);
+
+  /**
+   * Get selection summary
+   */
+  const getSelectionSummary = useCallback(() => {
+    const totalTopics = Object.values(selectedTopics).reduce(
+      (sum, topics) => sum + topics.length,
+      0
+    );
+    const availableCount = filteredTopicsByRSU.reduce(
+      (sum, rsuGroup) => sum + rsuGroup.topics.length,
+      0
+    );
+    
+    return {
+      truSelected: !!selectedTRU,
+      rsuSelected: selectedRSUs.length > 0,
+      rsuCount: selectedRSUs.length,
+      topicCount: totalTopics,
+      availableTopicCount: availableCount,
+    };
+  }, [selectedTRU, selectedRSUs, selectedTopics, filteredTopicsByRSU]);
+
+  /**
+   * Reset selection
+   */
+  const resetSelection = useCallback(() => {
+    selectTRU(null);
+    setDataTypeFilter(['all']);
+  }, [selectTRU]);
+  /**
    * Save topic configuration
+   * Constructs TRUTopicsMessage and sends to API via confirmDataSelection
    */
   const saveTopicConfiguration = useCallback(async () => {
     if (!selectedTRU) {
       throw new Error('No TRU selected');
     }
 
-    const truData = truTopics.find(t => t.unitId === selectedTRU);
-    if (!truData) {
-      throw new Error('TRU data not found');
+    if (selectedRSUs.length === 0) {
+      throw new Error('No RSUs selected');
     }
 
-    // Build updated topics data
-    const updatedRsuTopics = truData.rsuTopics.map(rsuTopic => {
-      const rsuKey = `${rsuTopic.rsu.ip}:${rsuTopic.rsu.port}`;
+    // Build TRUTopicsMessage matching API model
+    // Only include selected RSUs with their topic selections
+    const rsuTopicsMessages = selectedRSUs.map(rsu => {
+      const rsuKey = `${rsu.ip}:${rsu.port}`;
       const selectedForRSU = selectedTopics[rsuKey] || [];
       
+      // Get available topics for this RSU from truTopics
+      const truData = truTopics.find(t => t.unitId === selectedTRU);
+      const rsuData = truData?.rsuTopics?.find(
+        rt => rt.rsu.ip === rsu.ip && rt.rsu.port === rsu.port
+      );
+      
+      // Create topics array with selected status
+      const topics = (rsuData?.topics || []).map(topic => ({
+        name: topic.name,
+        selected: selectedForRSU.includes(topic.name)
+      }));
+
       return {
-        ...rsuTopic,
-        topics: rsuTopic.topics.map(topic => ({
-          ...topic,
-          selected: selectedForRSU.includes(topic.name)
-        }))
+        rsu: {
+          ip: rsu.ip,
+          port: rsu.port
+        },
+        topics: topics
       };
     });
 
-    const updatedData = {
+    // Construct complete TRUTopicsMessage
+    const truTopicsMessage = {
       unitId: selectedTRU,
-      rsuTopics: updatedRsuTopics,
+      rsuTopics: rsuTopicsMessages,
       timestamp: Date.now()
     };
 
-    return await updateTRUTopics(selectedTRU, updatedData);
-  }, [selectedTRU, selectedTopics, truTopics, updateTRUTopics]);
+    return await updateTRUTopics(selectedTRU, truTopicsMessage);
+  }, [selectedTRU, selectedRSUs, selectedTopics, truTopics, updateTRUTopics]);
+
+  // Update available topics when RSU selection changes
+  useEffect(() => {
+    const topics = getTopicsForSelectedRSUs();
+    setTopicsByRSU(topics);
+    setFilteredTopicsByRSU(topics);
+  }, [selectedRSUs, getTopicsForSelectedRSUs]);
+
+  // Apply data type filter
+  useEffect(() => {
+    if (dataTypeFilter.includes('all') || dataTypeFilter.length === 0) {
+      setFilteredTopicsByRSU(topicsByRSU);
+    } else {
+      // Parse RSU-specific filters: format is "rsuKey-topic"
+      const filtered = topicsByRSU.map(rsuGroup => {
+        // Get filters that apply to this specific RSU
+        const rsuSpecificFilters = dataTypeFilter
+          .filter(filter => {
+            if (filter === 'all') return false;
+            const [filterRsuKey] = filter.split('-');
+            return filterRsuKey === rsuGroup.rsuKey;
+          })
+          .map(filter => {
+            const parts = filter.split('-');
+            return parts.slice(1).join('-'); // Get topic name after rsuKey
+          });
+        
+        // If no filters for this RSU, don't include it
+        if (rsuSpecificFilters.length === 0) {
+          return { ...rsuGroup, topics: [] };
+        }
+        
+        // Filter topics that match
+        const filteredTopics = rsuGroup.topics.filter(topic => 
+          rsuSpecificFilters.some(filter => 
+            topic.name.toLowerCase() === filter.toLowerCase()
+          )
+        );
+        
+        return { ...rsuGroup, topics: filteredTopics };
+      }).filter(rsuGroup => rsuGroup.topics.length > 0);
+      
+      setFilteredTopicsByRSU(filtered);
+    }
+  }, [dataTypeFilter, topicsByRSU]);
 
   const value = {
     truTopics,
     selectedTRU,
     selectedRSUs,
     selectedTopics,
+    dataTypeFilter,
+    topicsByRSU,
+    filteredTopicsByRSU,
     loading,
     error,
-    fetchTRUTopics,
     fetchTRUTopicsById,
     updateTRUTopics,
-    fetchRSUTopics,
-    updateRSUTopics,
     selectTRU,
     selectRSUs,
     toggleTopic,
@@ -454,8 +433,12 @@ export const TRUTopicsProvider = ({ children }) => {
     clearAllTopics,
     clearTopicsForRSUs,
     getRSUListForSelectedTRU,
-    getTopicsForSelectedRSU,
     getTopicsForSelectedRSUs,
+    getTRUList,
+    getAvailableDataTypes,
+    handleDataTypeFilterChange,
+    getSelectionSummary,
+    resetSelection,
     saveTopicConfiguration,
   };
 

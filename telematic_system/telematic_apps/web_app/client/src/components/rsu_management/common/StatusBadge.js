@@ -19,14 +19,51 @@ import { Chip } from '@mui/material';
 
 /**
  * Status Badge Component
- * Displays online/offline status with color coding
+ * Displays RSU status with color coding
+ * Supports: other, standby, operate, fault (or legacy online/offline boolean)
  */
-const StatusBadge = ({ online, size = 'small' }) => {
+const StatusBadge = ({ online, status, size = 'small' }) => {
+  // Handle new status field (other, standby, operate, fault)
+  let statusLabel;
+  let statusColor;
+
+  if (status) {
+    // New status values
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
+      case 'operate':
+      case 'operation':
+        statusLabel = 'Operate';
+        statusColor = 'success';
+        break;
+      case 'standby':
+        statusLabel = 'Standby';
+        statusColor = 'warning';
+        break;
+      case 'fault':
+        statusLabel = 'Fault';
+        statusColor = 'error';
+        break;
+      case 'other':
+        statusLabel = 'Other';
+        statusColor = 'default';
+        break;
+      default:
+        statusLabel = 'Other';
+        statusColor = 'default';
+        break;
+    }
+  } else {
+    // Legacy online/offline boolean support
+    statusLabel = online ? 'Online' : 'Offline';
+    statusColor = online ? 'success' : 'error';
+  }
+
   return (
     <Chip
       icon={<FiberManualRecordIcon />}
-      label={online ? 'Online' : 'Offline'}
-      color={online ? 'success' : 'error'}
+      label={statusLabel}
+      color={statusColor}
       size={size}
       sx={{
         fontWeight: 'bold',

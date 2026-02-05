@@ -53,8 +53,10 @@ const RSUFilters = ({ filters, onFilterChange }) => {
               onChange={(e) => onFilterChange({ status: e.target.value })}
             >
               <MenuItem value="all">All</MenuItem>
-              <MenuItem value="online">Online</MenuItem>
-              <MenuItem value="offline">Offline</MenuItem>
+              <MenuItem value="operate">Operate</MenuItem>
+              <MenuItem value="standby">Standby</MenuItem>
+              <MenuItem value="fault">Fault</MenuItem>
+              <MenuItem value="other">Other</MenuItem>
             </Select>
           </FormControl>
         </Grid>

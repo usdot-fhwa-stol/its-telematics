@@ -53,35 +53,35 @@ const DataTypeFilter = ({ value, onChange, disabled, availableDataTypes = [] }) 
 
   const renderSelectedValue = (selected) => {
     if (selected.includes('all')) {
-      return 'All Topics';
+      return 'All Available Data Types';
     }
-    // Extract and display unique topic names from RSU-specific values
-    const topicNames = selected
+    // Extract and display unique data type names from RSU-specific values
+    const dataTypeNames = selected
       .filter(v => v !== 'all')
       .map(v => {
         const parts = v.split('-');
         return parts.length > 1 ? parts.slice(1).join('-').toUpperCase() : v.toUpperCase();
       });
-    return topicNames.length > 0 ? topicNames.join(', ') : 'All Topics';
+    return dataTypeNames.length > 0 ? dataTypeNames.join(', ') : 'All Available Data Types';
   };
 
   return (
     <Paper elevation={2} sx={{ p: 2 }}>
       <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <FilterListIcon color="primary" />
-        Filter by Data Type
+        <FilterListIcon sx={{ color: '#748c93' }} />
+        Filter by Available Data Types
       </Typography>
       
       <FormControl fullWidth disabled={disabled}>
-        <InputLabel>Data Type</InputLabel>
+        <InputLabel>Available Data Types</InputLabel>
         <Select
           multiple
           value={value}
-          label="Data Type"
+          label="Available Data Types"
           onChange={handleChange}
           renderValue={renderSelectedValue}>
           <MenuItem key="all" value="all">
-            All Topics
+            All Available Data Types
           </MenuItem>
           {availableDataTypes.map((rsuGroup) => [
             <ListSubheader key={`header-${rsuGroup.rsuKey}`}>

@@ -14,6 +14,7 @@
  * the License.
  */
 
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import SettingsInputAntennaIcon from '@mui/icons-material/SettingsInputAntenna';
 import {
   Box,
@@ -23,6 +24,7 @@ import {
   ListItemIcon,
   ListItemText,
   Paper,
+  Tooltip,
   Typography
 } from '@mui/material';
 
@@ -54,8 +56,11 @@ const RSUSelector = ({ rsuList, selectedRSUs = [], onSelect, disabled }) => {
     <Paper elevation={2} sx={{ p: 2 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <SettingsInputAntennaIcon color="primary" />
+          <SettingsInputAntennaIcon sx={{ color: '#748c93' }} />
           Select RSU(s)
+          <Tooltip title="Roadside Unit (RSU) - Infrastructure equipment that transmits and receives V2X messages at roadside locations" arrow>
+            <InfoOutlinedIcon sx={{ fontSize: 18, color: 'text.secondary', cursor: 'help' }} />
+          </Tooltip>
         </Typography>
         <Typography variant="caption" color="textSecondary">
           {selectedRSUs.length} of {rsuList.length} selected

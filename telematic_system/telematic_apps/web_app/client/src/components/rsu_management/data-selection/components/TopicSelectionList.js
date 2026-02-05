@@ -87,8 +87,8 @@ const TopicSelectionList = ({
     <Paper elevation={2} sx={{ p: 2 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <TopicIcon color="primary" />
-          Select Topics
+          <TopicIcon sx={{ color: '#748c93' }} />
+          Select Data Types
         </Typography>
         <Typography variant="caption" color="textSecondary">
           {getSelectionSummary()}
@@ -102,6 +102,11 @@ const TopicSelectionList = ({
             <Button
               size="small"
               startIcon={<SelectAllIcon />}
+              sx={{ 
+                border: '1px solid #748c93',
+                color: 'black',
+                '&:hover': { backgroundColor: '#5f7379' }
+              }}
               onClick={() => {
                 const allTopics = {};
                 topicsByRSU.forEach(rsuGroup => {
@@ -115,6 +120,11 @@ const TopicSelectionList = ({
             <Button
               size="small"
               startIcon={<ClearAllIcon />}
+              sx={{ 
+                border: '1px solid #748c93',
+                color: 'black',
+                '&:hover': { backgroundColor: '#5f7379' }
+              }}
               onClick={onClearAll}
               disabled={Object.keys(selectedTopics).length === 0}
             >
@@ -125,10 +135,10 @@ const TopicSelectionList = ({
         </>
       )}
 
-      {/* Topics List Grouped by RSU */}
+      {/* Data Types List Grouped by RSU */}
       {disabled ? (
         <Typography variant="body2" color="textSecondary" sx={{ py: 2 }}>
-          Please select TRU and RSU(s) to view available topics
+          Please select TRU and RSU(s) to view available data types
         </Typography>
       ) : topicsByRSU.length === 0 ? (
         <Typography variant="body2" color="textSecondary" sx={{ py: 2 }}>
@@ -149,8 +159,11 @@ const TopicSelectionList = ({
                     <Chip
                       label={`${selected}/${total}`}
                       size="small"
-                      color={selected > 0 ? 'primary' : 'default'}
-                      sx={{ mr: 2 }}
+                      sx={{ 
+                        mr: 2,
+                        backgroundColor: selected > 0 ? '#748c93' : undefined,
+                        color: selected > 0 ? 'white' : undefined
+                      }}
                     />
                   </Box>
                 </AccordionSummary>
@@ -160,6 +173,11 @@ const TopicSelectionList = ({
                     <Button
                       size="small"
                       variant="outlined"
+                      sx={{ 
+                        borderColor: '#748c93',
+                        color: '#748c93',
+                        '&:hover': { borderColor: '#5f7379', backgroundColor: 'rgba(116, 140, 147, 0.04)' }
+                      }}
                       onClick={() => handleSelectAllForRSU(rsuGroup.rsuKey)}
                       disabled={selected === total}
                     >
@@ -168,6 +186,11 @@ const TopicSelectionList = ({
                     <Button
                       size="small"
                       variant="outlined"
+                      sx={{ 
+                        borderColor: '#748c93',
+                        color: '#748c93',
+                        '&:hover': { borderColor: '#5f7379', backgroundColor: 'rgba(116, 140, 147, 0.04)' }
+                      }}
                       onClick={() => handleClearAllForRSU(rsuGroup.rsuKey)}
                       disabled={selected === 0}
                     >

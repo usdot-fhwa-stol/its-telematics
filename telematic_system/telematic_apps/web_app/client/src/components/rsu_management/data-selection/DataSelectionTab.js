@@ -28,8 +28,8 @@ import {
   Typography,
 } from '@mui/material';
 import { useState } from 'react';
+import { useTRUTopics } from '../../../context/TRUTopicsContext';
 import Button from '../../layout/Button';
-import useTopicConfiguration from '../hooks/useTopicConfiguration';
 import DataTypeFilter from './components/DataTypeFilter';
 import RSUSelector from './components/RSUSelector';
 import TopicSelectionList from './components/TopicSelectionList';
@@ -49,24 +49,25 @@ const DataSelectionTab = () => {
     loading,
     error,
     getTRUList,
-    getRSUList,
+    getRSUListForSelectedTRU,
     getAvailableDataTypes,
-    handleSelectTRU,
-    handleSelectRSUs,
-    handleToggleTopic,
-    handleSelectAll,
-    handleClearAll,
+    selectTRU,
+    selectRSUs,
+    toggleTopic,
+    selectAllTopics,
+    clearAllTopics,
     handleDataTypeFilterChange,
     getSelectionSummary,
-    handleSave,
+    saveTopicConfiguration,
     resetSelection,
-  } = useTopicConfiguration();
+  } = useTRUTopics();
 
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const summary = getSelectionSummary();
 
-  const steps = ['Select TRU', 'Select RSU', 'Filter Topics', 'Select Topics'];
+
+  const steps = ['Select TRU', 'Select RSU', 'Filter Data Types', 'Select Data Types'];
 
   const getActiveStep = () => {
     if (!selectedTRU) return 0;
@@ -76,18 +77,17 @@ const DataSelectionTab = () => {
   };
 
   const handleSaveConfiguration = async () => {
-    const result = await handleSave();
-    
-    if (result.success) {
+    try {
+      await saveTopicConfiguration();
       setSnackbar({
         open: true,
         message: 'Topic configuration saved successfully!',
         severity: 'success',
       });
-    } else {
+    } catch (err) {
       setSnackbar({
         open: true,
-        message: `Failed to save: ${result.error}`,
+        message: `Failed to save: ${err.message}`,
         severity: 'error',
       });
     }
@@ -138,7 +138,7 @@ const DataSelectionTab = () => {
 
       {/* Selection Summary */}
       {summary.truSelected && (
-        <Paper elevation={1} sx={{ p: 2, mb: 3, backgroundColor: 'info.light' }}>
+        <Paper elevation={1} sx={{ p: 2, mb: 3, backgroundColor: '#748c93' }}>
           <Typography variant="body2">
             <strong>Selected TRU:</strong> {selectedTRU}
             {summary.rsuSelected && (
@@ -164,16 +164,16 @@ const DataSelectionTab = () => {
           <TRUSelector
             truList={getTRUList()}
             selectedTRU={selectedTRU}
-            onSelect={handleSelectTRU}
+            onSelect={selectTRU}
           />
         </Grid>
 
         {/* Column 2: RSU Selector */}
         <Grid item xs={12} md={3}>
           <RSUSelector
-            rsuList={getRSUList()}
+            rsuList={getRSUListForSelectedTRU()}
             selectedRSUs={selectedRSUs}
-            onSelect={handleSelectRSUs}
+            onSelect={selectRSUs}
             disabled={!selectedTRU}
           />
         </Grid>
@@ -193,9 +193,9 @@ const DataSelectionTab = () => {
           <TopicSelectionList
             topicsByRSU={filteredTopicsByRSU}
             selectedTopics={selectedTopics}
-            onToggle={handleToggleTopic}
-            onSelectAll={handleSelectAll}
-            onClearAll={handleClearAll}
+            onToggle={toggleTopic}
+            onSelectAll={selectAllTopics}
+            onClearAll={clearAllTopics}
             disabled={selectedRSUs.length === 0}
           />
         </Grid>
