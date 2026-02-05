@@ -16,6 +16,7 @@
 package com.telematic.telematic_rsu_management_service.health.depositor;
 
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.telematic.telematic_rsu_management_service.health.dto.RSUHealthStatusMessage;
 import com.telematic.telematic_rsu_management_service.health.dto.TRUHealthStatusMessage;
@@ -31,6 +32,7 @@ public class RSUHealthStatusDepositor {
         this.truConfigStatusRepository = truConfigStatusRepository;
     }
 
+    @Transactional
     public void depositRSUHealthStatus(TRUHealthStatusMessage truHealthStatusMessage) {
         if(truHealthStatusMessage.getUnitHealthStatus() == null || truHealthStatusMessage.getUnitHealthStatus().getUnitId() == null) {
             throw new IllegalArgumentException("depositRSUHealthStatus: Unit ID is null");

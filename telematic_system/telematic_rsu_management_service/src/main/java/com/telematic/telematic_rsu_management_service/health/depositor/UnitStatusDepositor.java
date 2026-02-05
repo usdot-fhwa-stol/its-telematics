@@ -16,10 +16,11 @@
 package com.telematic.telematic_rsu_management_service.health.depositor;
 
 import org.springframework.stereotype.Component;
-import com.telematic.telematic_rsu_management_service.health.dto.RSUHealthStatusMessage;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.telematic.telematic_rsu_management_service.health.dto.TRUHealthStatusMessage;
-import com.telematic.telematic_rsu_management_service.model.RSUConfigStatus;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
+import com.telematic.telematic_rsu_management_service.model.UnitPluginStatus;
 import com.telematic.telematic_rsu_management_service.repository.mysql.TRUConfigStatusRepository;
 
 @Component
@@ -30,6 +31,7 @@ public class UnitStatusDepositor {
         this.truConfigStatusRepository = truConfigStatusRepository;
     }
 
+    @Transactional
     public void depositUnitStatus(TRUHealthStatusMessage truHealthStatusMessage) {
         if (truHealthStatusMessage.getUnitHealthStatus() == null
                 || truHealthStatusMessage.getUnitHealthStatus().getUnitId() == null) {
@@ -40,8 +42,21 @@ public class UnitStatusDepositor {
                 .findByUnitId(truHealthStatusMessage.getUnitHealthStatus().getUnitId());
         
         if (truConfigStatus != null) {
+            // Initialize pluginConfigStatus if null
+            if (truConfigStatus.getPluginConfigStatus() == null) {
+                UnitPluginStatus pluginStatus = new UnitPluginStatus();
+                pluginStatus.setTimestamp(System.currentTimeMillis());
+                truConfigStatus.setPluginConfigStatus(pluginStatus);
+            }
+            
+            // Update bridge plugin status and timestamps
             truConfigStatus.getPluginConfigStatus()
                     .setBridgePluginStatus(truHealthStatusMessage.getUnitHealthStatus().getBridgePluginStatus());
+            truConfigStatus.getPluginConfigStatus()
+                    .setLastCommunicationTimestamp(truHealthStatusMessage.getUnitHealthStatus().getLastCommunicationTimestamp());
+            truConfigStatus.getPluginConfigStatus()
+                    .setTimestamp(System.currentTimeMillis());
+            
             truConfigStatusRepository.save(truConfigStatus);
         } else {
             throw new IllegalArgumentException("TRUConfigStatus not found for Unit ID: "

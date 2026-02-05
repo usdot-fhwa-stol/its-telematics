@@ -9,7 +9,7 @@ logging:
     
 spring:
   datasource:
-    url: ${rsu_spring_datasource_url:jdbc:mysql://localhost:3306/rsm?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true}
+    url: ${rsu_spring_datasource_url:jdbc:mysql://localhost:3307/rsm?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true}
     username: ${rsu_spring_datasource_username:telematic}
     password: ${rsu_spring_datasource_password:telematic}
     driver-class-name: ${rsu_spring_datasource_driver:com.mysql.cj.jdbc.Driver}

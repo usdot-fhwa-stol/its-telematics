@@ -15,10 +15,10 @@
  */
 import axios from 'axios';
 import { DataSelectionRepository } from '../../application/rsu_management/ports/data_selection.repository';
-import { TRUTopicsMessage } from '../../models/rsu_management/tru_topics_message.model';
+import { RSUEndpoint } from '../../models/rsu_management/rsu_endpoint.model';
 import { RSUTopicsMessage } from '../../models/rsu_management/rsu_topics_message.model';
 import { TopicMessage } from '../../models/rsu_management/topic_message.model';
-import { RSUEndpoint } from '../../models/rsu_management/rsu_endpoint.model';
+import { TRUTopicsMessage } from '../../models/rsu_management/tru_topics_message.model';
 
 export class DataSelectionApiRepository implements DataSelectionRepository {
     private readonly baseUrl: string;
