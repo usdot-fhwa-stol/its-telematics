@@ -15,9 +15,15 @@
  */
 package com.telematic.telematic_rsu_management_service.data_ingestion.influx;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.Map;
 
@@ -27,8 +33,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.telematic.telematic_rsu_management_service.data_ingestion.influx.InfluxLineBuilder;
-import com.telematic.telematic_rsu_management_service.data_ingestion.influx.InfluxPipelineLineBuilder;
 import com.telematic.telematic_rsu_management_service.data_ingestion.influx.pipeline.LineRecordContext;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,9 +56,11 @@ class InfluxLineBuilderTest {
                 "metadata": {
                     "event": "test_event",
                     "unitId": "unit123",
-                    "rsuIp": "192.168.1.1",
+                    "rsu": {
+                        "ip": "192.168.1.1",
+                        "port": "8080"
+                    },
                     "topicName": "test/topic",
-                    "port": "8080",
                     "timestamp": 1234567890000000000
                 },
                 "payload": {
@@ -83,9 +89,11 @@ class InfluxLineBuilderTest {
                 "metadata": {
                     "event": "nested_event",
                     "unitId": "unit456",
-                    "rsuIp": "10.0.0.1",
+                    "rsu": {
+                        "ip": "10.0.0.1",
+                        "port": "9090"
+                    },
                     "topicName": "sensor/data",
-                    "port": "9090",
                     "timestamp": 1234567890123456789
                 },
                 "payload": {
@@ -133,9 +141,11 @@ class InfluxLineBuilderTest {
                 "metadata": {
                     "event": "array_event",
                     "unitId": "unit789",
-                    "rsuIp": "172.16.0.1",
+                    "rsu": {
+                        "ip": "172.16.0.1",
+                        "port": "7070"
+                    },
                     "topicName": "array/data",
-                    "port": "7070",
                     "timestamp": 1111111111000000000
                 },
                 "payload": {
@@ -206,9 +216,11 @@ class InfluxLineBuilderTest {
                 "metadata": {
                     "event": "empty_payload",
                     "unitId": "unit000",
-                    "rsuIp": "1.2.3.4",
+                    "rsu": {
+                        "ip": "1.2.3.4",
+                        "port": "5000"
+                    },
                     "topicName": "empty",
-                    "port": "5000",
                     "timestamp": 5555555555000000000
                 },
                 "payload": {}
@@ -238,9 +250,11 @@ class InfluxLineBuilderTest {
                 "metadata": {
                     "event": "null_payload",
                     "unitId": "unit111",
-                    "rsuIp": "5.6.7.8",
+                    "rsu": {
+                        "ip": "5.6.7.8",
+                        "port": "6000"
+                    },
                     "topicName": "null_test",
-                    "port": "6000",
                     "timestamp": 6666666666000000000
                 },
                 "payload": null
@@ -280,9 +294,11 @@ class InfluxLineBuilderTest {
                 "metadata": {
                     "event": "complex_event",
                     "unitId": "complex_unit",
-                    "rsuIp": "192.168.100.1",
+                    "rsu": {
+                        "ip": "192.168.100.1",
+                        "port": "8888"
+                    },
                     "topicName": "complex/topic",
-                    "port": "8888",
                     "timestamp": 7777777777000000000
                 },
                 "payload": {
@@ -328,9 +344,11 @@ class InfluxLineBuilderTest {
                 "metadata": {
                     "event": "tag_test",
                     "unitId": "tag_unit",
-                    "rsuIp": "10.20.30.40",
+                    "rsu": {
+                        "ip": "10.20.30.40",
+                        "port": "1234"
+                    },
                     "topicName": "tag/topic",
-                    "port": "1234",
                     "timestamp": 8888888888000000000
                 },
                 "payload": {

@@ -16,6 +16,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import rsuService from '../api/api-rsu';
+import AuthContext from './auth-context';
 
 const TRUStatusContext = createContext();
 
@@ -39,6 +40,7 @@ const RSU_MODE_MAP = {
  * Manages TRU status information following TruConfigStatus model
  */
 export const TRUStatusProvider = ({ children }) => {
+  const authCtx = useContext(AuthContext);
   const [truStatuses, setTruStatuses] = useState([]);
   const [filteredStatuses, setFilteredStatuses] = useState([]);
   const [rsuStatuses, setRsuStatuses] = useState([]);
@@ -231,10 +233,12 @@ export const TRUStatusProvider = ({ children }) => {
     await fetchTRUStatuses();
   }, [fetchTRUStatuses]);
 
-  // Initial data fetch
+  // Initial data fetch - only when authenticated
   useEffect(() => {
-    fetchTRUStatuses();
-  }, [fetchTRUStatuses]);
+    if (authCtx.isAuth) {
+      fetchTRUStatuses();
+    }
+  }, [fetchTRUStatuses, authCtx.isAuth]);
 
   // Apply filters when they or truStatuses change
   useEffect(() => {

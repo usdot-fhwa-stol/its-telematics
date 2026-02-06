@@ -57,8 +57,8 @@ public class InfluxLineBuilder {
         flatten("payload", payload, fields);
         ctx.setFields(fields);
 
-        long timestampNs = metadata.path("timestamp").asLong(0L);
-        ctx.setTimestamp(timestampNs);
+        long timestampMs = metadata.path("timestamp").asLong(0L);
+        ctx.setTimestamp(timestampMs);
         
         return pipelineLineBuilder.build(ctx);
     }
