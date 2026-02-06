@@ -96,7 +96,7 @@ export const TRUStatusProvider = ({ children }) => {
           // Convert numeric status to string using RSU_MODE_MAP
           let statusValue = 'other';
           if (rsuConfig.status !== null && rsuConfig.status !== undefined) {
-            statusValue = RSU_MODE_MAP[Number.parseInt(rsuConfig.status)] || 'other';
+            statusValue = RSU_MODE_MAP[Number.parseInt(rsuConfig.status)] || rsuConfig.status || 'other';
           }
           
           return {

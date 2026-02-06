@@ -23,7 +23,7 @@ import { TRUTopicsMessage } from '../../models/rsu_management/tru_topics_message
 export class DataSelectionApiRepository implements DataSelectionRepository {
     private readonly baseUrl: string;
 
-    constructor(baseUrl: string = process.env.RSU_MANAGEMENT_SERVICE_URL || 'http://localhost:8082') {
+    constructor(baseUrl: string = process.env.RSU_MANAGEMENT_SERVICE_URL || 'http://localhost:8083') {
         this.baseUrl = baseUrl;
     }
 

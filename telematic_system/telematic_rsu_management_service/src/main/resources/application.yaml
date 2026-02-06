@@ -1,5 +1,5 @@
 server:
-  port: ${rsu_server_port:8082}
+  port: ${rsu_server_port:8083}
 
 logging:
   config: classpath:log4j2-spring.xml
