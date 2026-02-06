@@ -1,9 +1,12 @@
 import axios from 'axios';
-import {env} from "../env"
 import { constructError } from './api-utils';
 
+const getApiBaseUrl = () => {
+    return window.env.REACT_APP_WEB_SERVER_URI;
+};
+
 const registerNewUser = async (username, email, password, org_id) => {
-    const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/register`
+    const URL = `${getApiBaseUrl()}/api/users/register`;
 
     try {
         const { data } = await axios.post(URL, {
@@ -14,14 +17,14 @@ const registerNewUser = async (username, email, password, org_id) => {
         }, { withCredentials: true });
         return data;
     } catch (err) {
-        
-          return constructError(err)
-  
+
+        return constructError(err)
+
     }
 }
 
 const updatePassword = async (username, email, new_password) => {
-    const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/forget/password`
+    const URL = `${getApiBaseUrl()}/api/users/forget/password`;
     try {
         const { data } = await axios.post(URL, {
             username: username,
@@ -30,23 +33,23 @@ const updatePassword = async (username, email, new_password) => {
         }, { withCredentials: true });
         return data;
     } catch (err) {
-        
-          return constructError(err)
-  
+
+        return constructError(err)
+
     }
 }
 
 const loginUser = async (username, password) => {
-    const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/login`
+    const URL = `${getApiBaseUrl()}/api/users/login`
     try {
         const { data } = await axios.post(URL, {
             username: username,
             password: password
         }, { withCredentials: true });   
-        if(data.token ===undefined)
-        {
+        if (data.token === undefined || data.token === null || data.token === "") 
+            {
             return { errCode: 500, errMsg: "No token"}
-        }     
+        }
         axios.defaults.headers.common['Authorization'] = data.token;
         return data;
     } catch (err) {
@@ -57,50 +60,50 @@ const loginUser = async (username, password) => {
 
 
 const deleteUser = async (username) => {
-    const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/delete`
+    const URL = `${getApiBaseUrl()}/api/users/delete`
 
     try {
         const { data } = await axios.delete(URL + "?username=" + username, { withCredentials: true });
         return data;
     } catch (err) {
-        
-          return constructError(err)
-  
+
+        return constructError(err)
+
     }
 }
 
 
 const listUsers = async () => {
-    const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/all`
+    const URL = `${getApiBaseUrl()}/api/users/all`
 
     try {
         const { data } = await axios.get(URL, { withCredentials: true });
         return data;
     } catch (err) {
-        
-          return constructError(err)
-  
+
+        return constructError(err)
+
     }
 }
 const updateUserServerAdmin = async (req) => {
-    const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/update/server/admin`
+    const URL = `${getApiBaseUrl()}/api/users/update/server/admin`
     try {
         const { data } = await axios.post(URL, req, { withCredentials: true });
         return data;
     } catch (err) {
-        
-          return constructError(err)
-  
+
+        return constructError(err)
+
     }
 }
 const checkServerSession = async (token) => {
     axios.defaults.headers.common['Authorization'] = token;
-    const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/ping`
+    const URL = `${getApiBaseUrl()}/api/users/ping`;
     try {
         const { data } = await axios.get(URL, { withCredentials: true });
         return data;
     } catch (err) {
-        
+
         return {
             errCode:  err.response !== undefined ? err.response.status : "", errMsg:  err.response !== undefined&& err.response.data !== undefined
                 && err.response.data.message !== undefined ? err.response.data.message :  ( err.response !== undefined ? err.response.statusText: ""),

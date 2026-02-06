@@ -14,6 +14,7 @@
  * the License.
  */
 import { CircularProgress, Grid, Alert, Button } from '@mui/material';
+import DensityMediumIcon from '@mui/icons-material/DensityMedium';
 import { Box } from '@mui/system';
 import React, { useContext, useEffect, useState } from 'react';
 import Iframe from 'react-iframe';
@@ -22,6 +23,7 @@ import AuthContext from '../context/auth-context';
 import { env } from '../env';
 import { Capacitor } from '@capacitor/core';
 import { InAppBrowser } from '@capacitor/inappbrowser';
+import { deleteUser } from '../api/api-user';
 
 const Dashboard = React.memo(() => {
   const [embedURL, setEmbedURL] = useState(env.REACT_APP_GRAFANA_URI + "/dashboards?theme=light")
@@ -123,6 +125,15 @@ const Dashboard = React.memo(() => {
     openGrafana();
   };
 
+  const handleLogout = () => {
+    deleteUser(authContext.username).then(() => {
+      authContext.logout();
+    }).catch(error => {
+      console.log("error logout: " + error);
+      authContext.logout();
+    });
+  };
+
   // Mobile: Show loading while authenticating
   if (isMobile && isAuthenticating) {
     return (
@@ -142,6 +153,9 @@ const Dashboard = React.memo(() => {
         <Button variant="contained" onClick={handleRetry}>
           Retry
         </Button>
+        <Button variant="outlined" onClick={handleLogout}>
+          Logout
+        </Button>
       </Box>
     );
   }
@@ -149,9 +163,12 @@ const Dashboard = React.memo(() => {
   // Mobile: After InAppBrowser closes, show button to reopen
   if (isMobile && browserClosed) {
     return (
-      <Box sx={{ display: 'flex', width: '100%', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
-        <Button variant="contained" onClick={handleRetry}>
-          Open Grafana Dashboard
+      <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+        <Button variant="contained" onClick={handleRetry} startIcon={<DensityMediumIcon />}>
+          Browse Dashboards
+        </Button>
+        <Button variant="outlined" onClick={handleLogout}>
+          Logout
         </Button>
       </Box>
     );
