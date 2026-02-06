@@ -40,7 +40,7 @@ const EditRSUDialog = ({ open, onClose, rsu, onSuccess }) => {
       authPassPhrase: '',
       user: '',
       privacyPassPhrase: '',
-      rsuMibVersion: 'RSU4.1'
+      rsuMibVersion: 'NTCIP1218'
     }
   });
   const [error, setError] = useState(null);
@@ -59,7 +59,7 @@ const EditRSUDialog = ({ open, onClose, rsu, onSuccess }) => {
           authPassPhrase: '',
           user: '',
           privacyPassPhrase: '',
-          rsuMibVersion: 'RSU4.1'
+          rsuMibVersion: 'NTCIP1218'
         }
       });
     }

@@ -41,7 +41,7 @@ const RegisterRSUDialog = ({ open, onClose, onSuccess }) => {
       authPassPhrase: '',
       user: '',
       privacyPassPhrase: '',
-      rsuMibVersion: 'RSU4.1'
+      rsuMibVersion: 'NTCIP1218'
     }
   });
   const [error, setError] = useState(null);
@@ -54,13 +54,14 @@ const RegisterRSUDialog = ({ open, onClose, onSuccess }) => {
       const truWithCapacity = truStatuses
         .map(tru => {
           const currentConnections = tru.rsuConfigs?.length || 0;
-          const maxConnections = tru.unitConfig?.maxRsuConnections || 0;
+          const maxConnections = tru.unitConfig?.maxConnections || 0;
           const availableCapacity = maxConnections - currentConnections;
+          const bridgeStatus = tru.pluginConfigStatus?.bridgePluginStatus?.toLowerCase() || 'unknown';
           
           return {
             unitId: tru.unitConfig?.unitId,
             name: tru.unitConfig?.name,
-            bridgePluginStatus: tru.unitConfig?.bridgePluginStatus,
+            bridgePluginStatus: bridgeStatus,
             availableCapacity,
             currentConnections,
             maxConnections
@@ -68,7 +69,7 @@ const RegisterRSUDialog = ({ open, onClose, onSuccess }) => {
         })
         // Filter: only running TRUs with available capacity
         .filter(tru => 
-          tru.bridgePluginStatus === 'Running' && 
+          tru.bridgePluginStatus === 'running' && 
           tru.availableCapacity > 0
         )
         // Sort by most available capacity first
