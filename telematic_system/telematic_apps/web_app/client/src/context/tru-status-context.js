@@ -81,7 +81,7 @@ export const TRUStatusProvider = ({ children }) => {
           lastUpdatedTimestamp: tru.unitConfig?.timestamp || tru.timestamp || null
         },
         pluginConfigStatus: {
-          bridgePluginStatus: tru.pluginConfigStatus?.bridgePluginStatus.toLowerCase() || 'pending',
+          bridgePluginStatus: tru.pluginConfigStatus?.bridgePluginStatus?.toLowerCase() || 'pending',
           lastCommunicationTimestamp: tru.pluginConfigStatus?.lastCommunicationTimestamp || null,
           timestamp: tru.pluginConfigStatus?.timestamp || null
         },
@@ -179,7 +179,7 @@ export const TRUStatusProvider = ({ children }) => {
   const getStatusCount = useCallback((statusValue) => {
     return truStatuses.filter(item => {
       const pluginStatus = item.pluginConfigStatus?.bridgePluginStatus?.toLowerCase() || 'pending';
-      return pluginStatus === statusValue.toLowerCase();
+      return pluginStatus === statusValue?.toLowerCase();
     }).length;
   }, [truStatuses]);
 
@@ -191,7 +191,7 @@ export const TRUStatusProvider = ({ children }) => {
 
     // Apply search filter
     if (rsuFilters.search) {
-      const searchLower = rsuFilters.search.toLowerCase();
+      const searchLower = rsuFilters.search?.toLowerCase();
       filtered = filtered.filter(item => 
         item.ip?.toLowerCase().includes(searchLower) ||
         item.port?.toString().includes(searchLower)
@@ -222,7 +222,7 @@ export const TRUStatusProvider = ({ children }) => {
   const getRSUStatusCount = useCallback((statusValue) => {
     return rsuStatuses.filter(item => {
       const status = item.status?.toLowerCase() || 'pending';
-      return status === statusValue.toLowerCase();
+      return status === statusValue?.toLowerCase();
     }).length;
   }, [rsuStatuses]);
 

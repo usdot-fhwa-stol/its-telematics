@@ -28,7 +28,7 @@ public class RSUHealthStatusMessage {
     @JsonProperty("rsu")
     private RSUEndpoint rsu;
     
-    @JsonProperty("Status")
+    @JsonProperty("status")
     private String status;
     
     @JsonProperty("event")

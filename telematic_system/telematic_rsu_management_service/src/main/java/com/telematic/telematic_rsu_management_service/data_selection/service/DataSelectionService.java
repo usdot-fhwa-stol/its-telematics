@@ -67,9 +67,9 @@ public class DataSelectionService {
     }
     
     public TRUTopicsMessage requestAvailableTopics(TRUTopicsMessage truTopicsMessage) {
-        availableTopicSubject = availableTopicSubject.replace("*", truTopicsMessage.getUnitId());
-        log.info("Requesting available topics for TRU ID '{}' by to subject '{}': {}", truTopicsMessage.getUnitId(), availableTopicSubject, truTopicsMessage);
-        Message message = natsMessagingClient.request(availableTopicSubject, serializer.encode(truTopicsMessage),
+        String subject = availableTopicSubject.replace("*", truTopicsMessage.getUnitId());
+        log.info("Requesting available topics for TRU ID '{}' by to subject '{}': {}", truTopicsMessage.getUnitId(), subject, truTopicsMessage);
+        Message message = natsMessagingClient.request(subject, serializer.encode(truTopicsMessage),
                 Duration.ofSeconds(requestTimeoutSeconds));
         TRUTopicsMessage responseTopicMessage = serializer.decode(message.payload(), TRUTopicsMessage.class);
         log.info("Received available topics response: {}", responseTopicMessage);
@@ -105,10 +105,10 @@ public class DataSelectionService {
     }
 
     public TRUTopicsMessage requestDataSelection(TRUTopicsMessage truTopicsMessage) {
-        confirmTopicSubject = confirmTopicSubject.replace("*", truTopicsMessage.getUnitId());
+        String subject = confirmTopicSubject.replace("*", truTopicsMessage.getUnitId());
         log.info("Requesting topic confirmation for TRU ID '{}' to subject '{}': {}", truTopicsMessage.getUnitId(),
-                confirmTopicSubject, truTopicsMessage);
-        Message message = natsMessagingClient.request(confirmTopicSubject, serializer.encode(truTopicsMessage),
+                subject, truTopicsMessage);
+        Message message = natsMessagingClient.request(subject, serializer.encode(truTopicsMessage),
                 Duration.ofSeconds(confirmTopicRequestTimeoutSeconds));   
         TRUTopicsMessage truTopicsMessageRResponse = serializer.decode(message.payload(), TRUTopicsMessage.class);
         log.info("Received confirm topics response: {}", truTopicsMessageRResponse);

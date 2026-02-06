@@ -64,7 +64,7 @@ const TRUStatusTab = () => {
           <Chip
             label={status.charAt(0).toUpperCase() + status.slice(1)}
             size="small"
-            color={status.toLowerCase() === 'running' ? 'success' : 'error'}
+            color={status.toLowerCase() === 'running' ? 'success' : status.toLowerCase() === 'error' ? 'error' : 'secondary'}
           />
         );
       },

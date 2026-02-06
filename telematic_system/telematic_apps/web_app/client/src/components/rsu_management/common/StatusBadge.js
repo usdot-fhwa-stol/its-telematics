@@ -49,8 +49,8 @@ const StatusBadge = ({ online, status, size = 'small' }) => {
         statusColor = 'default';
         break;
       default:
-        statusLabel = 'Other';
-        statusColor = 'default';
+        statusLabel = 'Pending';
+        statusColor = 'secondary';
         break;
     }
   } else {
