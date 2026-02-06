@@ -48,9 +48,9 @@ public class InfluxLineBuilder {
 
         Map<String, String> tags = new LinkedHashMap<>();
         tags.put("unitId", metadata.path("unitId").asText("unknown"));
-        tags.put("rsuIp", metadata.path("rsuIp").asText("0.0.0.0"));
+        tags.put("rsuIp", metadata.path("rsu").path("ip").asText("0.0.0.0"));
         tags.put("topicName", metadata.path("topicName").asText("unknown"));
-        tags.put("port", metadata.path("port").asText("0"));
+        tags.put("port", metadata.path("rsu").path("port").asText("0"));
         ctx.setTags(tags);
 
         Map<String, Object> fields = new LinkedHashMap<>();

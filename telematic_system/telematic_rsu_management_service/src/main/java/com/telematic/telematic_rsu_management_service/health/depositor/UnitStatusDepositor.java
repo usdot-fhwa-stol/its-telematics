@@ -33,13 +33,13 @@ public class UnitStatusDepositor {
 
     @Transactional
     public void depositUnitStatus(TRUHealthStatusMessage truHealthStatusMessage) {
-        if (truHealthStatusMessage.getUnitHealthStatus() == null
-                || truHealthStatusMessage.getUnitHealthStatus().getUnitId() == null) {
+        if (truHealthStatusMessage.getUnitConfig() == null
+                || truHealthStatusMessage.getUnitConfig().getUnitId() == null) {
             throw new IllegalArgumentException("depositUnitStatus: Unit ID is null");
         }
         
         TRUConfigStatus truConfigStatus = truConfigStatusRepository
-                .findByUnitId(truHealthStatusMessage.getUnitHealthStatus().getUnitId());
+                .findByUnitId(truHealthStatusMessage.getUnitConfig().getUnitId());
         
         if (truConfigStatus != null) {
             // Initialize pluginConfigStatus if null
@@ -51,16 +51,16 @@ public class UnitStatusDepositor {
             
             // Update bridge plugin status and timestamps
             truConfigStatus.getPluginConfigStatus()
-                    .setBridgePluginStatus(truHealthStatusMessage.getUnitHealthStatus().getBridgePluginStatus());
+                    .setBridgePluginStatus(truHealthStatusMessage.getUnitConfig().getBridgePluginStatus());
             truConfigStatus.getPluginConfigStatus()
-                    .setLastCommunicationTimestamp(truHealthStatusMessage.getUnitHealthStatus().getLastCommunicationTimestamp());
+                    .setLastCommunicationTimestamp(truHealthStatusMessage.getUnitConfig().getLastUpdatedTimestamp());
             truConfigStatus.getPluginConfigStatus()
                     .setTimestamp(System.currentTimeMillis());
             
             truConfigStatusRepository.save(truConfigStatus);
         } else {
             throw new IllegalArgumentException("TRUConfigStatus not found for Unit ID: "
-                    + truHealthStatusMessage.getUnitHealthStatus().getUnitId());
+                    + truHealthStatusMessage.getUnitConfig().getUnitId());
         }
     }
 }

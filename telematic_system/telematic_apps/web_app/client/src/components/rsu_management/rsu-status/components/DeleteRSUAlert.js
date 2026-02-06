@@ -24,8 +24,8 @@ import {
   Typography,
 } from '@mui/material';
 import { useState } from 'react';
-import { useTRUConfig } from '../../../../context/TRUConfigContext';
-import { useTRUStatus } from '../../../../context/TRUStatusContext';
+import { useTRUConfig } from '../../../../context/tru-config-context';
+import { useTRUStatus } from '../../../../context/tru-status-context';
 import Button from '../../../layout/Button';
 
 /**

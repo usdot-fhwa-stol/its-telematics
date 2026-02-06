@@ -28,7 +28,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useState } from 'react';
-import { useTRUTopics } from '../../../context/TRUTopicsContext';
+import { useTRUTopics } from '../../../context/tru-topic-context';
 import Button from '../../layout/Button';
 import DataTypeFilter from './components/DataTypeFilter';
 import RSUSelector from './components/RSUSelector';

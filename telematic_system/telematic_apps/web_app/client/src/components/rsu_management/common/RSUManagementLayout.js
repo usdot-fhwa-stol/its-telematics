@@ -16,8 +16,8 @@
 
 import { Box, Paper, Tab, Tabs } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { useTRUStatus } from '../../../context/TRUStatusContext';
-import { useTRUTopics } from '../../../context/TRUTopicsContext';
+import { useTRUStatus } from '../../../context/tru-status-context';
+import { useTRUTopics } from '../../../context/tru-topic-context';
 import DataSelectionTab from '../data-selection/DataSelectionTab';
 import RSUStatusTab from '../rsu-status/RSUStatusTab';
 import TRUStatusTab from '../tru-status/TRUStatusTab';

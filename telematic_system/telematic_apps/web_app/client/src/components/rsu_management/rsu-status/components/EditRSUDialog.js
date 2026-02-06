@@ -17,8 +17,8 @@
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { Accordion, AccordionDetails, AccordionSummary, Alert, FormControl, Grid, InputLabel, MenuItem, Select, TextField, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { useTRUConfig } from '../../../../context/TRUConfigContext';
-import { useTRUStatus } from '../../../../context/TRUStatusContext';
+import { useTRUConfig } from '../../../../context/tru-config-context';
+import { useTRUStatus } from '../../../../context/tru-status-context';
 import Button from '../../../layout/Button';
 import ManagementDialog from '../../common/ManagementDialog';
 

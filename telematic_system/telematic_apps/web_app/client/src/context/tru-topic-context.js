@@ -15,8 +15,8 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import rsuService from '../api/rsuService';
-import { useTRUStatus } from './TRUStatusContext';
+import rsuService from '../api/api-rsu';
+import { useTRUStatus } from './tru-status-context';
 
 const TRUTopicsContext = createContext();
 

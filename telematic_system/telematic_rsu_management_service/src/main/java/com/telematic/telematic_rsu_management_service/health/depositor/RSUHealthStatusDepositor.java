@@ -34,16 +34,16 @@ public class RSUHealthStatusDepositor {
 
     @Transactional
     public void depositRSUHealthStatus(TRUHealthStatusMessage truHealthStatusMessage) {
-        if(truHealthStatusMessage.getUnitHealthStatus() == null || truHealthStatusMessage.getUnitHealthStatus().getUnitId() == null) {
+        if(truHealthStatusMessage.getUnitConfig() == null || truHealthStatusMessage.getUnitConfig().getUnitId() == null) {
             throw new IllegalArgumentException("depositRSUHealthStatus: Unit ID is null");
         }
         TRUConfigStatus truConfigStatus = truConfigStatusRepository
-                .findByUnitId(truHealthStatusMessage.getUnitHealthStatus().getUnitId());
+                .findByUnitId(truHealthStatusMessage.getUnitConfig().getUnitId());
         if (truConfigStatus != null) {
             for (RSUConfigStatus rsuConfigStatus : truConfigStatus.getRsuConfigs()) {
-                for(RSUHealthStatusMessage rsuHealthStatusMessage : truHealthStatusMessage.getRsuHealthStatus()) {
-                    if (rsuConfigStatus.getRsuEndpoint().getIp().equals(rsuHealthStatusMessage.getIp())
-                            && rsuConfigStatus.getRsuEndpoint().getPort().equals(rsuHealthStatusMessage.getPort())) {
+                for(RSUHealthStatusMessage rsuHealthStatusMessage : truHealthStatusMessage.getRsuConfigs()) {
+                    if (rsuConfigStatus.getRsuEndpoint().getIp().equals(rsuHealthStatusMessage.getRsu().getIp())
+                            && rsuConfigStatus.getRsuEndpoint().getPort().equals(rsuHealthStatusMessage.getRsu().getPort())) {
                         rsuConfigStatus.setStatus(rsuHealthStatusMessage.getStatus());
                         rsuConfigStatus.setEvent(rsuHealthStatusMessage.getEvent());
                     }
@@ -53,7 +53,7 @@ public class RSUHealthStatusDepositor {
             
         } else {
             throw new IllegalArgumentException("TRUConfigStatus not found for unitId: "
-                    + truHealthStatusMessage.getUnitHealthStatus().getUnitId());
+                    + truHealthStatusMessage.getUnitConfig().getUnitId());
         }
     }
 }

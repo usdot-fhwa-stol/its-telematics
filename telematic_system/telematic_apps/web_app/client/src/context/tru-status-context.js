@@ -15,7 +15,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import rsuService from '../api/rsuService';
+import rsuService from '../api/api-rsu';
 
 const TRUStatusContext = createContext();
 
@@ -79,7 +79,7 @@ export const TRUStatusProvider = ({ children }) => {
           lastUpdatedTimestamp: tru.unitConfig?.timestamp || tru.timestamp || null
         },
         pluginConfigStatus: {
-          bridgePluginStatus: tru.pluginConfigStatus?.bridgePluginStatus || 'unknown',
+          bridgePluginStatus: tru.pluginConfigStatus?.bridgePluginStatus.toLowerCase() || 'pending',
           lastCommunicationTimestamp: tru.pluginConfigStatus?.lastCommunicationTimestamp || null,
           timestamp: tru.pluginConfigStatus?.timestamp || null
         },
@@ -94,9 +94,9 @@ export const TRUStatusProvider = ({ children }) => {
       const allRSUs = normalizedStatuses.flatMap(tru => 
         tru.rsuConfigs?.map(rsuConfig => {
           // Convert numeric status to string using RSU_MODE_MAP
-          let statusValue = 'other';
+          let statusValue = 'pending';
           if (rsuConfig.status !== null && rsuConfig.status !== undefined) {
-            statusValue = RSU_MODE_MAP[Number.parseInt(rsuConfig.status)] || rsuConfig.status || 'other';
+            statusValue = RSU_MODE_MAP[Number.parseInt(rsuConfig.status)] || rsuConfig.status || 'pending';
           }
           
           return {
@@ -156,7 +156,7 @@ export const TRUStatusProvider = ({ children }) => {
     // Apply status filter
     if (filters.status !== 'all') {
       filtered = filtered.filter(item => {
-        const pluginStatus = item.pluginConfigStatus?.bridgePluginStatus?.toLowerCase() || 'unknown';
+        const pluginStatus = item.pluginConfigStatus?.bridgePluginStatus?.toLowerCase() || 'pending';
         return filters.status === pluginStatus;
       });
     }
@@ -176,7 +176,7 @@ export const TRUStatusProvider = ({ children }) => {
    */
   const getStatusCount = useCallback((statusValue) => {
     return truStatuses.filter(item => {
-      const pluginStatus = item.pluginConfigStatus?.bridgePluginStatus?.toLowerCase() || 'unknown';
+      const pluginStatus = item.pluginConfigStatus?.bridgePluginStatus?.toLowerCase() || 'pending';
       return pluginStatus === statusValue.toLowerCase();
     }).length;
   }, [truStatuses]);
@@ -199,7 +199,7 @@ export const TRUStatusProvider = ({ children }) => {
     // Apply status filter
     if (rsuFilters.status !== 'all') {
       filtered = filtered.filter(item => {
-        const itemStatus = item.status?.toLowerCase() || 'unknown';
+        const itemStatus = item.status?.toLowerCase() || 'pending';
         return rsuFilters.status === itemStatus;
       });
     }
@@ -219,7 +219,7 @@ export const TRUStatusProvider = ({ children }) => {
    */
   const getRSUStatusCount = useCallback((statusValue) => {
     return rsuStatuses.filter(item => {
-      const status = item.status?.toLowerCase() || 'unknown';
+      const status = item.status?.toLowerCase() || 'pending';
       return status === statusValue.toLowerCase();
     }).length;
   }, [rsuStatuses]);

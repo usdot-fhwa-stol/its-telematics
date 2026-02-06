@@ -23,12 +23,15 @@ import lombok.Data;
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class UnitHealthStatusMessage {
-    @JsonProperty("UnitId")
+    @JsonProperty("unitId")
     private String unitId;
     
-    @JsonProperty("BridgePluginStatus")
+    @JsonProperty("bridgePluginStatus")
     private String bridgePluginStatus;
     
-    @JsonProperty("LastCommunicationTimestamp")
-    private long lastCommunicationTimestamp;
+    @JsonProperty("lastUpdatedTimestamp")
+    private Long lastUpdatedTimestamp;
+    
+    @JsonProperty("timestamp")
+    private Long timestamp;
 }

@@ -14,12 +14,11 @@
  * the License.
  */
 
-import React from 'react';
-import MainRouter from './components/layout/MainRouter';
 import Layout from './components/layout/Layout';
-import { TRUConfigProvider } from './context/TRUConfigContext';
-import { TRUStatusProvider } from './context/TRUStatusContext';
-import { TRUTopicsProvider } from './context/TRUTopicsContext';
+import MainRouter from './components/layout/MainRouter';
+import { TRUConfigProvider } from './context/tru-config-context';
+import { TRUStatusProvider } from './context/tru-status-context';
+import { TRUTopicsProvider } from './context/tru-topic-context';
 
 function App() {
   return (

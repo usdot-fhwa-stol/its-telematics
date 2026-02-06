@@ -15,10 +15,10 @@ The RSU Management module provides a comprehensive user interface for managing R
 ```
 src/
 ├── api/
-│   └── rsuService.js                  # API layer for all RSU/TRU operations
+│   └── api-rsu.js                     # API layer for all RSU/TRU operations
 ├── context/
-│   ├── TRUStatusContext.js            # Global state for TRU status
-│   └── TRUTopicsContext.js            # Global state for TRU topics
+│   ├── tru-status-context.js          # Global state for TRU status
+│   └── tru-topic-context.js           # Global state for TRU topics
 ├── components/
 │   ├── layout/
 │   │   ├── Button.js                  # Reusable button component
@@ -57,7 +57,7 @@ src/
 
 ### API Layer
 
-**rsuService.js**
+**api-rsu.js**
 - Centralized API client for all RSU/TRU operations
 - Methods for CRUD operations on RSU configurations
 - Methods for fetching TRU configs, status, and topics
@@ -65,13 +65,13 @@ src/
 
 ### Context Providers
 
-**TRUStatusContext.js**
+**tru-status-context.js**
 - Manages global state for TRU configurations and statuses
 - Provides methods for fetching and updating TRU data
 - Combines configuration and status information
 - Includes filtering capabilities
 
-**TRUTopicsContext.js**
+**tru-topic-context.js**
 - Manages topic selection and configuration
 - Handles TRU and RSU selection state
 - Provides methods for topic manipulation

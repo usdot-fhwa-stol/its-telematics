@@ -23,7 +23,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useTRUStatus } from '../../../context/TRUStatusContext';
+import { useTRUStatus } from '../../../context/tru-status-context';
 import StatusTable from '../common/StatusTable';
 import TRUFilters from './components/TRUFilters';
 
@@ -59,7 +59,7 @@ const TRUStatusTab = () => {
       headerName: 'Bridge Status',
       flex: 0.8,
       render: (row) => {
-        const status = row.pluginConfigStatus?.bridgePluginStatus || 'unknown';
+        const status = row.pluginConfigStatus?.bridgePluginStatus.toLowerCase() || 'pending';
         return (
           <Chip
             label={status.charAt(0).toUpperCase() + status.slice(1)}
@@ -126,6 +126,11 @@ const TRUStatusTab = () => {
             <Chip
               label={`Error: ${getStatusCount('error')}`}
               color="error"
+              size="small"
+            />
+            <Chip
+              label={`Pending: ${getStatusCount('pending')}`}
+              color="secondary"
               size="small"
             />
           </Stack>

@@ -27,7 +27,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useState } from 'react';
-import { useTRUStatus } from '../../../context/TRUStatusContext';
+import { useTRUStatus } from '../../../context/tru-status-context';
 import Button from '../../layout/Button';
 import StatusTable from '../common/StatusTable';
 import DeleteRSUAlert from './components/DeleteRSUAlert';
@@ -176,6 +176,11 @@ const RSUStatusTab = () => {
             <Chip
               label={`Other: ${getRSUStatusCount('other')}`}
               color="default"
+              size="small"
+            />
+            <Chip
+              label={`Pending: ${getRSUStatusCount('pending')}`}
+              color="secondary"
               size="small"
             />
           </Stack>

@@ -51,9 +51,9 @@ On failure, these APIs typically return an error wrapper of the form:
 				"privacyProtocol": "AES128",
 				"securityLevel": "authPriv",
 				"authProtocol": "SHA",
-				"authPassPhrase": "password123",
+				"authPassPhrase": "",
 				"user": "snmpuser",
-				"privacyPassPhrase": "privpass",
+				"privacyPassPhrase": "",
 				"rsuMibVersion": "v3"
 			}
 		}
