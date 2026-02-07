@@ -42,6 +42,16 @@ monitor:
     health:
       subject: ${rsu_monitor_plugin_health_subject:unit.*.monitor.plugin.health_status}
       health.timeout.seconds: ${rsu_monitor_plugin_health_health_timeout_seconds:10}
+  unit:
+    health:
+      check:
+        # Enable/disable unit health check scheduler
+        enabled: ${rsu_monitor_unit_health_check_enabled:true}
+        # Interval in milliseconds for the scheduler to run the health check
+        interval-ms: ${rsu_monitor_unit_health_check_interval_ms:60000}
+        # Maximum number of missed heartbeats before removing a unit
+        # Unit is removed if: currentTime > lastCommunicationTimestamp + (max-missed-heartbeats * pluginHeartbeatInterval)
+        max-missed-heartbeats: ${rsu_monitor_unit_health_check_max_missed_heartbeats:5}
 
 data:
   selection:
