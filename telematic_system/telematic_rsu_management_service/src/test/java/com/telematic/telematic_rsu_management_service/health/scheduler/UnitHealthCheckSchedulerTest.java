@@ -63,9 +63,9 @@ class UnitHealthCheckSchedulerTest {
         int maxMissedHeartbeats = 5;
         
         // Last communication was more than 5 * 10 seconds = 50 seconds ago
-        long lastCommunicationTimestamp = currentTime - 60000; // 60 seconds ago
+        long lastPingTimestamp = currentTime - 60000; // 60 seconds ago
         
-        TRUConfigStatus inactiveUnit = createUnit("UNIT001", lastCommunicationTimestamp, heartbeatInterval);
+        TRUConfigStatus inactiveUnit = createUnit("UNIT001", lastPingTimestamp, heartbeatInterval);
         
         when(truConfigStatusRepository.findAllWithAssociations()).thenReturn(Collections.singletonList(inactiveUnit));
         when(config.getMaxMissedHeartbeats()).thenReturn(maxMissedHeartbeats);
@@ -85,9 +85,9 @@ class UnitHealthCheckSchedulerTest {
         int maxMissedHeartbeats = 5;
         
         // Last communication was within the threshold (40 seconds ago < 50 seconds threshold)
-        long lastCommunicationTimestamp = currentTime - 40000; // 40 seconds ago
+        long lastPingTimestamp = currentTime - 40000; // 40 seconds ago
         
-        TRUConfigStatus activeUnit = createUnit("UNIT002", lastCommunicationTimestamp, heartbeatInterval);
+        TRUConfigStatus activeUnit = createUnit("UNIT002", lastPingTimestamp, heartbeatInterval);
         
         when(truConfigStatusRepository.findAllWithAssociations()).thenReturn(Collections.singletonList(activeUnit));
         when(config.getMaxMissedHeartbeats()).thenReturn(maxMissedHeartbeats);
@@ -149,7 +149,7 @@ class UnitHealthCheckSchedulerTest {
         // Given
         TRUConfigStatus unitWithoutConfig = new TRUConfigStatus();
         UnitPluginStatus pluginStatus = new UnitPluginStatus();
-        pluginStatus.setLastCommunicationTimestamp(System.currentTimeMillis() - 60000);
+        pluginStatus.setTimestamp(System.currentTimeMillis() - 60000);
         unitWithoutConfig.setPluginConfigStatus(pluginStatus);
         unitWithoutConfig.setUnitConfig(null);
         
@@ -164,7 +164,7 @@ class UnitHealthCheckSchedulerTest {
     }
 
     @Test
-    void testCheckUnitHealth_ShouldSkipUnitWithNullLastCommunicationTimestamp() {
+    void testCheckUnitHealth_ShouldSkipUnitWithNulllastPingTimestamp() {
         // Given
         TRUConfigStatus unit = new TRUConfigStatus();
         UnitConfig unitConfig = new UnitConfig();
@@ -173,7 +173,7 @@ class UnitHealthCheckSchedulerTest {
         unit.setUnitConfig(unitConfig);
         
         UnitPluginStatus pluginStatus = new UnitPluginStatus();
-        pluginStatus.setLastCommunicationTimestamp(null);
+        pluginStatus.setTimestamp(null);
         unit.setPluginConfigStatus(pluginStatus);
         
         when(truConfigStatusRepository.findAllWithAssociations())
@@ -196,7 +196,7 @@ class UnitHealthCheckSchedulerTest {
         unit.setUnitConfig(unitConfig);
         
         UnitPluginStatus pluginStatus = new UnitPluginStatus();
-        pluginStatus.setLastCommunicationTimestamp(System.currentTimeMillis() - 60000);
+        pluginStatus.setTimestamp(System.currentTimeMillis() - 60000);
         unit.setPluginConfigStatus(pluginStatus);
         
         when(truConfigStatusRepository.findAllWithAssociations())
@@ -244,9 +244,9 @@ class UnitHealthCheckSchedulerTest {
         
         // Last communication was just over the threshold (50.1 seconds ago)
         // Using 51000 to ensure we're past the threshold even with small timing differences
-        long lastCommunicationTimestamp = currentTime - 51000;
+        long lastPingTimestamp = currentTime - 51000;
         
-        TRUConfigStatus unit = createUnit("UNIT006", lastCommunicationTimestamp, heartbeatInterval);
+        TRUConfigStatus unit = createUnit("UNIT006", lastPingTimestamp, heartbeatInterval);
         
         when(truConfigStatusRepository.findAllWithAssociations()).thenReturn(Collections.singletonList(unit));
         when(config.getMaxMissedHeartbeats()).thenReturn(maxMissedHeartbeats);
@@ -266,9 +266,9 @@ class UnitHealthCheckSchedulerTest {
         int maxMissedHeartbeats = 5;
         
         // Last communication was just past the threshold (50.001 seconds ago)
-        long lastCommunicationTimestamp = currentTime - 50001;
+        long lastPingTimestamp = currentTime - 50001;
         
-        TRUConfigStatus unit = createUnit("UNIT007", lastCommunicationTimestamp, heartbeatInterval);
+        TRUConfigStatus unit = createUnit("UNIT007", lastPingTimestamp, heartbeatInterval);
         
         when(truConfigStatusRepository.findAllWithAssociations()).thenReturn(Collections.singletonList(unit));
         when(config.getMaxMissedHeartbeats()).thenReturn(maxMissedHeartbeats);
@@ -286,9 +286,9 @@ class UnitHealthCheckSchedulerTest {
         long currentTime = System.currentTimeMillis();
         int heartbeatInterval = 10; // 10 seconds
         int maxMissedHeartbeats = 5;
-        long lastCommunicationTimestamp = currentTime - 60000; // 60 seconds ago
+        long lastPingTimestamp = currentTime - 60000; // 60 seconds ago
         
-        TRUConfigStatus inactiveUnit = createUnit("UNIT008", lastCommunicationTimestamp, heartbeatInterval);
+        TRUConfigStatus inactiveUnit = createUnit("UNIT008", lastPingTimestamp, heartbeatInterval);
         
         // Add RSU connections
         RSUConfigStatus rsu1 = new RSUConfigStatus();
@@ -308,7 +308,7 @@ class UnitHealthCheckSchedulerTest {
     /**
      * Helper method to create a unit with specified parameters
      */
-    private TRUConfigStatus createUnit(String unitId, long lastCommunicationTimestamp, int heartbeatInterval) {
+    private TRUConfigStatus createUnit(String unitId, long lastPingTimestamp, int heartbeatInterval) {
         TRUConfigStatus unit = new TRUConfigStatus();
         
         UnitConfig unitConfig = new UnitConfig();
@@ -317,7 +317,7 @@ class UnitHealthCheckSchedulerTest {
         unit.setUnitConfig(unitConfig);
         
         UnitPluginStatus pluginStatus = new UnitPluginStatus();
-        pluginStatus.setLastCommunicationTimestamp(lastCommunicationTimestamp);
+        pluginStatus.setTimestamp(lastPingTimestamp);
         unit.setPluginConfigStatus(pluginStatus);
         
         return unit;

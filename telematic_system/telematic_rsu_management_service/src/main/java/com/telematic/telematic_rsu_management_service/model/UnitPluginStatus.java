@@ -39,6 +39,9 @@ public class UnitPluginStatus {
     @JsonProperty("bridgePluginStatus")
     private String bridgePluginStatus;
 	
+    /**
+     * @brief Timestamp when the last bridgePluginStatus was updated 
+     */
     @JsonProperty("lastCommunicationTimestamp")
     private Long lastCommunicationTimestamp;
     
