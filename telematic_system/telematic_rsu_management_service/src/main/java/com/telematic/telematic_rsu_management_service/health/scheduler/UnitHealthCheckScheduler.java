@@ -64,7 +64,7 @@ public class UnitHealthCheckScheduler {
                     log.warn("Unit {} failed health check - removing unit and all associated connections. " +
                             "Last communication: {}, Current time: {}, Max missed heartbeats: {}", 
                             unitId,
-                            getLastCommunicationTimestamp(truConfigStatus),
+                            getLastPingTimestamp(truConfigStatus),
                             currentTime,
                             config.getMaxMissedHeartbeats());
                     
@@ -104,26 +104,26 @@ public class UnitHealthCheckScheduler {
             return false;
         }
         
-        Long lastCommunicationTimestamp = pluginStatus.getLastCommunicationTimestamp();
+        Long lastPingTimestamp = pluginStatus.getTimestamp();
         Integer pluginHeartbeatInterval = unitConfig.getPluginHeartbeatInterval();
         
         // Skip if last communication timestamp or heartbeat interval is not set
-        if (lastCommunicationTimestamp == null || pluginHeartbeatInterval == null) {
-            log.info("Skipping unit {} - missing lastCommunicationTimestamp or pluginHeartbeatInterval", 
+        if (lastPingTimestamp == null || pluginHeartbeatInterval == null) {
+            log.info("Skipping unit {} - missing lastPingTimestamp or pluginHeartbeatInterval", 
                     getUnitId(truConfigStatus));
             return false;
         }
         
-        // Calculate the threshold: lastCommunicationTimestamp + (maxMissedHeartbeats * pluginHeartbeatInterval)
+        // Calculate the threshold: lastPingTimestamp + (maxMissedHeartbeats * pluginHeartbeatInterval)
         long heartbeatIntervalMs = pluginHeartbeatInterval * 1000L; // Convert seconds to milliseconds
-        long threshold = lastCommunicationTimestamp + (config.getMaxMissedHeartbeats() * heartbeatIntervalMs);
+        long threshold = lastPingTimestamp + (config.getMaxMissedHeartbeats() * heartbeatIntervalMs);
         
         // Unit should be removed if current time exceeds the threshold
         boolean shouldRemove = currentTime > threshold;
         
         if (shouldRemove) {
             log.info("Unit {} exceeded threshold. LastComm: {}, Threshold: {}, Current: {}", 
-                    getUnitId(truConfigStatus), lastCommunicationTimestamp, threshold, currentTime);
+                    getUnitId(truConfigStatus), lastPingTimestamp, threshold, currentTime);
         }
         
         return shouldRemove;
@@ -140,11 +140,11 @@ public class UnitHealthCheckScheduler {
     }
     
     /**
-     * Safely extracts the last communication timestamp from TRUConfigStatus
+     * Safely extracts the last ping timestamp from TRUConfigStatus
      */
-    private Long getLastCommunicationTimestamp(TRUConfigStatus truConfigStatus) {
+    private Long getLastPingTimestamp(TRUConfigStatus truConfigStatus) {
         if (truConfigStatus != null && truConfigStatus.getPluginConfigStatus() != null) {
-            return truConfigStatus.getPluginConfigStatus().getLastCommunicationTimestamp();
+            return truConfigStatus.getPluginConfigStatus().getTimestamp();
         }
         return null;
     }
