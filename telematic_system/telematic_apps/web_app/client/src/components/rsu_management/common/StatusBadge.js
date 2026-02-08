@@ -29,7 +29,7 @@ const StatusBadge = ({ online, status, size = 'small' }) => {
 
   if (status) {
     // New status values
-    const statusLower = status.toLowerCase();
+    const statusLower = status?.toLowerCase();
     switch (statusLower) {
       case 'operate':
       case 'operation':
@@ -42,6 +42,10 @@ const StatusBadge = ({ online, status, size = 'small' }) => {
         break;
       case 'fault':
         statusLabel = 'Fault';
+        statusColor = 'error';
+        break;
+      case 'off':
+        statusLabel = 'Off';
         statusColor = 'error';
         break;
       case 'other':

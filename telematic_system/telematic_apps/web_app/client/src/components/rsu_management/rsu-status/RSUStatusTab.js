@@ -183,6 +183,11 @@ const RSUStatusTab = () => {
               color="secondary"
               size="small"
             />
+            <Chip
+              label={`Off: ${getRSUStatusCount('off')}`}
+              color="error"
+              size="small"
+            />
           </Stack>
         </Box>
         <Stack direction="row" spacing={2}>
