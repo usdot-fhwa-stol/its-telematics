@@ -50,10 +50,10 @@ monitor:
         # Interval in milliseconds for the scheduler to run the health check
         interval-ms: ${rsu_monitor_unit_health_check_interval_ms:60000}
         # Maximum number of missed heartbeats before removing a unit
-        # Unit is removed if: currentTime > lastCommunicationTimestamp + (max-missed-heartbeats * pluginHeartbeatInterval)
+        # Unit is removed if: currentTime > lastPingTimestamp + (max-missed-heartbeats * pluginHeartbeatInterval)
         max-missed-heartbeats: ${rsu_monitor_unit_health_check_max_missed_heartbeats:5}
       # Multiplier for the pluginHeartbeatInterval to determine if a unit is inactive
-      # If (now - lastCommunicationTimestamp) > (inactivityMultiplier * pluginHeartbeatInterval), the unit is removed
+      # If (now - lastPingTimestamp) > (inactivityMultiplier * pluginHeartbeatInterval), the unit is removed
       inactivity-multiplier: ${rsu_health_check_unit_inactivity_multiplier:5}
 
 data:

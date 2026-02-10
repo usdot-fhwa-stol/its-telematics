@@ -32,7 +32,7 @@ public class UnitHealthSchedulerConfig {
     
     /**
      * Maximum number of missed heartbeats before considering a unit unhealthy
-     * Unit is removed if: currentTime > lastCommunicationTimestamp + (maxMissedHeartbeats * pluginHeartbeatInterval)
+     * Unit is removed if: currentTime > lastPingTimestamp + (maxMissedHeartbeats * pluginHeartbeatInterval)
      */
     private int maxMissedHeartbeats = 5; // Default 5 times
 }

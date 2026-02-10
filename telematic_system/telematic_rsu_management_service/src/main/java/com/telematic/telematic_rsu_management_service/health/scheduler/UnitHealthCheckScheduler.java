@@ -88,7 +88,7 @@ public class UnitHealthCheckScheduler {
      * Determines if a unit should be removed based on its last communication timestamp
      * and the configured plugin heartbeat interval.
      * 
-     * Logic: lastCommunicationTimestamp + (maxMissedHeartbeats * pluginHeartbeatInterval) < currentTime
+     * Logic: lastPingTimestamp + (maxMissedHeartbeats * pluginHeartbeatInterval) < currentTime
      * 
      * @param truConfigStatus the unit configuration status
      * @param currentTime the current timestamp in milliseconds
