@@ -56,6 +56,7 @@ const TRUFilters = ({ filters, onFilterChange }) => {
               <MenuItem value="all">All</MenuItem>
               <MenuItem value="running">Running</MenuItem>
               <MenuItem value="error">Error</MenuItem>
+              <MenuItem value="pending">Pending</MenuItem>
             </Select>
           </FormControl>
         </Grid>
