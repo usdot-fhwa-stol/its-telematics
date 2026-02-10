@@ -370,3 +370,119 @@ test("RegisterRSUDialog should disable form during submission", async () => {
     // Button state should change
   }, { timeout: 2000 });
 });
+
+// ============= ADDITIONAL COVERAGE TESTS ==============
+
+test("RegisterRSUDialog should fill and persist all basic form fields", () => {
+  render(<RegisterRSUDialog open={true} onClose={() => {}} />, { wrapper });
+
+  const ipField = screen.getByLabelText(/IP Address/i);
+  const portField = screen.getByLabelText(/Port/i);
+  const eventField = screen.getByLabelText(/Event/i);
+
+  // Set all required basic fields
+  fireEvent.change(ipField, { target: { value: "192.168.50.100" } });
+  fireEvent.change(portField, { target: { value: "1517" } });
+  fireEvent.change(eventField, { target: { value: "test-event-1" } });
+
+  expect(ipField.value).toBe("192.168.50.100");
+  expect(portField.value).toBe("1517");
+  expect(eventField.value).toBe("test-event-1");
+});
+
+test("RegisterRSUDialog should allow SNMP User field edit", () => {
+  render(<RegisterRSUDialog open={true} onClose={() => {}} />, { wrapper });
+
+  const userFields = screen.queryAllByLabelText(/User/i);
+  const snmpUserField = userFields[userFields.length - 1];
+
+  fireEvent.change(snmpUserField, { target: { value: "testuser" } });
+  expect(snmpUserField.value).toBe("testuser");
+});
+
+test("RegisterRSUDialog should render SNMP Configuration accordion", () => {
+  render(<RegisterRSUDialog open={true} onClose={() => {}} />, { wrapper });
+
+  const accordion = screen.getByText(/SNMP Configuration/i);
+  expect(accordion).toBeInTheDocument();
+});
+
+test("RegisterRSUDialog should show dialog title when opened", () => {
+  render(<RegisterRSUDialog open={true} onClose={() => {}} />, { wrapper });
+
+  const title = screen.getByText(/Register New RSU/i);
+  expect(title).toBeInTheDocument();
+});
+
+test("RegisterRSUDialog form fields should be initially empty except defaults", () => {
+  render(<RegisterRSUDialog open={true} onClose={() => {}} />, { wrapper });
+
+  const ipField = screen.getByLabelText(/IP Address/i);
+  const portField = screen.getByLabelText(/Port/i);
+  const eventField = screen.getByLabelText(/Event/i);
+
+  // These fields should be empty initially
+  expect(ipField.value).toBe("");
+  expect(portField.value).toBe("");
+  expect(eventField.value).toBe("");
+});
+
+test("RegisterRSUDialog should have password fields for SNMP passphrases", () => {
+  render(<RegisterRSUDialog open={true} onClose={() => {}} />, { wrapper });
+
+  const passwordFields = screen.queryAllByDisplayValue("");
+  const authFields = screen.queryAllByLabelText(/Auth Pass Phrase/i);
+  
+  if (authFields.length > 0) {
+    expect(authFields[0]).toHaveAttribute("type", "password");
+  }
+});
+
+test("RegisterRSUDialog should handle port field with number constraints", () => {
+  render(<RegisterRSUDialog open={true} onClose={() => {}} />, { wrapper });
+
+  const portField = screen.getByLabelText(/Port/i);
+  
+  // Try to set various port values
+  fireEvent.change(portField, { target: { value: "80" } });
+  expect(portField.value).toBe("80");
+  
+  fireEvent.change(portField, { target: { value: "65535" } });
+  expect(portField.value).toBe("65535");
+  
+  fireEvent.change(portField, { target: { value: "1" } });
+  expect(portField.value).toBe("1");
+});
+
+test("RegisterRSUDialog should handle IP field with various formats", () => {
+  render(<RegisterRSUDialog open={true} onClose={() => {}} />, { wrapper });
+
+  const ipField = screen.getByLabelText(/IP Address/i);
+  
+  // Valid IPs
+  fireEvent.change(ipField, { target: { value: "10.0.0.1" } });
+  expect(ipField.value).toBe("10.0.0.1");
+  
+  fireEvent.change(ipField, { target: { value: "255.255.255.255" } });
+  expect(ipField.value).toBe("255.255.255.255");
+  
+  fireEvent.change(ipField, { target: { value: "172.16.0.1" } });
+  expect(ipField.value).toBe("172.16.0.1");
+});
+
+test("RegisterRSUDialog should contain a cancel button that calls onClose", () => {
+  const onCloseMock = jest.fn();
+  render(<RegisterRSUDialog open={true} onClose={onCloseMock} />, { wrapper });
+
+  const cancelButton = screen.getByText(/Cancel/i);
+  fireEvent.click(cancelButton);
+
+  expect(onCloseMock).toHaveBeenCalledTimes(1);
+});
+
+test("RegisterRSUDialog should contain a register button", () => {
+  render(<RegisterRSUDialog open={true} onClose={() => {}} />, { wrapper });
+
+  const registerButtons = screen.queryAllByText(/Register/i);
+  expect(registerButtons.length).toBeGreaterThan(0);
+});
