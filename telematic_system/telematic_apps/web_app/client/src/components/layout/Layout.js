@@ -18,6 +18,7 @@ import { Box } from '@mui/system';
 import { withStyles } from '@mui/styles';
 import React, { useContext, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { checkServerSession, deleteUser } from '../../api/api-user';
 import logo from '../../assets/CAV_telematics_tool_logo_color.png';
 import AuthContext from '../../context/auth-context';
@@ -27,6 +28,7 @@ const Layout = React.memo((props) => {
     const authContext = useContext(AuthContext);
     const location = useLocation();
     const [open, setOpen] = useState(false);
+    const isMobile = Capacitor.isNativePlatform();
     const handleLogout = React.useCallback(() => {
         deleteUser(authContext.username).then(status => {
             authContext.logout();
@@ -72,6 +74,44 @@ const Layout = React.memo((props) => {
             }
         },
     })(ListItemButton)
+
+    if (isMobile) {
+        return (
+            <React.Fragment>
+                <CssBaseline />
+                <Box component="main" sx={{ flexGrow: 1 }}>
+                    {props.children}
+                </Box>
+                {authContext.sessionToken !== null &&
+                    <Dialog
+                        open={open}
+                        aria-labelledby="timeout-dialog-title"
+                        aria-describedby="timeout-dialog-description" >
+                        <DialogTitle id="timeout-dialog-title" sx={{ color: 'black', fontWeight: 'bolder' }}>
+                            Session Timeout Alert
+                        </DialogTitle>
+                        <DialogContent>
+                            <DialogContentText id="timeout-dialog-description" sx={{ color: 'black' }}>
+                                Your session has expired!
+                            </DialogContentText>
+                        </DialogContent>
+                        <DialogActions sx={{ display: "block" }}>
+                            <Box sx={{
+                                margin: 0,
+                                padding: 0,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                textAlign: 'center',
+                                justifyContent: 'center'
+                            }}>
+                                <Button variant='outlined' sx={{ marginTop: '5px' }} onClick={handleLogout}>Logout</Button>
+                            </Box>
+                        </DialogActions>
+                    </Dialog>
+                }
+            </React.Fragment>
+        );
+    }
 
     return (
         <React.Fragment>

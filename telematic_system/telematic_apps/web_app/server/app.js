@@ -26,8 +26,9 @@ var app = express();
 const cors = require("cors");
 
 require("dotenv").config();
+const allowedOrigins = process.env.ALLOW_CLIENT_URL.split(",");
 var corsOptions = {
-  origin: process.env.ALLOW_CLIENT_URL,
+  origin: allowedOrigins,
   credentials: true,
   optionsSuccessStatus: 200,
 };
@@ -50,7 +51,7 @@ const verifyToken = (req) => {
 
 // Access session when receiving GET request
 app.get("/*", function (req, res, next) {
-  if (req.url === "/api/org/all") {
+  if (req.url === "/api/org/all" || req.url.startsWith("/api/grafana-auth/validate")) {
     //Pass request for the above URLs
     next();
   } else if (verifyToken(req)) {
@@ -121,6 +122,7 @@ require("./routes/states.router")(app);
 require("./routes/dashboards.router")(app);
 require("./routes/rsu_management/rsu_registration.router")(app);
 require("./routes/rsu_management/data_selection.router")(app);
+require("./routes/grafana_auth.router")(app);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {

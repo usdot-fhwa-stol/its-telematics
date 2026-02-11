@@ -38,7 +38,7 @@ const {
   pubFileProcessingReq,
 } = require("./nats_client/file_processing_nats_publisher");
 const port = process.env.UPLOAD_HTTP_PORT;
-const allowedOrigin = process.env.ALLOW_CLIENT_URL;
+const allowedOrigins = process.env.ALLOW_CLIENT_URL.split(",");
 const uploadTimeout = parseInt(process.env.UPLOAD_TIME_OUT, 3600000);
 const HTTP_METHODS = {
   POST: "POST",
@@ -55,8 +55,11 @@ const HTTP_URLS = {
 
 const uploadDestPath = process.env.UPLOAD_DESTINATION_PATH;
 
-const setResponseHeaders = (res) => {
-  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+const setResponseHeaders = (req, res) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
   res.setHeader("Access-Control-Request-Headers", "*");
   res.setHeader("Access-Control-Request-Method", "*");
   res.setHeader("Access-Control-Allow-Headers", "*");

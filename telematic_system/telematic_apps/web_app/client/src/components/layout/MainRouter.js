@@ -15,6 +15,7 @@
  */
 import React, { useContext } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import AuthContext from '../../context/auth-context';
 import AdminPage from '../../pages/AdminPage';
 import EventPage from '../../pages/EventPage';
@@ -28,6 +29,9 @@ import ROS2RosbagPage from '../../pages/ROS2RosbagPage';
 
 const MainRouter = React.memo(() => {
   const authContext = useContext(AuthContext);
+  const isMobile = Capacitor.isNativePlatform();
+
+  const postLoginRoute = isMobile ? "/dashboard" : "/telematic/events";
 
   return (
     <React.Fragment>
@@ -39,10 +43,11 @@ const MainRouter = React.memo(() => {
         {authContext.sessionToken !== null && (parseInt(authContext.is_admin) === 1 || authContext.role === USER_ROLES.ADMIN) && <Route path="/telematic/admin" element={<AdminPage />} />}
         {authContext.sessionToken !== null && <Route path="/dashboard" element={<Dashboard />} />}
         {authContext.sessionToken === null && <Route path="/telematic/login" element={<Login />} />}
-        {authContext.sessionToken !== null && <Route path="/telematic/login" element={<Navigate to="/telematic/events" replace></Navigate>}></Route>}
+        {authContext.sessionToken !== null && <Route path="/telematic/login" element={<Navigate to={postLoginRoute} replace></Navigate>}></Route>}
         {authContext.sessionToken === null && <Route path="/telematic/forget/password" element={<ForgetPasswordPage />} />}
         {authContext.sessionToken === null && <Route path="/telematic/register/user" element={<RegisterUserPage />} />}
         {authContext.sessionToken === null && <Route path="*" element={<Navigate to="/telematic/login" replace></Navigate>}></Route>}
+        {isMobile && authContext.sessionToken !== null && <Route path="*" element={<Navigate to="/dashboard" replace></Navigate>}></Route>}
       </Routes>
     </React.Fragment>
   )

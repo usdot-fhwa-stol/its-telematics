@@ -14,7 +14,7 @@ services:
       environment:
         - NODE_ENV=development
         - CHOKIDAR_USEPOLLING=true
-        - ALLOW_CLIENT_URL=https://cav-telematics.com
+        - ALLOW_CLIENT_URL=https://cav-telematics.com,http://localhost
         - GRAFANA_HTPASSWORD=/opt/apache2/grafana_htpasswd
         - SESSION_TIMEOUT=3600
         - SECRET=my_secret_telematic_ui
