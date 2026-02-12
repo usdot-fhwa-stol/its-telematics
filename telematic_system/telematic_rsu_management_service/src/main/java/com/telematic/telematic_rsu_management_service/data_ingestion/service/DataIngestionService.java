@@ -141,7 +141,7 @@ public class DataIngestionService {
                 continue;
             }
             for (RSUConfigStatus rsu : tru.getRsuConfigs()) {
-                String ip = rsu.getRsuEndpoint() != null ? rsu.getRsuEndpoint().getIp() : null;
+                String ip = rsu.getRsu() != null ? rsu.getRsu().getIp() : null;
                 if (ip == null || ip.isBlank()) {
                     continue;
                 }

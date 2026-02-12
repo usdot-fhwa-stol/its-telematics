@@ -81,7 +81,7 @@ public class DataSelectionService {
         }
         Map<RSUEndpoint, List<String>> endpointToRules = truConfigStatus.getRsuConfigs().stream()
             .collect(Collectors.toMap(
-                RSUConfigStatus::getRsuEndpoint,
+                RSUConfigStatus::getRsu,
                 rsu -> rsu.getDataSelectionRuleConfigs().stream()
                         .map(DataSelectionRuleConfig::getRule)
                         .collect(Collectors.toList()),
@@ -92,7 +92,7 @@ public class DataSelectionService {
                 ));
         log.info("Mark available topics based on existing rules: {} ", endpointToRules);
         for(RSUTopicsMessage rsuTopicsMessage : responseTopicMessage.getRsuTopics()) {
-            List<String> existingRules = endpointToRules.get(rsuTopicsMessage.getRsuEndpoint());
+            List<String> existingRules = endpointToRules.get(rsuTopicsMessage.getRsu());
             for (TopicMessage topicMessage : rsuTopicsMessage.getTopics()) {
                 if (existingRules != null && existingRules.contains(topicMessage.getName())) {
                     topicMessage.setSelected(true);

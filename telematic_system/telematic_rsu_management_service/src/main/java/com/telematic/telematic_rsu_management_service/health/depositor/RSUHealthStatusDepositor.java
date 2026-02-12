@@ -42,8 +42,8 @@ public class RSUHealthStatusDepositor {
         if (truConfigStatus != null) {
             for (RSUConfigStatus rsuConfigStatus : truConfigStatus.getRsuConfigs()) {
                 for(RSUHealthStatusMessage rsuHealthStatusMessage : truHealthStatusMessage.getRsuConfigs()) {
-                    if (rsuConfigStatus.getRsuEndpoint().getIp().equals(rsuHealthStatusMessage.getRsu().getIp())
-                            && rsuConfigStatus.getRsuEndpoint().getPort().equals(rsuHealthStatusMessage.getRsu().getPort())) {
+                    if (rsuConfigStatus.getRsu().getIp().equals(rsuHealthStatusMessage.getRsu().getIp())
+                            && rsuConfigStatus.getRsu().getPort().equals(rsuHealthStatusMessage.getRsu().getPort())) {
                         rsuConfigStatus.setStatus(rsuHealthStatusMessage.getStatus());
                         rsuConfigStatus.setEvent(rsuHealthStatusMessage.getEvent());
                     }

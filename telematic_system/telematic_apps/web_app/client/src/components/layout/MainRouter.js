@@ -44,7 +44,6 @@ const MainRouter = React.memo(() => {
         {authContext.sessionToken !== null && <Route path="/telematic/login" element={<Navigate to="/telematic/events" replace></Navigate>}></Route>}
         {authContext.sessionToken === null && <Route path="/telematic/forget/password" element={<ForgetPasswordPage />} />}
         {authContext.sessionToken === null && <Route path="/telematic/register/user" element={<RegisterUserPage />} />}
-        {/* {authContext.sessionToken === null && <Route path="/telematic/rsu-management" element={<RSUManagementPage />} />} */}
         {authContext.sessionToken === null && <Route path="*" element={<Navigate to="/telematic/login" replace></Navigate>}></Route>}
       </Routes>
     </React.Fragment>

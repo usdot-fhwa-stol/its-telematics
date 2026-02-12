@@ -59,7 +59,7 @@ public class DataSelectionDepositor {
         }
         Map<RSUEndpoint, List<String>> topicsByEndpoint = truTopicMessage.getRsuTopics().stream()
             .collect(Collectors.toMap(
-                RSUTopicsMessage::getRsuEndpoint,
+                RSUTopicsMessage::getRsu,
                 msg -> msg.getTopics().stream()
                     .filter(topic -> topic.getSelected())  // Only include selected topics
                     .map(topic -> topic.getName())
@@ -71,7 +71,7 @@ public class DataSelectionDepositor {
                 }
             ));
         for (RSUConfigStatus rsuConfig : rsuConfigs) {
-            List<String> topics = topicsByEndpoint.get(rsuConfig.getRsuEndpoint());
+            List<String> topics = topicsByEndpoint.get(rsuConfig.getRsu());
             if (topics == null || topics.isEmpty()) {
                 continue;
             }

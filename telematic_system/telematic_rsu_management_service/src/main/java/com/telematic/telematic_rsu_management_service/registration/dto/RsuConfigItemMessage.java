@@ -38,7 +38,7 @@ public class RsuConfigItemMessage {
     @JsonProperty("rsu")
     @NotNull
     @Valid
-    private RSUEndpoint rsuEndpoint;
+    private RSUEndpoint rsu;
 
     @JsonProperty("snmp")
     private SnmpConfigMessage snmpConfig;

@@ -16,9 +16,7 @@
 package com.telematic.telematic_rsu_management_service.registration.service;
 
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
@@ -83,9 +81,9 @@ public class RegistrationService {
     private boolean isRSUAssignedToTRU(TruConfigMessage truConfigMessage) {
         TRUConfigStatus truConfigStatus = truConfigStatusRepository
                 .findByUnitId(truConfigMessage.getUnitConfig().getUnitId());
-        RSUEndpoint rsuEndpointToCheck = truConfigMessage.getRsuConfigs().get(0).getRsuEndpoint();
+        RSUEndpoint rsuEndpointToCheck = truConfigMessage.getRsuConfigs().get(0).getRsu();
         if (truConfigStatus != null) {
-            for (RSUEndpoint rsuEndpoint : truConfigStatus.getRsuConfigs().stream().map(RSUConfigStatus::getRsuEndpoint)
+            for (RSUEndpoint rsuEndpoint : truConfigStatus.getRsuConfigs().stream().map(RSUConfigStatus::getRsu)
                     .toList()) {
                 if (rsuEndpoint.getIp().equals(rsuEndpointToCheck.getIp())
                         && rsuEndpoint.getPort().equals(rsuEndpointToCheck.getPort())) {

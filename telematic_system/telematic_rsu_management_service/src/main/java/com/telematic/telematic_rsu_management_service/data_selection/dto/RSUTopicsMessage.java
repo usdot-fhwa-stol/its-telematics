@@ -30,5 +30,5 @@ public class RSUTopicsMessage {
     private List<TopicMessage> topics;
     
     @JsonProperty("rsu")
-    public RSUEndpoint rsuEndpoint;
+    public RSUEndpoint rsu;
 }

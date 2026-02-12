@@ -48,7 +48,7 @@ public class RSUConfigStatus {
     @JsonProperty("rsu")
     @OneToOne(cascade = jakarta.persistence.CascadeType.ALL)
     @JoinColumn(name = "rsu_endpoint_id")
-    private RSUEndpoint rsuEndpoint;
+    private RSUEndpoint rsu;
 
     @JsonProperty("status")
     private String status;
