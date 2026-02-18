@@ -20,20 +20,6 @@ import AuthContext from './auth-context';
 
 const TRUStatusContext = createContext();
 
-const RSU_MODE_MAP = {
-  /**
-   * rsuModeStatus OBJECT-TYPE
-    SYNTAX INTEGER { 
-      other (1),
-      standby (2),
-      operate (3),
-      fault (4)
-  }*/
-  1: 'other',
-  2: 'standby',
-  3: 'operate',
-  4: 'fault'
-};
 
 /**
  * Context provider for TRU Status management
@@ -95,10 +81,9 @@ export const TRUStatusProvider = ({ children }) => {
       // Extract all RSUs from TRU statuses
       const allRSUs = normalizedStatuses.flatMap(tru => 
         tru.rsuConfigs?.map(rsuConfig => {
-          // Convert numeric status to string using RSU_MODE_MAP
           let statusValue = 'pending';
           if (rsuConfig.status !== null && rsuConfig.status !== undefined) {
-            statusValue = RSU_MODE_MAP[Number.parseInt(rsuConfig.status)] || rsuConfig.status || 'pending';
+            statusValue = rsuConfig.status || 'pending';
           }
           
           return {

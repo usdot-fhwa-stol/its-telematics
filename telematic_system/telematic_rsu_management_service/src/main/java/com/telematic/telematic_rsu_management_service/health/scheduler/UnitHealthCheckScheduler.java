@@ -136,7 +136,7 @@ public class UnitHealthCheckScheduler {
         if (truConfigStatus != null && truConfigStatus.getUnitConfig() != null) {
             return truConfigStatus.getUnitConfig().getUnitId();
         }
-        return "unknown";
+        throw new IllegalStateException("TRUConfigStatus or UnitConfig is null - cannot extract unit ID");
     }
     
     /**
@@ -146,6 +146,6 @@ public class UnitHealthCheckScheduler {
         if (truConfigStatus != null && truConfigStatus.getPluginConfigStatus() != null) {
             return truConfigStatus.getPluginConfigStatus().getTimestamp();
         }
-        return null;
+        throw new IllegalStateException("TRUConfigStatus or PluginConfigStatus is null - cannot extract last ping timestamp");
     }
 }
