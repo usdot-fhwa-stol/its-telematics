@@ -16,7 +16,9 @@
 import React, { useContext } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
+import { Box, CircularProgress } from '@mui/material';
 import AuthContext from '../../context/auth-context';
+import ServerContext from '../../context/server-context';
 import AdminPage from '../../pages/AdminPage';
 import EventPage from '../../pages/EventPage';
 import ForgetPasswordPage from '../../pages/ForgetPasswordPage';
@@ -24,14 +26,33 @@ import Dashboard from '../../pages/Dashboard';
 import Login from '../../pages/Login';
 import RegisterUserPage from '../../pages/RegisterUserPage';
 import TopicPage from '../../pages/TopicPage';
+import ServerConfigPage from '../../pages/ServerConfigPage';
 import { USER_ROLES } from '../users/UserMetadata';
 import ROS2RosbagPage from '../../pages/ROS2RosbagPage';
 
 const MainRouter = React.memo(() => {
   const authContext = useContext(AuthContext);
+  const serverContext = useContext(ServerContext);
   const isMobile = Capacitor.isNativePlatform();
 
   const postLoginRoute = isMobile ? "/dashboard" : "/telematic/events";
+
+  if (isMobile && !serverContext.isInitialized) {
+    return (
+      <Box sx={{ display: 'flex', width: '100%', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // Show server config page if not configured (mobile only)
+  if (isMobile && !serverContext.isConfigured) {
+    return (
+      <Routes>
+        <Route path="*" element={<ServerConfigPage />} />
+      </Routes>
+    );
+  }
 
   return (
     <React.Fragment>

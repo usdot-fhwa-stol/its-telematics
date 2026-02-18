@@ -36,6 +36,7 @@ import { Capacitor } from '@capacitor/core';
  */
 import { CookiesProvider } from "react-cookie";
 import { BrowserRouter } from 'react-router-dom';
+import { ServerContextProvider } from './context/server-context';
 import { AuthContextProvider } from './context/auth-context';
 import { TopicContextProvider } from './context/topic-context';
 import {ROS2RosbagContextProvider} from './context/ros2-rosbag-context';
@@ -54,13 +55,15 @@ root.render(
   <React.StrictMode>
     <BrowserRouter>
       <CookiesProvider>
-        <AuthContextProvider>
-          <TopicContextProvider>
-            <ROS2RosbagContextProvider>
-              <App />
-            </ROS2RosbagContextProvider>
-          </TopicContextProvider>
-        </AuthContextProvider>
+        <ServerContextProvider>
+          <AuthContextProvider>
+            <TopicContextProvider>
+              <ROS2RosbagContextProvider>
+                <App />
+              </ROS2RosbagContextProvider>
+            </TopicContextProvider>
+          </AuthContextProvider>
+        </ServerContextProvider>
       </CookiesProvider>
     </BrowserRouter>
   </React.StrictMode>

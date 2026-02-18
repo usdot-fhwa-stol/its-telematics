@@ -26,16 +26,22 @@ import { Capacitor } from '@capacitor/core';
 import { getOrgsByUser, listOrgs } from '../api/api-org';
 import { loginUser } from '../api/api-user';
 import AuthContext from '../context/auth-context';
+import ServerContext from '../context/server-context';
 import { getMobileWrapperStyles, getMobileContainerStyles, getMobileBoxStyles, getTextFieldStyles } from '../utils/mobileStyles';
 
 const theme = createTheme();
 
 const Login = React.memo(() => {
     const authContext = React.useContext(AuthContext);
+    const serverContext = React.useContext(ServerContext);
     const [loginState, setLoginState] = React.useState(true);
     const [loginErrMsg, setLoginErrMsg] = React.useState('');
     // Initialize isMobile immediately, not in useEffect
     const [isMobile] = React.useState(Capacitor.isNativePlatform());
+
+    const handleChangeServer = () => {
+        serverContext.resetServerConfig();
+    };
 
     const handleSubmit = (event) => {
         event.preventDefault();
@@ -168,12 +174,22 @@ const Login = React.memo(() => {
                                     Sign In
                                 </Button>
                             </Box>
-                            <Box component="div">
-                                <Grid container spacing={isMobile ? 0 : 1} >
-                                    <Grid item xs={12}>
-                                        <Link href="/telematic/register/user" sx={{ fontSize: isMobile ? '0.85rem' : 'inherit' }}>Register user</Link>
-                                    </Grid>
-                                </Grid>
+                            <Box component="div" sx={{ width: '100%', textAlign: 'center' }}>
+                                <Link href="/telematic/register/user" sx={{ fontSize: isMobile ? '0.85rem' : 'inherit' }}>
+                                    Register user
+                                </Link>
+                                {isMobile && (
+                                    <Box sx={{ mt: 2 }}>
+                                        <Link
+                                            component="button"
+                                            variant="body2"
+                                            onClick={handleChangeServer}
+                                            sx={{ fontSize: '0.85rem' }}
+                                        >
+                                            Change Server
+                                        </Link>
+                                    </Box>
+                                )}
                             </Box>
                         </Box>
                     </Container>

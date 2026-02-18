@@ -85,10 +85,24 @@ export const useStorageNumber = (key, defaultValue = 0) => {
 export const useClearStorage = () => {
     const isMobile = Capacitor.isNativePlatform();
 
-    const clearStorage = async () => {
+    const clearStorage = async (preserveServerConfig = true) => {
         try {
             if (isMobile) {
-                await Preferences.clear();
+                if (preserveServerConfig) {
+                    // Save server config keys before clearing
+                    const serverConfig = await Preferences.get({ key: 'server_config' });
+                    const webServerUri = await Preferences.get({ key: 'web_server_uri' });
+                    const grafanaUri = await Preferences.get({ key: 'grafana_uri' });
+
+                    await Preferences.clear();
+
+                    // Restore server config after clearing
+                    if (serverConfig.value) await Preferences.set({ key: 'server_config', value: serverConfig.value });
+                    if (webServerUri.value) await Preferences.set({ key: 'web_server_uri', value: webServerUri.value });
+                    if (grafanaUri.value) await Preferences.set({ key: 'grafana_uri', value: grafanaUri.value });
+                } else {
+                    await Preferences.clear();
+                }
             } else {
                 sessionStorage.clear();
             }
