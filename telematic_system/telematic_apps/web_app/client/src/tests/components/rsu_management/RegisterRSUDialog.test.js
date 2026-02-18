@@ -22,7 +22,7 @@ const mockTRUStatuses = [
       bridgePluginStatus: "running"
     },
     rsuConfigs: [
-      { rsu: { ip: "192.168.1.10", port: 1516 }, status: 3, event: "event1", timestamp: "2026-02-09T10:00:00Z" }
+      { rsu: { ip: "192.168.1.10", port: 1516 }, status: 'operate', event: "event1", timestamp: "2026-02-09T10:00:00Z" }
     ]
   },
   {
@@ -35,8 +35,8 @@ const mockTRUStatuses = [
       bridgePluginStatus: "running"
     },
     rsuConfigs: [
-      { rsu: { ip: "192.168.1.11", port: 1516 }, status: 3, event: "event2", timestamp: "2026-02-09T10:00:00Z" },
-      { rsu: { ip: "192.168.1.12", port: 1516 }, status: 3, event: "event3", timestamp: "2026-02-09T10:00:00Z" }
+      { rsu: { ip: "192.168.1.11", port: 1516 }, status: 'operate', event: "event2", timestamp: "2026-02-09T10:00:00Z" },
+      { rsu: { ip: "192.168.1.12", port: 1516 }, status: 'operate', event: "event3", timestamp: "2026-02-09T10:00:00Z" }
     ]
   },
   {
@@ -49,7 +49,7 @@ const mockTRUStatuses = [
       bridgePluginStatus: "error"
     },
     rsuConfigs: [
-      { rsu: { ip: "192.168.1.13", port: 1516 }, status: 3, event: "event4", timestamp: "2026-02-09T10:00:00Z" }
+      { rsu: { ip: "192.168.1.13", port: 1516 }, status: 'operate', event: "event4", timestamp: "2026-02-09T10:00:00Z" }
     ]
   },
   {

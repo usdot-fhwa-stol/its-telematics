@@ -20,7 +20,6 @@ import AuthContext from './auth-context';
 
 const TRUStatusContext = createContext();
 
-
 /**
  * Context provider for TRU Status management
  * Manages TRU status information following TruConfigStatus model

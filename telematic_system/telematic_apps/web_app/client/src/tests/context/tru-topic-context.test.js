@@ -28,7 +28,7 @@ const mockTRUStatuses = [
     rsuConfigs: [
       {
         rsu: { ip: '192.168.1.100', port: 1516 },
-        status: 3
+        status: 'operate'
       }
     ]
   }
