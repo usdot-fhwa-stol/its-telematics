@@ -50,31 +50,31 @@ public class TRUConfigMessageDepositor {
                     }
                     RSUConfigStatus newRsuConfigStatus = new RSUConfigStatus();
                     newRsuConfigStatus.setEvent(rsuConfigItemMessage.getEvent());
-                    newRsuConfigStatus.setRsuEndpoint(rsuConfigItemMessage.getRsuEndpoint());
+                    newRsuConfigStatus.setRsu(rsuConfigItemMessage.getRsu());
                     newRsuConfigStatus.setStatus(null);
                     newRsuConfigStatus.setTimestamp(truConfigMessage.getTimestamp());
                     newRsuConfigStatus.setTruConfigStatus(existingTruConfig);
                     existingTruConfig.getRsuConfigs().add(newRsuConfigStatus);
                     truConfigStatusRepository.save(existingTruConfig);
                     log.info("Added RSU Config IP: {} port: {} for TRU Unit ID: {}, TRU ID: {}",
-                                    newRsuConfigStatus.getRsuEndpoint().getIp(),
-                                    newRsuConfigStatus.getRsuEndpoint().getPort(),
+                                    newRsuConfigStatus.getRsu().getIp(),
+                                    newRsuConfigStatus.getRsu().getPort(),
                                     existingTruConfig.getUnitConfig().getUnitId(),
                                                             existingTruConfig.getId());
                 }else if (rsuConfigItemMessage.getAction().equalsIgnoreCase("update") || rsuConfigItemMessage.getAction().equalsIgnoreCase("modify")) {
                     for (RSUConfigStatus rsuConfigStatus : existingRsuConfigStatusList) {
-                        if (rsuConfigStatus.getRsuEndpoint() == null) {
-                            log.warn("Skipping RSUConfigStatus with null RSUEndpoint for TRU ID: {}", existingTruConfig.getId());
+                        if (rsuConfigStatus.getRsu() == null) {
+                            log.warn("Skipping RSUConfigStatus with null RSU for TRU ID: {}", existingTruConfig.getId());
                             continue;
                         }
-                        if (rsuConfigStatus.getRsuEndpoint().getIp().equals(rsuConfigItemMessage.getRsuEndpoint().getIp())
-                                && rsuConfigStatus.getRsuEndpoint().getPort().equals(rsuConfigItemMessage.getRsuEndpoint().getPort())) {
+                        if (rsuConfigStatus.getRsu().getIp().equals(rsuConfigItemMessage.getRsu().getIp())
+                                && rsuConfigStatus.getRsu().getPort().equals(rsuConfigItemMessage.getRsu().getPort())) {
                             rsuConfigStatus.setEvent(rsuConfigItemMessage.getEvent());
                             rsuConfigStatus.setTimestamp(Instant.now().toEpochMilli());
                             truConfigStatusRepository.save(existingTruConfig);
                             log.info("Updated RSU Config IP: {} port: {} for TRU of Unit ID: {}, TRU ID: {}",
-                                    rsuConfigStatus.getRsuEndpoint().getIp(),
-                                    rsuConfigStatus.getRsuEndpoint().getPort(),
+                                    rsuConfigStatus.getRsu().getIp(),
+                                    rsuConfigStatus.getRsu().getPort(),
                                     existingTruConfig.getUnitConfig().getUnitId(),
                                                             existingTruConfig.getId());
                             break;
@@ -82,12 +82,12 @@ public class TRUConfigMessageDepositor {
                     }
                 }else if (rsuConfigItemMessage.getAction().equalsIgnoreCase("remove") || rsuConfigItemMessage.getAction().equalsIgnoreCase("delete")) {
                     existingRsuConfigStatusList.removeIf(rsuConfigStatus -> {
-                        if (rsuConfigStatus.getRsuEndpoint() == null) {
-                            log.warn("Skipping RSUConfigStatus with null RSUEndpoint during remove for TRU ID: {}", existingTruConfig.getId());
+                        if (rsuConfigStatus.getRsu() == null) {
+                            log.warn("Skipping RSUConfigStatus with null RSU during remove for TRU ID: {}", existingTruConfig.getId());
                             return false;
                         }
-                        boolean match = rsuConfigStatus.getRsuEndpoint().getIp().equals(rsuConfigItemMessage.getRsuEndpoint().getIp())
-                                && rsuConfigStatus.getRsuEndpoint().getPort().equals(rsuConfigItemMessage.getRsuEndpoint().getPort());
+                        boolean match = rsuConfigStatus.getRsu().getIp().equals(rsuConfigItemMessage.getRsu().getIp())
+                                && rsuConfigStatus.getRsu().getPort().equals(rsuConfigItemMessage.getRsu().getPort());
                         if (match) {
                             rsuConfigStatus.setTruConfigStatus(null);
                         }
@@ -95,8 +95,8 @@ public class TRUConfigMessageDepositor {
                     });
                     truConfigStatusRepository.save(existingTruConfig);
                     log.info("Removed RSU Config IP: {} port: {} from TRU of Unit ID: {}, TRU ID: {}",
-                            rsuConfigItemMessage.getRsuEndpoint().getIp(),
-                            rsuConfigItemMessage.getRsuEndpoint().getPort(),
+                            rsuConfigItemMessage.getRsu().getIp(),
+                            rsuConfigItemMessage.getRsu().getPort(),
                             existingTruConfig.getUnitConfig().getUnitId(),
                             existingTruConfig.getId());
                 }else {

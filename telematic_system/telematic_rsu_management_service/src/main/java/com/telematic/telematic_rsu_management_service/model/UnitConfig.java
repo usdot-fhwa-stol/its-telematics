@@ -46,7 +46,7 @@ public class UnitConfig {
     @JsonProperty("maxConnections")
     private Integer maxConnections;
 
-    @JsonProperty("pluginHeartbeatInterval")
+    @JsonProperty("bridgePluginHeartbeatInterval")
     private Integer pluginHeartbeatInterval;
 
     @JsonProperty("healthMonitorPluginHeartbeatInterval")

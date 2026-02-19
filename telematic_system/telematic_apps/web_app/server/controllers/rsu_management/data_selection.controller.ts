@@ -13,13 +13,13 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-import { GetAvailableTopics } from "../../application/rsu_management/get_available_topics";
-import { ConfirmDataSelection } from "../../application/rsu_management/confirm_data_selection";
 import { NextFunction, Request, Response } from "express";
-import { TRUTopicsMessage } from "../../models/rsu_management/tru_topics_message.model";
+import { ConfirmDataSelection } from "../../application/rsu_management/confirm_data_selection";
+import { GetAvailableTopics } from "../../application/rsu_management/get_available_topics";
+import { RSUEndpoint } from "../../models/rsu_management/rsu_endpoint.model";
 import { RSUTopicsMessage } from "../../models/rsu_management/rsu_topics_message.model";
 import { TopicMessage } from "../../models/rsu_management/topic_message.model";
-import { RSUEndpoint } from "../../models/rsu_management/rsu_endpoint.model";
+import { TRUTopicsMessage } from "../../models/rsu_management/tru_topics_message.model";
 
 export class DataSelectionController {
     private readonly getAvailableTopicsApp: GetAvailableTopics;

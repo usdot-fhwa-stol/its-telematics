@@ -26,9 +26,12 @@ import lombok.Data;
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TRUHealthStatusMessage {
-    @JsonProperty("AssignedRSUHealthStatus")
-    public List<RSUHealthStatusMessage> rsuHealthStatus;
+    @JsonProperty("unitConfig")
+    private UnitHealthStatusMessage unitConfig;
 
-    @JsonProperty("Unit")
-    public UnitHealthStatusMessage unitHealthStatus;
+    @JsonProperty("rsuConfigs")
+    private List<RSUHealthStatusMessage> rsuConfigs;
+
+    @JsonProperty("timestamp")
+    private Long timestamp;
 }

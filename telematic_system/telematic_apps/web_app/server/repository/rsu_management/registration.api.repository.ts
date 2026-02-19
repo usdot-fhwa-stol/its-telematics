@@ -15,17 +15,17 @@
  */
 import axios from 'axios';
 import { RegistrationRepository } from '../../application/rsu_management/ports/registration.repository';
+import { RSUConfigStatus } from '../../models/rsu_management/rsu_config_status.model';
+import { RSUEndpoint } from '../../models/rsu_management/rsu_endpoint.model';
 import { TruConfigMessage } from '../../models/rsu_management/tru_config_message.model';
 import { TruConfigStatus } from '../../models/rsu_management/tru_config_status.model';
-import { RSUConfigStatus } from '../../models/rsu_management/rsu_config_status.model';
 import { UnitConfig } from '../../models/rsu_management/unit_config.model';
 import { UnitPluginStatus } from '../../models/rsu_management/unit_plugin_status.model';
-import { RSUEndpoint } from '../../models/rsu_management/rsu_endpoint.model';
 
 export class RegistrationApiRepository implements RegistrationRepository {
     private readonly baseUrl: string;
 
-    constructor(baseUrl: string = process.env.RSU_MANAGEMENT_SERVICE_URL || 'http://localhost:8082') {
+    constructor(baseUrl: string = process.env.RSU_MANAGEMENT_SERVICE_URL || 'http://localhost:8083') {
         this.baseUrl = baseUrl;
     }
 

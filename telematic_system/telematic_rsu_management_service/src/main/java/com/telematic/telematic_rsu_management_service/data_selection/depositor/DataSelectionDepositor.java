@@ -26,8 +26,8 @@ import org.springframework.stereotype.Component;
 import com.telematic.telematic_rsu_management_service.data_selection.dto.RSUTopicsMessage;
 import com.telematic.telematic_rsu_management_service.data_selection.dto.TRUTopicsMessage;
 import com.telematic.telematic_rsu_management_service.model.DataSelectionRuleConfig;
-import com.telematic.telematic_rsu_management_service.model.RSUEndpoint;
 import com.telematic.telematic_rsu_management_service.model.RSUConfigStatus;
+import com.telematic.telematic_rsu_management_service.model.RSUEndpoint;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
 import com.telematic.telematic_rsu_management_service.repository.mysql.TRUConfigStatusRepository;
 
@@ -59,8 +59,11 @@ public class DataSelectionDepositor {
         }
         Map<RSUEndpoint, List<String>> topicsByEndpoint = truTopicMessage.getRsuTopics().stream()
             .collect(Collectors.toMap(
-                RSUTopicsMessage::getRsuEndpoint,
-                msg -> msg.getTopics().stream().map(topic -> topic.getName()).collect(Collectors.toList()),
+                RSUTopicsMessage::getRsu,
+                msg -> msg.getTopics().stream()
+                    .filter(topic -> topic.getSelected())  // Only include selected topics
+                    .map(topic -> topic.getName())
+                    .collect(Collectors.toList()),
                 (a, b) -> { 
                     List<String> merged = new ArrayList<>(a);
                     merged.addAll(b);
@@ -68,7 +71,7 @@ public class DataSelectionDepositor {
                 }
             ));
         for (RSUConfigStatus rsuConfig : rsuConfigs) {
-            List<String> topics = topicsByEndpoint.get(rsuConfig.getRsuEndpoint());
+            List<String> topics = topicsByEndpoint.get(rsuConfig.getRsu());
             if (topics == null || topics.isEmpty()) {
                 continue;
             }

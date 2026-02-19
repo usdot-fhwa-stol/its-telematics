@@ -49,7 +49,7 @@ public class TRUAutoConfigMessageDepositor {
         List<RSUConfigStatus> rsuConfigStatuses = configMessage.getRsuConfigs().stream().map(rsuConfigItem -> {
             RSUConfigStatus rsuConfigStatus = new RSUConfigStatus();
             rsuConfigStatus.setEvent(rsuConfigItem.getEvent());
-            rsuConfigStatus.setRsuEndpoint(rsuConfigItem.getRsuEndpoint());
+            rsuConfigStatus.setRsu(rsuConfigItem.getRsu());
             rsuConfigStatus.setStatus(null);
             rsuConfigStatus.setTimestamp(configMessage.getTimestamp());
             rsuConfigStatus.setTruConfigStatus(truConfigStatus);

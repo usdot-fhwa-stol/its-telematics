@@ -18,14 +18,15 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import AuthContext from '../../context/auth-context';
 import AdminPage from '../../pages/AdminPage';
+import Dashboard from '../../pages/Dashboard';
 import EventPage from '../../pages/EventPage';
 import ForgetPasswordPage from '../../pages/ForgetPasswordPage';
-import Dashboard from '../../pages/Dashboard';
 import Login from '../../pages/Login';
 import RegisterUserPage from '../../pages/RegisterUserPage';
+import ROS2RosbagPage from '../../pages/ROS2RosbagPage';
+import RSUManagementPage from '../../pages/RSUManagementPage';
 import TopicPage from '../../pages/TopicPage';
 import { USER_ROLES } from '../users/UserMetadata';
-import ROS2RosbagPage from '../../pages/ROS2RosbagPage';
 
 const MainRouter = React.memo(() => {
   const authContext = useContext(AuthContext);
@@ -38,6 +39,7 @@ const MainRouter = React.memo(() => {
       <Routes>
         {authContext.sessionToken !== null && <Route path="/telematic/events" element={<EventPage />} />}
         {authContext.sessionToken !== null && <Route path="/telematic/topics" element={<TopicPage />} />}
+        {authContext.sessionToken !== null && <Route path="/telematic/rsu-management" element={<RSUManagementPage />} />}
         {authContext.sessionToken !== null && <Route path="/historical/data/ros2/rosbag" element={<ROS2RosbagPage />} />}
         {authContext.sessionToken !== null && <Route path="/historical/data"  element={<Navigate to="/historical/data/ros2/rosbag" replace></Navigate>}/>}
         {authContext.sessionToken !== null && (parseInt(authContext.is_admin) === 1 || authContext.role === USER_ROLES.ADMIN) && <Route path="/telematic/admin" element={<AdminPage />} />}

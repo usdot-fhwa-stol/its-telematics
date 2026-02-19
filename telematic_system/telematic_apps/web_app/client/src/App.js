@@ -14,15 +14,23 @@
  * the License.
  */
 
-import React from 'react';
-import MainRouter from './components/layout/MainRouter';
 import Layout from './components/layout/Layout';
+import MainRouter from './components/layout/MainRouter';
+import { TRUConfigProvider } from './context/tru-config-context';
+import { TRUStatusProvider } from './context/tru-status-context';
+import { TRUTopicsProvider } from './context/tru-topic-context';
 
 function App() {
   return (
-      <Layout>
-        <MainRouter />
-      </Layout>
+    <TRUConfigProvider>
+      <TRUStatusProvider>
+        <TRUTopicsProvider>
+          <Layout>
+            <MainRouter />
+          </Layout>
+        </TRUTopicsProvider>
+      </TRUStatusProvider>
+    </TRUConfigProvider>
   );
 }
 

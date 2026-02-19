@@ -136,7 +136,7 @@ public class DataIngestionDepositor {
     public void depositData(String json) {
         try {
             String line = influxLineBuilder.buildLine(json);
-            log.debug("Built Influx line: {} (bytes: {})", line, line.getBytes().length);
+            log.info("Built Influx line: {} (bytes: {})", line, line.getBytes().length);
             
             if (queue != null) {
                 boolean enqueued = queue.offer(line);

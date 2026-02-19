@@ -14,9 +14,9 @@
  * the License.
  */
 import { Application, Router } from 'express';
-import { DataSelectionController } from '../../controllers/rsu_management/data_selection.controller';
-import { GetAvailableTopics } from '../../application/rsu_management/get_available_topics';
 import { ConfirmDataSelection } from '../../application/rsu_management/confirm_data_selection';
+import { GetAvailableTopics } from '../../application/rsu_management/get_available_topics';
+import { DataSelectionController } from '../../controllers/rsu_management/data_selection.controller';
 import { DataSelectionApiRepository } from '../../repository/rsu_management/data_selection.api.repository';
 
 export = (app: Application) => {
@@ -36,7 +36,7 @@ export = (app: Application) => {
     );
 
     // Define routes
-    router.get('/available-topics', dataSelectionController.getAvailableTopics);
+    router.post('/available-topics', dataSelectionController.getAvailableTopics);
     router.post('/confirm-topics', dataSelectionController.confirmDataSelection);
 
     app.use('/api/data-selection', router);
