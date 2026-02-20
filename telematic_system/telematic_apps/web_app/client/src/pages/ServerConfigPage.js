@@ -48,6 +48,7 @@ const ServerConfigPage = React.memo(() => {
 
   const [serverUrl, setServerUrl] = useState('');
   const [serverPort, setServerPort] = useState('');
+  const [useCustomPort, setUseCustomPort] = useState(false);
   const [customGrafanaUri, setCustomGrafanaUri] = useState('');
   const [useCustomGrafana, setUseCustomGrafana] = useState(false);
 
@@ -70,7 +71,7 @@ const ServerConfigPage = React.memo(() => {
 
   const buildServerUri = () => {
     const url = serverUrl.trim();
-    const port = serverPort.trim();
+    const port = useCustomPort ? serverPort.trim() : '';
     if (!url) return '';
     if (!port) return url;
     return `${url}:${port}`;
@@ -134,25 +135,40 @@ const ServerConfigPage = React.memo(() => {
               Enter your server connection details
             </Typography>
 
-            {/* Server URL and Port fields in a row */}
-            <Box sx={{ display: 'flex', gap: 1, width: '100%', mb: 2 }}>
-              <TextField
-                size="small"
-                label="Server URL"
-                placeholder="https://example.com"
-                value={serverUrl}
-                onChange={(e) => setServerUrl(e.target.value)}
-                sx={{ flex: 2 }}
+            {/* Server URL field */}
+            <TextField
+              fullWidth
+              size="small"
+              label="Server URL"
+              placeholder="https://example.com"
+              value={serverUrl}
+              onChange={(e) => setServerUrl(e.target.value)}
+              sx={{ mb: 2 }}
+            />
+
+            {/* Custom Port option */}
+            <Box sx={{ width: '100%', mb: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={useCustomPort}
+                    onChange={(e) => setUseCustomPort(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label={<Typography variant="body2">Use custom port</Typography>}
               />
-              <TextField
-                size="small"
-                label="Port"
-                placeholder="8888"
-                value={serverPort}
-                onChange={(e) => setServerPort(e.target.value)}
-                helperText="Optional"
-                sx={{ flex: 1, minWidth: 80 }}
-              />
+              <Collapse in={useCustomPort}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Port"
+                  placeholder="8080"
+                  value={serverPort}
+                  onChange={(e) => setServerPort(e.target.value)}
+                  sx={{ mt: 1 }}
+                />
+              </Collapse>
             </Box>
 
             {/* Custom Grafana URL option */}
@@ -172,7 +188,7 @@ const ServerConfigPage = React.memo(() => {
                   fullWidth
                   size="small"
                   label="Grafana URL"
-                  placeholder="http://192.168.1.100:8888/grafana"
+                  placeholder="http://###.###.###.###"
                   value={customGrafanaUri}
                   onChange={(e) => setCustomGrafanaUri(e.target.value)}
                   sx={{ mt: 1 }}
