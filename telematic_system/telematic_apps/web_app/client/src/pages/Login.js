@@ -14,7 +14,7 @@
  * the License.
  */
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import { Alert, FormControl, Grid, Link, Snackbar } from '@mui/material';
+import { Alert, FormControl, Grid, Link, Snackbar, Typography } from '@mui/material';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -194,6 +194,13 @@ const Login = React.memo(() => {
                         </Box>
                     </Container>
                 </Box>
+                {isMobile && serverContext.webServerUri && (
+                    <Box sx={{ position: 'fixed', bottom: 16, left: 0, right: 0, textAlign: 'center' }}>
+                        <Typography variant="caption" color="text.secondary">
+                            {serverContext.webServerUri}
+                        </Typography>
+                    </Box>
+                )}
             </ThemeProvider>
         </React.Fragment >
     );
