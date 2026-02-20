@@ -1,1 +1,1 @@
-export const env = window['env']; 
+export const env = { ...window['env'] } 
