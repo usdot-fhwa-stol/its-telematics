@@ -191,14 +191,14 @@ test("deleteRSU should call removeRSU API", async () => {
   const { result } = renderHook(() => useTRUConfig(), { wrapper });
 
   await act(async () => {
-    await result.current.deleteRSU('192.168.1.1', 8080, 'TRU-001');
+    await result.current.deleteRSU('192.168.1.1', 8080, 'TRU-001', 'startup');
   });
 
   expect(rsuService.default.removeRSU).toHaveBeenCalledTimes(1);
   const callArg = rsuService.default.removeRSU.mock.calls[0][0];
   expect(callArg.unitConfig.unitId).toBe('TRU-001');
   expect(callArg.rsuConfigs[0].action).toBe('remove');
-  expect(callArg.rsuConfigs[0].event).toBe('delete');
+  expect(callArg.rsuConfigs[0].event).toBe('startup');
   expect(callArg.rsuConfigs[0].rsu.ip).toBe('192.168.1.1');
   expect(callArg.rsuConfigs[0].rsu.port).toBe(8080);
   expect(callArg.rsuConfigs[0].snmp).toBeUndefined();
