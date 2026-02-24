@@ -45,7 +45,7 @@ const DeleteRSUAlert = ({ open, onClose, rsu, onSuccess }) => {
     setError(null);
 
     try {
-      await deleteRSU(rsu.ip, rsu.port, rsu.unitId);
+      await deleteRSU(rsu.ip, rsu.port, rsu.unitId, rsu.event);
       await refreshStatus(); // Refresh status after config change
       onSuccess && onSuccess();
       onClose();
