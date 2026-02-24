@@ -127,6 +127,13 @@ const RegisterRSUDialog = ({ open, onClose, onSuccess }) => {
       setError('Event name is required');
       return;
     }
+    
+    // Validate event name format (alphanumeric, underscores, hyphens)
+    const eventRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!eventRegex.test(formData.event)) {
+      setError('Event name must be alphanumeric and can include underscores and hyphens');
+      return;
+    }
 
     // Validate SNMP configuration
     if (!formData.snmp.user) {
