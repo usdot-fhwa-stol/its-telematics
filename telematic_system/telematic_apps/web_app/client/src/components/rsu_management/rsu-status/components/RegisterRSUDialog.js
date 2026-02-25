@@ -140,11 +140,6 @@ const RegisterRSUDialog = ({ open, onClose, onSuccess }) => {
       return;
     }
 
-    if (!formData.snmp.securityLevel) {
-      setError('SNMP Security Level is required');
-      return;
-    }
-
     if (!formData.snmp.authProtocol) {
       setError('SNMP Auth Protocol is required');
       return;
@@ -162,11 +157,6 @@ const RegisterRSUDialog = ({ open, onClose, onSuccess }) => {
 
     if (!formData.snmp.privacyPassPhrase) {
       setError('SNMP Privacy Pass Phrase is required');
-      return;
-    }
-
-    if (!formData.snmp.rsuMibVersion) {
-      setError('RSU MIB Version is required');
       return;
     }
 
@@ -348,7 +338,7 @@ const RegisterRSUDialog = ({ open, onClose, onSuccess }) => {
                       label="Security Level"
                       onChange={(e) => handleChange('snmp.securityLevel', e.target.value)}
                     >
-                      <MenuItem value="noAuthNoPriv">No Auth No Priv</MenuItem>
+                      <MenuItem value="">No Auth No Priv</MenuItem>
                       <MenuItem value="authNoPriv">Auth No Priv</MenuItem>
                       <MenuItem value="authPriv">Auth Priv</MenuItem>
                     </Select>
