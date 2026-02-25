@@ -15,6 +15,8 @@
  */
 package com.telematic.telematic_rsu_management_service.health.depositor;
 
+import java.time.Instant;
+
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +48,7 @@ public class RSUHealthStatusDepositor {
                             && rsuConfigStatus.getRsu().getPort().equals(rsuHealthStatusMessage.getRsu().getPort())) {
                         rsuConfigStatus.setStatus(rsuHealthStatusMessage.getStatus());
                         rsuConfigStatus.setEvent(rsuHealthStatusMessage.getEvent());
+                        rsuConfigStatus.setTimestamp(Instant.now().toEpochMilli());
                     }
                 }
             }

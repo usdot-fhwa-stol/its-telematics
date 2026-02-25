@@ -103,6 +103,16 @@ const TRUStatusTab = () => {
         if (!timestamp) return '-';
         return new Date(timestamp).toLocaleString();
       },
+    },{
+      field: 'lastSeen',
+      headerName: 'Last Seen',
+      type: 'timestamp',
+      flex: 1,
+      render: (row) => {
+        const timestamp = row.pluginConfigStatus?.timestamp || null;
+        if (!timestamp) return '-';
+        return new Date(timestamp).toLocaleString();
+      },
     },
   ];
 
