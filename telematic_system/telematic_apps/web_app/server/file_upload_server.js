@@ -189,7 +189,7 @@ const serverError = (res, err) => {
 
 const httpServer = http.createServer(requestListener).listen(port, () => {
   console.log(
-    `Server is running on http://${port}. Allowed client url ${allowedOrigin}`
+    `Server is running on http://${port}. Allowed client urls: ${allowedOrigins.join(", ")}`
   );
 });
 
