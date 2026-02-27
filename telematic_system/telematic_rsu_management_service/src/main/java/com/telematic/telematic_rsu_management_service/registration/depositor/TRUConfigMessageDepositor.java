@@ -67,10 +67,10 @@ public class TRUConfigMessageDepositor {
                             log.warn("Skipping RSUConfigStatus with null RSU for TRU ID: {}", existingTruConfig.getId());
                             continue;
                         }
-                        if (rsuConfigStatus.getRsu().getIp().equals(rsuConfigItemMessage.getRsu().getIp())
-                                && rsuConfigStatus.getRsu().getPort().equals(rsuConfigItemMessage.getRsu().getPort())) {
+                        if (rsuConfigStatus.getRsu().getIp().equals(rsuConfigItemMessage.getRsu().getIp())) {
                             rsuConfigStatus.setEvent(rsuConfigItemMessage.getEvent());
                             rsuConfigStatus.setTimestamp(Instant.now().toEpochMilli());
+                            rsuConfigStatus.setRsu(rsuConfigItemMessage.getRsu());
                             truConfigStatusRepository.save(existingTruConfig);
                             log.info("Updated RSU Config IP: {} port: {} for TRU of Unit ID: {}, TRU ID: {}",
                                     rsuConfigStatus.getRsu().getIp(),

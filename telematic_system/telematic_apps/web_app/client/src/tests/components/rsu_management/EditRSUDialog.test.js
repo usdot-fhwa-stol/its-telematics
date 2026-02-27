@@ -238,6 +238,110 @@ test("EditRSUDialog should show validation error for invalid port", async () => 
   });
 });
 
+test("EditRSUDialog should require SNMP User on submit", async () => {
+  render(
+    <EditRSUDialog open={true} onClose={() => {}} rsu={mockRSU} />,
+    { wrapper }
+  );
+
+  const userFields = screen.getAllByLabelText(/User/i);
+  const snmpUserField = userFields[userFields.length - 1];
+  fireEvent.change(snmpUserField, { target: { value: "" } });
+
+  const updateButton = screen.getByText("Update");
+  await act(async () => {
+    fireEvent.click(updateButton);
+  });
+
+  await waitFor(() => {
+    expect(screen.getByText("SNMP User is required")).toBeInTheDocument();
+  });
+});
+
+test("EditRSUDialog should require SNMP Auth Protocol on submit", async () => {
+  const rsuMissingAuthProtocol = {
+    ...mockRSU,
+    snmp: {
+      ...mockRSU.snmp,
+      authProtocol: ""
+    }
+  };
+
+  render(
+    <EditRSUDialog open={true} onClose={() => {}} rsu={rsuMissingAuthProtocol} />,
+    { wrapper }
+  );
+
+  const updateButton = screen.getByText("Update");
+  await act(async () => {
+    fireEvent.click(updateButton);
+  });
+
+  await waitFor(() => {
+    expect(screen.getByText("SNMP Auth Protocol is required")).toBeInTheDocument();
+  });
+});
+
+test("EditRSUDialog should require SNMP Auth Pass Phrase on submit", async () => {
+  render(
+    <EditRSUDialog open={true} onClose={() => {}} rsu={mockRSU} />,
+    { wrapper }
+  );
+
+  fireEvent.change(screen.getByLabelText(/Auth Pass Phrase/i), { target: { value: "" } });
+
+  const updateButton = screen.getByText("Update");
+  await act(async () => {
+    fireEvent.click(updateButton);
+  });
+
+  await waitFor(() => {
+    expect(screen.getByText("SNMP Auth Pass Phrase is required")).toBeInTheDocument();
+  });
+});
+
+test("EditRSUDialog should require SNMP Privacy Protocol on submit", async () => {
+  const rsuMissingPrivacyProtocol = {
+    ...mockRSU,
+    snmp: {
+      ...mockRSU.snmp,
+      privacyProtocol: ""
+    }
+  };
+
+  render(
+    <EditRSUDialog open={true} onClose={() => {}} rsu={rsuMissingPrivacyProtocol} />,
+    { wrapper }
+  );
+
+  const updateButton = screen.getByText("Update");
+  await act(async () => {
+    fireEvent.click(updateButton);
+  });
+
+  await waitFor(() => {
+    expect(screen.getByText("SNMP Privacy Protocol is required")).toBeInTheDocument();
+  });
+});
+
+test("EditRSUDialog should require SNMP Privacy Pass Phrase on submit", async () => {
+  render(
+    <EditRSUDialog open={true} onClose={() => {}} rsu={mockRSU} />,
+    { wrapper }
+  );
+
+  fireEvent.change(screen.getByLabelText(/Privacy Pass Phrase/i), { target: { value: "" } });
+
+  const updateButton = screen.getByText("Update");
+  await act(async () => {
+    fireEvent.click(updateButton);
+  });
+
+  await waitFor(() => {
+    expect(screen.getByText("SNMP Privacy Pass Phrase is required")).toBeInTheDocument();
+  });
+});
+
 test("EditRSUDialog should disable buttons during submission", async () => {
   rsuService.updateRSUConfig.mockImplementation(() => new Promise(() => {})); // Never resolves
 

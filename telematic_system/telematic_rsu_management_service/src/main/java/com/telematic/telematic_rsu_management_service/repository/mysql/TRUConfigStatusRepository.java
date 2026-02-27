@@ -32,7 +32,7 @@ public interface TRUConfigStatusRepository extends JpaRepository<TRUConfigStatus
 		"unitConfig",
 		"pluginConfigStatus",
 		"rsuConfigs",
-		"rsuConfigs.rsuEndpoint"
+		"rsuConfigs.rsu"
 	})
 	@Query("select t from TRUConfigStatus t")
 	List<TRUConfigStatus> findAllWithAssociations();
@@ -41,7 +41,7 @@ public interface TRUConfigStatusRepository extends JpaRepository<TRUConfigStatus
 		"unitConfig",
 		"pluginConfigStatus",
 		"rsuConfigs",
-		"rsuConfigs.rsuEndpoint"
+		"rsuConfigs.rsu"
 	})
 	@Query("select t from TRUConfigStatus t where t.unitConfig.unitId = :unitId")
 	TRUConfigStatus findByUnitIdWithAssociations(@Param("unitId") String unitId);

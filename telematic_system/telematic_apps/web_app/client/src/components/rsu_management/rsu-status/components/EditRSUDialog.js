@@ -103,14 +103,16 @@ const EditRSUDialog = ({ open, onClose, rsu, onSuccess }) => {
       return;
     }
 
-    // Validate SNMP configuration
-    if (!formData.snmp.user) {
-      setError('SNMP User is required');
+    // Validate event name format (alphanumeric, underscores, hyphens)
+    const eventRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!eventRegex.test(formData.event)) {
+      setError('Event name must be alphanumeric and can include underscores and hyphens');
       return;
     }
 
-    if (!formData.snmp.securityLevel) {
-      setError('SNMP Security Level is required');
+    // Validate SNMP configuration
+    if (!formData.snmp.user) {
+      setError('SNMP User is required');
       return;
     }
 
@@ -131,11 +133,6 @@ const EditRSUDialog = ({ open, onClose, rsu, onSuccess }) => {
 
     if (!formData.snmp.privacyPassPhrase) {
       setError('SNMP Privacy Pass Phrase is required');
-      return;
-    }
-
-    if (!formData.snmp.rsuMibVersion) {
-      setError('RSU MIB Version is required');
       return;
     }
 
@@ -211,7 +208,7 @@ const EditRSUDialog = ({ open, onClose, rsu, onSuccess }) => {
             value={formData.ip}
             onChange={(e) => handleChange('ip', e.target.value)}
             required
-            disabled={loading}
+            disabled={true}
           />
         </Grid>
         <Grid item xs={12}>
@@ -263,7 +260,7 @@ const EditRSUDialog = ({ open, onClose, rsu, onSuccess }) => {
                       label="Security Level"
                       onChange={(e) => handleChange('snmp.securityLevel', e.target.value)}
                     >
-                      <MenuItem value="noAuthNoPriv">No Auth No Priv</MenuItem>
+                      <MenuItem value="">No Auth No Priv</MenuItem>
                       <MenuItem value="authNoPriv">Auth No Priv</MenuItem>
                       <MenuItem value="authPriv">Auth Priv</MenuItem>
                     </Select>

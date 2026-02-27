@@ -55,9 +55,14 @@ public class RegistrationService {
 
     public Message requestTruConfig(String truConfigSubject, TruConfigMessage truConfigMessage, long timeout) {
         byte[] payload = serializer.encode(truConfigMessage);
+        if(truConfigMessage.getUnitConfig().getUnitId() == null || truConfigMessage.getUnitConfig().getUnitId().isEmpty()) {
+            throw new IllegalArgumentException("TRU config message must contain a unit ID");
+        }
+        String unitId = truConfigMessage.getUnitConfig().getUnitId();
+        truConfigSubject= truConfigSubject.replace("*", unitId);
         log.info("Request for RSU configuration update on subject '{}': {}", truConfigSubject, truConfigMessage);
         if (isAddAction(truConfigMessage.getRsuConfigs().get(0).getAction()) && isRSUAssignedToTRU(truConfigMessage)) {
-            log.info("RSU is already assigned to TRU Unit ID: {}, skipping request", truConfigMessage.getUnitConfig().getUnitId());
+            log.info("RSU is already assigned to TRU Unit ID: {}, skipping request", unitId);
             throw new IllegalStateException("RSU is already assigned to TRU");
         }
         Message message = messagingClient.request(truConfigSubject, payload, Duration.ofSeconds(timeout));

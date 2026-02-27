@@ -137,7 +137,7 @@ export const TRUConfigProvider = ({ children }) => {
    * @param {number} port - RSU port
    * @param {string} unitId - TRU unit ID
    */
-  const deleteRSU = useCallback(async (ip, port, unitId) => {
+  const deleteRSU = useCallback(async (ip, port, unitId, event) => {
     setLoading(true);
     setError(null);
     try {
@@ -145,7 +145,7 @@ export const TRUConfigProvider = ({ children }) => {
       const truConfigMessage = buildTruConfigMessage(
         unitId,
         'remove',
-        'delete',
+        event,
         { ip, port },
         null // No SNMP config needed for delete
       );
