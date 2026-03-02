@@ -3,6 +3,8 @@ services:
 
   influxdb:
     image:  influxdb:latest
+    profiles:
+      - default
     container_name: influxdb
     ports:
       - '8086:8086'
@@ -19,6 +21,8 @@ services:
 
   influxdb3-core:
     image: influxdb:3.7.0-core
+    profiles:
+      - rsu_integration
     container_name: influxdb3-core
     user: "0:0"
     ports:
@@ -45,6 +49,9 @@ services:
 
   mysqldb:
     image: mysql:5.7
+    profiles:
+      - default
+      - rsu_integration
     restart: always
     container_name: mysqldb
     logging:
@@ -67,6 +74,9 @@ services:
 
   nats:
     image: 'nats:2.7.3-alpine3.15'
+    profiles:
+      - rsu_integration
+      - default
     restart: always
     container_name: nats
     logging:
@@ -79,6 +89,9 @@ services:
       build:
         context: "./telematic_apps/grafana"
       image: usdotfhwastoldev/telematic_grafana:develop
+      profiles:
+        - rsu_integration
+        - default
       restart: always
       container_name: grafana
       logging:
@@ -102,6 +115,9 @@ services:
         context: "./telematic_apps/web_app/server"
         dockerfile: "Dockerfile"
       image: usdotfhwastoldev/telematic_web_server:develop
+      profiles:
+        - rsu_integration
+        - default
       restart: always
       container_name: web_server
       logging:
@@ -124,6 +140,9 @@ services:
     build:
       context: "./telematic_apps/web_app/client"
     image: usdotfhwastoldev/telematic_web_client:develop
+    profiles:
+      - rsu_integration
+      - default
     restart: always
     container_name: web_client
     logging:
@@ -139,6 +158,9 @@ services:
       context: "./telematic_apps/apache2"
       dockerfile: "./local.Dockerfile"
     image: usdotfhwastoldev/telematic_local_apache2:develop
+    profiles:
+      - rsu_integration
+      - default
     restart: always
     container_name: apache2
     logging:
@@ -164,6 +186,8 @@ services:
       context: "./telematic_cloud_messaging"
     container_name: messaging_server
     image: usdotfhwastoldev/telematic_cloud_messaging:develop
+    profiles:
+      - default
     depends_on:
       - nats
       - mysqldb
@@ -183,6 +207,8 @@ services:
       context: "./telematic_rsu_management_service"
     container_name: rsu_management_service
     image: usdotfhwastoldev/telematic_rsu_management_service:develop
+    profiles:
+      - rsu_integration
     depends_on:
       - nats
       - mysqldb
@@ -207,6 +233,8 @@ services:
     image: usdotfhwastoldev/telematic_historical_data_processing:develop
     container_name: rosbag2_processing_service
     restart: always
+    profiles:
+      - default
     depends_on:
       - nats
       - mysqldb
