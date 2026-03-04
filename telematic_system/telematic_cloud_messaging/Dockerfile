@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17.0.18_8-jdk-jammy
+FROM maven:3.9-eclipse-temurin-17-alpine AS build
 WORKDIR /telematic_cloud_messaging
 COPY ./ /telematic_cloud_messaging/
 RUN ./mvnw clean package -Dmaven.test.skip=true
