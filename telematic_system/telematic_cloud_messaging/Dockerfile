@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17.0.18_8-jdk-ubi10-minimal
+FROM eclipse-temurin:17.0.18_8-jdk-jammy
 WORKDIR /telematic_cloud_messaging
 COPY ./ /telematic_cloud_messaging/
 RUN ./mvnw clean package -Dmaven.test.skip=true
