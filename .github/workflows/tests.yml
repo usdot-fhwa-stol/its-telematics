@@ -79,7 +79,7 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/telematic_system/telematic_cloud_messaging
           ./mvnw org.jacoco:jacoco-maven-plugin:prepare-agent package
-          ./mvnw org.jacoco:jacoco-maven-plugin:report package
+          ./mvnw org.jacoco:jacoco-maven-plugin:prepare-agent test jacoco:report
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4
         with:
