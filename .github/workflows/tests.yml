@@ -191,7 +191,7 @@ jobs:
           if-no-files-found: error
   sonar:
     # Remove cloud bridge, vehicle bridge, and telematic_cloud_messaging coverage temporarily as test build failed
-    needs: [telematic_rsu_management_service_coverage, web_app_client_coverage, web_app_server_coverage, rosbag2_processing_service_coverage]
+    needs: [telematic_rsu_management_service_coverage, web_app_client_coverage, web_app_server_coverage, rosbag2_processing_service_coverage, telematic_cloud_messaging_coverage, carma_vehicle_bridge_coverage, carma_cloud_bridge_coverage]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ${{ github.event.repository.name }}
@@ -308,7 +308,7 @@ jobs:
           web_app_client.sonar.exclusions=scripts/**,coverage/***
           web_app_server.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/server
           web_app_server.sonar.sources=.
-          web_app_server.sonar.tests=src/tests
+          web_app_server.sonar.tests=tests
           web_app_server.sonar.exclusions=scripts/**,coverage/**
           EOF
           cp /tmp/sonar-scanner.properties $GITHUB_WORKSPACE/sonar-project.properties
