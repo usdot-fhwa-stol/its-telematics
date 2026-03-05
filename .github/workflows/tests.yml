@@ -191,31 +191,28 @@ jobs:
           if-no-files-found: error
   sonar:
     # Remove cloud bridge, vehicle bridge, and telematic_cloud_messaging coverage temporarily as test build failed
-    needs: [telematic_rsu_management_service_coverage, web_app_client_coverage, web_app_server_coverage, rosbag2_processing_service_coverage]
+    needs: [telematic_rsu_management_service_coverage, web_app_client_coverage, web_app_server_coverage, rosbag2_processing_service_coverage, telematic_cloud_messaging_coverage, carma_vehicle_bridge_coverage, carma_cloud_bridge_coverage]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ${{ github.event.repository.name }}
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      # Comment out cloud bridge code coverage temporarily because of test failure
-      # - name: Download code coverage results
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: carma-cloud-bridge-coverage
-      #     path: carma_cloud_bridge
-      # Comment out vehicle bridge code coverage temporarily because of test failure
-      # - name: Download code coverage results
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: carma-vehicle-bridge-coverage
-      #     path: carma_vehicle_bridge
-      # Comment out cloud messaging code coverage temporarily because of test failure
-      # - name: Download telematic cloud messaging server code coverage results
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: telematic-cloud-messaging
-      #     path: telematic_system/telematic_cloud_messaging/target
+      - name: Download code coverage results
+        uses: actions/download-artifact@v4
+        with:
+          name: carma-cloud-bridge-coverage
+          path: carma_cloud_bridge
+      - name: Download code coverage results
+        uses: actions/download-artifact@v4
+        with:
+          name: carma-vehicle-bridge-coverage
+          path: carma_vehicle_bridge
+      - name: Download telematic cloud messaging server code coverage results
+        uses: actions/download-artifact@v4
+        with:
+          name: telematic-cloud-messaging
+          path: telematic_system/telematic_cloud_messaging/target
       - name: Download telematic RSU management service code coverage results
         uses: actions/download-artifact@v4
         with:
@@ -240,18 +237,17 @@ jobs:
         shell: bash
         run: |
           find "$GITHUB_WORKSPACE" -name "jacoco.xml"
-      # Comment out coverage for vehicle and cloud bridge temporarily because of test failure
-      # - name: Rewrite workspace path in coverage.xml
-      #   shell: python
-      #   run: |
-      #     for coverage_file in ["/home/runner/work/cda-telematics/cda-telematics/carma_cloud_bridge/coverage.xml", "/home/runner/work/cda-telematics/cda-telematics/carma_vehicle_bridge/coverage.xml"] :
-      #       with open(coverage_file, 'r') as coverage :
-      #         coverage_content = coverage.read()
+      - name: Rewrite workspace path in coverage.xml
+        shell: python
+        run: |
+          for coverage_file in ["/home/runner/work/cda-telematics/cda-telematics/carma_cloud_bridge/coverage.xml", "/home/runner/work/cda-telematics/cda-telematics/carma_vehicle_bridge/coverage.xml"] :
+            with open(coverage_file, 'r') as coverage :
+              coverage_content = coverage.read()
 
-      #       coverage_content = coverage_content.replace('/__w/', '/home/runner/work/')
+            coverage_content = coverage_content.replace('/__w/', '/home/runner/work/')
 
-      #       with open(coverage_file, 'w') as coverage:
-      #         coverage.write(coverage_content)
+            with open(coverage_file, 'w') as coverage:
+              coverage.write(coverage_content)
       - name: Move web app client and server code coverage files into one
         run: |
             cd $GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app
@@ -272,7 +268,7 @@ jobs:
           cat <<EOF > /tmp/sonar-scanner.properties
           sonar.host.url=https://sonarcloud.io
           sonar.coverage.jacoco.xmlReportPaths=$GITHUB_WORKSPACE/telematic_system/telematic_rsu_management_service/target/site/jacoco/jacoco.xml
-          sonar.exclusions=**/__init__.py,**/*test*.py,**/test/**
+          sonar.exclusions=**/__init__.py,**/*test*.py,**/test/**,**/scripts/**,**/coverage/**
           sonar.coverage.exclusions=**/__init__.py,**/*test*.py,**/test/**,setup.py
           sonar.java.binaries=$GITHUB_WORKSPACE/telematic_system/telematic_rsu_management_service/target/
           sonar.javascript.lcov.reportPaths=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/coverage/lcov.info
@@ -304,7 +300,7 @@ jobs:
           web_app_client.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/client
           web_app_client.sonar.sources=src
           web_app_client.sonar.tests=src/tests
-          web_app_client.sonar.exclusions =src/tests/**
+          web_app_client.sonar.exclusions=src/tests/**
           web_app_server.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/server
           web_app_server.sonar.sources=.
           web_app_server.sonar.tests=tests
