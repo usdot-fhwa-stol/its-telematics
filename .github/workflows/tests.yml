@@ -198,24 +198,21 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      # Comment out cloud bridge code coverage temporarily because of test failure
-      # - name: Download code coverage results
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: carma-cloud-bridge-coverage
-      #     path: carma_cloud_bridge
-      # Comment out vehicle bridge code coverage temporarily because of test failure
-      # - name: Download code coverage results
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: carma-vehicle-bridge-coverage
-      #     path: carma_vehicle_bridge
-      # Comment out cloud messaging code coverage temporarily because of test failure
-      # - name: Download telematic cloud messaging server code coverage results
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: telematic-cloud-messaging
-      #     path: telematic_system/telematic_cloud_messaging/target
+      - name: Download code coverage results
+        uses: actions/download-artifact@v3
+        with:
+          name: carma-cloud-bridge-coverage
+          path: carma_cloud_bridge
+      - name: Download code coverage results
+        uses: actions/download-artifact@v3
+        with:
+          name: carma-vehicle-bridge-coverage
+          path: carma_vehicle_bridge
+      - name: Download telematic cloud messaging server code coverage results
+        uses: actions/download-artifact@v4
+        with:
+          name: telematic-cloud-messaging
+          path: telematic_system/telematic_cloud_messaging/target
       - name: Download telematic RSU management service code coverage results
         uses: actions/download-artifact@v4
         with:
@@ -240,18 +237,17 @@ jobs:
         shell: bash
         run: |
           find "$GITHUB_WORKSPACE" -name "jacoco.xml"
-      # Comment out coverage for vehicle and cloud bridge temporarily because of test failure
-      # - name: Rewrite workspace path in coverage.xml
-      #   shell: python
-      #   run: |
-      #     for coverage_file in ["/home/runner/work/cda-telematics/cda-telematics/carma_cloud_bridge/coverage.xml", "/home/runner/work/cda-telematics/cda-telematics/carma_vehicle_bridge/coverage.xml"] :
-      #       with open(coverage_file, 'r') as coverage :
-      #         coverage_content = coverage.read()
+      - name: Rewrite workspace path in coverage.xml
+        shell: python
+        run: |
+          for coverage_file in ["/home/runner/work/cda-telematics/cda-telematics/carma_cloud_bridge/coverage.xml", "/home/runner/work/cda-telematics/cda-telematics/carma_vehicle_bridge/coverage.xml"] :
+            with open(coverage_file, 'r') as coverage :
+              coverage_content = coverage.read()
 
-      #       coverage_content = coverage_content.replace('/__w/', '/home/runner/work/')
+            coverage_content = coverage_content.replace('/__w/', '/home/runner/work/')
 
-      #       with open(coverage_file, 'w') as coverage:
-      #         coverage.write(coverage_content)
+            with open(coverage_file, 'w') as coverage:
+              coverage.write(coverage_content)
       - name: Move web app client and server code coverage files into one
         run: |
             cd $GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app
@@ -288,27 +284,32 @@ jobs:
           cloud_nats_bridge.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_units/carma_cloud_bridge/cloud_nats_bridge
           cloud_nats_bridge.sonar.sources=src
           cloud_nats_bridge.sonar.tests=test
+          cloud_nats_bridge.sonar.exclusions=tests/**,scripts/**,coverage/**
           ros2_nats_bridge.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_units/carma_vehicle_bridge/ros2_nats_bridge
           ros2_nats_bridge.sonar.sources=.
           ros2_nats_bridge.sonar.tests=test
+          ros2_nats_bridge.sonar.exclusions=tests/**,scripts/**,coverage/**
           rosbag2_processing_service.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_historical_data_processing/rosbag2_processing_service
           rosbag2_processing_service.sonar.sources=.
           rosbag2_processing_service.sonar.tests=test
+          rosbag2_processing_service.sonar.exclusions=tests/**,scripts/**,coverage/**
           streets_nats_bridge.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_units/carma_street_bridge/streets_nats_bridge
           streets_nats_bridge.sonar.sources=src
+          streets_nats_bridge.sonar.exclusions=tests/**,scripts/**,coverage/**
           telematic_rsu_management_service.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_rsu_management_service
           telematic_rsu_management_service.sonar.sources=src/main/java
           telematic_rsu_management_service.sonar.tests=src/test
           telematic_rsu_management_service.sonar.test.inclusions=src/test/**
+          telematic_rsu_management_service.sonar.exclusions=tests/**,scripts/**,coverage/**
           telematic_rsu_management_service.sonar.coverage.exclusions=**/messaging/nats/**,**/registration/depositor/**,**/data_ingestion/service/**,**/data_ingestion/influx/pipeline/processors/**,**/data_ingestion/influx/InfluxClientConfig.java,**/data_ingestion/influx/InfluxDBRepository.java,**/data_selection/service/**,**/repository/influx/**,**/common/api/**,**/health/depositor/**,**/data_selection/depositor/**,**/config/**,**/registration/service/**,**/health/service/**,**/security/**,**/health/handler/**,**/data_ingestion/influx/pipeline/**,**/health/bootstrap/**,**/registration/api/**,**/data_selection/api/**,**/data_ingestion/bootstrap/**,**/registration/bootstrap/**,**/TelematicRsuManagementServiceApplication.java
           web_app_client.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/client
           web_app_client.sonar.sources=src
           web_app_client.sonar.tests=src/tests
-          web_app_client.sonar.exclusions =src/tests/**
+          web_app_client.sonar.exclusions=tests/**,scripts/**,coverage/***
           web_app_server.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/server
           web_app_server.sonar.sources=.
           web_app_server.sonar.tests=tests
-          web_app_server.sonar.exclusions=tests/**,scripts/**
+          web_app_server.sonar.exclusions=tests/**,scripts/**,coverage/**
           EOF
           cp /tmp/sonar-scanner.properties $GITHUB_WORKSPACE/sonar-project.properties
       - name: Run SonarScanner
