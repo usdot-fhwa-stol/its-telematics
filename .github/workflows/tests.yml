@@ -283,16 +283,16 @@ jobs:
           sonar.python.version=3.9
           cloud_nats_bridge.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_units/carma_cloud_bridge/cloud_nats_bridge
           cloud_nats_bridge.sonar.sources=src
-          cloud_nats_bridge.sonar.tests=tests
+          cloud_nats_bridge.sonar.tests=test
           cloud_nats_bridge.sonar.exclusions=scripts/**,coverage/**
           ros2_nats_bridge.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_units/carma_vehicle_bridge/ros2_nats_bridge
           ros2_nats_bridge.sonar.sources=.
-          ros2_nats_bridge.sonar.tests=tests
+          ros2_nats_bridge.sonar.tests=test
           ros2_nats_bridge.sonar.exclusions=scripts/**,coverage/**
           rosbag2_processing_service.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_historical_data_processing/rosbag2_processing_service
           rosbag2_processing_service.sonar.sources=.
-          rosbag2_processing_service.sonar.tests=tests
-          rosbag2_processing_service.sonar.exclusions=tests/**,scripts/**,coverage/**
+          rosbag2_processing_service.sonar.tests=test
+          rosbag2_processing_service.sonar.exclusions=scripts/**,coverage/**
           streets_nats_bridge.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_units/carma_street_bridge/streets_nats_bridge
           streets_nats_bridge.sonar.sources=src
           streets_nats_bridge.sonar.exclusions=tests/**,scripts/**,coverage/**
@@ -308,7 +308,7 @@ jobs:
           web_app_client.sonar.exclusions=scripts/**,coverage/***
           web_app_server.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/server
           web_app_server.sonar.sources=.
-          web_app_server.sonar.tests=tests
+          web_app_server.sonar.tests=src/tests
           web_app_server.sonar.exclusions=scripts/**,coverage/**
           EOF
           cp /tmp/sonar-scanner.properties $GITHUB_WORKSPACE/sonar-project.properties
