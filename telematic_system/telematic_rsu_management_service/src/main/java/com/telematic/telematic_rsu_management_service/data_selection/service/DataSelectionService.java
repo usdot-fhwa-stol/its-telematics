@@ -79,7 +79,7 @@ public class DataSelectionService {
             log.info("No existing data selection rules found for TRU ID '{}'", truTopicsMessage.getUnitId());
             return responseTopicMessage;
         }
-        // Build a map by IP address for matching, since TRU may send port=0
+        // Build a map by IP address for matching
         Map<String, List<String>> ipToRules = truConfigStatus.getRsuConfigs().stream()
             .collect(Collectors.toMap(
                 (RSUConfigStatus rsu) -> rsu.getRsu().getIp(),
