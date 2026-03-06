@@ -95,9 +95,8 @@ const DataSelectionTab = () => {
       setSaveCooldown(true);
       setTimeout(() => {
         setSaveCooldown(false);
-      }, 1500); // 1.5 second cooldown
+      }, 1500); 
     } catch (err) {
-      // Don't show error if it's just a duplicate save attempt
       if (err.message !== 'Save operation already in progress') {
         setSnackbar({
           open: true,

@@ -116,8 +116,24 @@ export const TRUTopicsProvider = ({ children }) => {
       const updatedTopics = await fetchTopicsInternal(unitId);
       
       // Update truTopics context with the fresh data
-      // Use flushSync to ensure this state update completes before we update selectedTopics
+      // Calculate selectedTopics from the fresh backend data
+      // Use SINGLE flushSync to update both states atomically, preventing race conditions
       if (updatedTopics && updatedTopics.rsuTopics) {
+        // Calculate new selectedTopics before flushSync
+        let newSelectedTopics = {};
+        if (currentSelectedRSUs.length > 0 && currentSelectedTRU === unitId) {
+          updatedTopics.rsuTopics.forEach(rsuTopic => {
+            const rsuKey = `${rsuTopic.rsu.ip}:${rsuTopic.rsu.port}`;
+            // Only include topics for currently selected RSUs (match by IP only)
+            if (currentSelectedRSUs.some(ep => ep.ip === rsuTopic.rsu.ip)) {
+              newSelectedTopics[rsuKey] = rsuTopic.topics
+                .filter(t => t.selected)
+                .map(t => t.name);
+            }
+          });
+        }
+        
+        // Update both states atomically in a single flushSync block
         flushSync(() => {
           setTruTopics(prev => {
             const updated = [...prev];
@@ -129,22 +145,8 @@ export const TRUTopicsProvider = ({ children }) => {
             }
             return updated;
           });
+          setSelectedTopics(newSelectedTopics);
         });
-        
-        // Re-sync selectedTopics with the fresh data from backend
-        if (currentSelectedRSUs.length > 0 && currentSelectedTRU === unitId) {
-          const topicsByRSU = {};
-          updatedTopics.rsuTopics.forEach(rsuTopic => {
-            const rsuKey = `${rsuTopic.rsu.ip}:${rsuTopic.rsu.port}`;
-            // Only include topics for currently selected RSUs (match by IP only)
-            if (currentSelectedRSUs.some(ep => ep.ip === rsuTopic.rsu.ip)) {
-              topicsByRSU[rsuKey] = rsuTopic.topics
-                .filter(t => t.selected)
-                .map(t => t.name);
-            }
-          });
-          setSelectedTopics(topicsByRSU);
-        }
       }
       
       return { success: true, message: 'Topics configuration saved successfully', data: result };
@@ -227,48 +229,60 @@ export const TRUTopicsProvider = ({ children }) => {
 
   /**
    * Toggle topic selection for a specific RSU
+   * Use flushSync to ensure state updates synchronously before subsequent actions (like Save)
    */
   const toggleTopic = useCallback((rsuKey, topicName) => {
-    setSelectedTopics(prev => {
-      const rsuTopics = prev[rsuKey] || [];
-      const newRsuTopics = rsuTopics.includes(topicName)
-        ? rsuTopics.filter(t => t !== topicName)
-        : [...rsuTopics, topicName];
-      
-      return {
-        ...prev,
-        [rsuKey]: newRsuTopics
-      };
+    flushSync(() => {
+      setSelectedTopics(prev => {
+        const rsuTopics = prev[rsuKey] || [];
+        const newRsuTopics = rsuTopics.includes(topicName)
+          ? rsuTopics.filter(t => t !== topicName)
+          : [...rsuTopics, topicName];
+        
+        return {
+          ...prev,
+          [rsuKey]: newRsuTopics
+        };
+      });
     });
   }, []);
 
   /**
    * Select all topics for specific RSUs
+   * Use flushSync to ensure state updates synchronously before subsequent actions (like Save)
    */
   const selectAllTopics = useCallback((rsuTopicsMap) => {
-    setSelectedTopics(prev => ({
-      ...prev,
-      ...rsuTopicsMap
-    }));
+    flushSync(() => {
+      setSelectedTopics(prev => ({
+        ...prev,
+        ...rsuTopicsMap
+      }));
+    });
   }, []);
 
   /**
    * Clear all topic selections for all RSUs
+   * Use flushSync to ensure state updates synchronously before subsequent actions (like Save)
    */
   const clearAllTopics = useCallback(() => {
-    setSelectedTopics({});
+    flushSync(() => {
+      setSelectedTopics({});
+    });
   }, []);
 
   /**
    * Clear topics for specific RSUs
+   * Use flushSync to ensure state updates synchronously before subsequent actions (like Save)
    */
   const clearTopicsForRSUs = useCallback((rsuKeys) => {
-    setSelectedTopics(prev => {
-      const newTopics = { ...prev };
-      rsuKeys.forEach(key => {
-        delete newTopics[key];
+    flushSync(() => {
+      setSelectedTopics(prev => {
+        const newTopics = { ...prev };
+        rsuKeys.forEach(key => {
+          delete newTopics[key];
+        });
+        return newTopics;
       });
-      return newTopics;
     });
   }, []);
 
