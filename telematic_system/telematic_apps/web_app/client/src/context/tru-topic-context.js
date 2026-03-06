@@ -14,7 +14,8 @@
  * the License.
  */
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import rsuService from '../api/api-rsu';
 import { useTRUStatus } from './tru-status-context';
 
@@ -35,10 +36,18 @@ export const TRUTopicsProvider = ({ children }) => {
   const [filteredTopicsByRSU, setFilteredTopicsByRSU] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const saveInProgressRef = useRef(false);
+  const truTopicsRef = useRef([]);
+
+  // Keep ref in sync with truTopics state
+  useEffect(() => {
+    truTopicsRef.current = truTopics;
+  }, [truTopics]);
 
   // Initialize truTopics from truStatuses
+  // Only initialize if truTopics is empty (don't overwrite fetched data)
   useEffect(() => {
-    if (Array.isArray(truStatuses) && truStatuses.length > 0) {
+    if (Array.isArray(truStatuses) && truStatuses.length > 0 && truTopics.length === 0) {
       const topics = truStatuses.map(tru => ({
         unitId: tru.unitConfig?.unitId || '',
         rsuTopics: tru.rsuConfigs?.map(rsu => ({
@@ -51,7 +60,23 @@ export const TRUTopicsProvider = ({ children }) => {
       }));
       setTruTopics(topics);
     }
-  }, [truStatuses]);
+  }, [truStatuses, truTopics]);
+
+  /**
+   * Internal helper to fetch topics without managing loading state
+   * Used when already within another operation that manages loading
+   * This prevents nested loading state management and double API calls
+   */
+  const fetchTopicsInternal = useCallback(async (unitId) => {
+    const truTopicsMessage = {
+      unitId: unitId,
+      rsuTopics: [], // Empty for fetching available topics
+      timestamp: Date.now()
+    };
+    
+    const result = await rsuService.getAvailableTopics(truTopicsMessage);
+    return result;
+  }, []);
 
   /**
    * Fetch TRU topics by unit ID
@@ -60,15 +85,7 @@ export const TRUTopicsProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      // Call API to get available topics for this TRU
-      const truTopicsMessage = {
-        unitId: unitId,
-        rsuTopics: [], // Empty for fetching available topics
-        timestamp: Date.now()
-      };
-      
-      const result = await rsuService.getAvailableTopics(truTopicsMessage);
-      return result;
+      return await fetchTopicsInternal(unitId);
     } catch (err) {
       setError(err.message || `Failed to fetch TRU topics for ${unitId}`);
       console.error(`Error fetching TRU topics for ${unitId}:`, err);
@@ -76,34 +93,62 @@ export const TRUTopicsProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchTopicsInternal]);
 
   /**
    * Update TRU topics configuration
    */
   const updateTRUTopics = useCallback(async (unitId, topicsData) => {
+    // Prevent concurrent save operations
+    if (saveInProgressRef.current) {
+      console.warn('Save already in progress, ignoring duplicate request');
+      throw new Error('Save operation already in progress');
+    }
+
+    saveInProgressRef.current = true;
     setLoading(true);
     setError(null);
+    
     try {
-      // Call API to confirm data selection
+      // Call API to confirm data selection (save to backend)
       const result = await rsuService.confirmDataSelection(topicsData);
       
-      // Refresh the topics from backend to get the latest selection state
-      const updatedTopics = await fetchTRUTopicsById(unitId);
-      
-      // Update truTopics context with the fresh data
-      if (updatedTopics && updatedTopics.rsuTopics) {
-        setTruTopics(prev => {
-          const updated = [...prev];
-          const index = updated.findIndex(t => t.unitId === unitId);
-          if (index !== -1) {
-            updated[index] = updatedTopics;
-          } else {
-            updated.push(updatedTopics);
-          }
-          return updated;
-        });
-      }
+      // Update truTopics with the saved data to keep selections in sync
+      // When user deselects and re-selects RSUs, they'll see their saved selections
+      setTruTopics(prev => {
+        const updated = [...prev];
+        const index = updated.findIndex(t => t.unitId === unitId);
+        
+        if (index !== -1) {
+          // Merge saved data with existing truTopics
+          // For each RSU in topicsData, update its topics in truTopics
+          const existingTRU = updated[index];
+          const updatedRsuTopics = existingTRU.rsuTopics.map(rsuTopic => {
+            // Find matching RSU in saved data (match by IP)
+            const savedRsu = topicsData.rsuTopics.find(
+              saved => saved.rsu.ip === rsuTopic.rsu.ip
+            );
+            
+            // If this RSU was in the save, update its topics
+            if (savedRsu) {
+              return {
+                ...rsuTopic,
+                topics: savedRsu.topics
+              };
+            }
+            
+            // Otherwise keep existing data
+            return rsuTopic;
+          });
+          
+          updated[index] = {
+            ...existingTRU,
+            rsuTopics: updatedRsuTopics
+          };
+        }
+        
+        return updated;
+      });
       
       return { success: true, message: 'Topics configuration saved successfully', data: result };
     } catch (err) {
@@ -112,6 +157,7 @@ export const TRUTopicsProvider = ({ children }) => {
       throw err;
     } finally {
       setLoading(false);
+      saveInProgressRef.current = false;
     }
   }, []);
 
@@ -165,8 +211,8 @@ export const TRUTopicsProvider = ({ children }) => {
         const topicsByRSU = {};
         truData.rsuTopics.forEach(rsuTopic => {
           const rsuKey = `${rsuTopic.rsu.ip}:${rsuTopic.rsu.port}`;
-          // Only include topics for selected RSUs
-          if (rsuEndpoints.some(ep => ep.ip === rsuTopic.rsu.ip && ep.port === rsuTopic.rsu.port)) {
+          // Only include topics for selected RSUs (match by IP only)
+          if (rsuEndpoints.some(ep => ep.ip === rsuTopic.rsu.ip)) {
             topicsByRSU[rsuKey] = rsuTopic.topics
               .filter(t => t.selected)
               .map(t => t.name);
@@ -184,48 +230,60 @@ export const TRUTopicsProvider = ({ children }) => {
 
   /**
    * Toggle topic selection for a specific RSU
+   * Use flushSync to ensure state updates synchronously before subsequent actions (like Save)
    */
   const toggleTopic = useCallback((rsuKey, topicName) => {
-    setSelectedTopics(prev => {
-      const rsuTopics = prev[rsuKey] || [];
-      const newRsuTopics = rsuTopics.includes(topicName)
-        ? rsuTopics.filter(t => t !== topicName)
-        : [...rsuTopics, topicName];
-      
-      return {
-        ...prev,
-        [rsuKey]: newRsuTopics
-      };
+    flushSync(() => {
+      setSelectedTopics(prev => {
+        const rsuTopics = prev[rsuKey] || [];
+        const newRsuTopics = rsuTopics.includes(topicName)
+          ? rsuTopics.filter(t => t !== topicName)
+          : [...rsuTopics, topicName];
+        
+        return {
+          ...prev,
+          [rsuKey]: newRsuTopics
+        };
+      });
     });
   }, []);
 
   /**
    * Select all topics for specific RSUs
+   * Use flushSync to ensure state updates synchronously before subsequent actions (like Save)
    */
   const selectAllTopics = useCallback((rsuTopicsMap) => {
-    setSelectedTopics(prev => ({
-      ...prev,
-      ...rsuTopicsMap
-    }));
+    flushSync(() => {
+      setSelectedTopics(prev => ({
+        ...prev,
+        ...rsuTopicsMap
+      }));
+    });
   }, []);
 
   /**
    * Clear all topic selections for all RSUs
+   * Use flushSync to ensure state updates synchronously before subsequent actions (like Save)
    */
   const clearAllTopics = useCallback(() => {
-    setSelectedTopics({});
+    flushSync(() => {
+      setSelectedTopics({});
+    });
   }, []);
 
   /**
    * Clear topics for specific RSUs
+   * Use flushSync to ensure state updates synchronously before subsequent actions (like Save)
    */
   const clearTopicsForRSUs = useCallback((rsuKeys) => {
-    setSelectedTopics(prev => {
-      const newTopics = { ...prev };
-      rsuKeys.forEach(key => {
-        delete newTopics[key];
+    flushSync(() => {
+      setSelectedTopics(prev => {
+        const newTopics = { ...prev };
+        rsuKeys.forEach(key => {
+          delete newTopics[key];
+        });
+        return newTopics;
       });
-      return newTopics;
     });
   }, []);
 
@@ -250,7 +308,7 @@ export const TRUTopicsProvider = ({ children }) => {
 
     return selectedRSUs.map(rsu => {
       const rsuData = truData.rsuTopics?.find(
-        rt => rt.rsu.ip === rsu.ip && rt.rsu.port === rsu.port
+        rt => rt.rsu.ip === rsu.ip
       );
       
       return {
@@ -333,19 +391,20 @@ export const TRUTopicsProvider = ({ children }) => {
     }
 
     // Build TRUTopicsMessage matching API model
-    // Only include selected RSUs with their topic selections
+    // Include selected RSUs with ALL their topics, marking each as selected or not
+    // Use ref to get fresh truTopics data (avoids closure/dependency issues)
+    const truData = truTopicsRef.current.find(t => t.unitId === selectedTRU);
+    
     const rsuTopicsMessages = selectedRSUs.map(rsu => {
       const rsuKey = `${rsu.ip}:${rsu.port}`;
       const selectedForRSU = selectedTopics[rsuKey] || [];
       
-      // Get available topics for this RSU from truTopics
-      const truData = truTopics.find(t => t.unitId === selectedTRU);
-      const rsuData = truData?.rsuTopics?.find(
-        rt => rt.rsu.ip === rsu.ip && rt.rsu.port === rsu.port
-      );
+      // Get all available topics for this RSU from truTopics
+      const rsuData = truData?.rsuTopics?.find(rt => rt.rsu.ip === rsu.ip);
+      const allTopics = rsuData?.topics || [];
       
-      // Create topics array with selected status
-      const topics = (rsuData?.topics || []).map(topic => ({
+      // Map all topics with their selected status
+      const topics = allTopics.map(topic => ({
         name: topic.name,
         selected: selectedForRSU.includes(topic.name)
       }));
@@ -367,7 +426,7 @@ export const TRUTopicsProvider = ({ children }) => {
     };
 
     return await updateTRUTopics(selectedTRU, truTopicsMessage);
-  }, [selectedTRU, selectedRSUs, selectedTopics, truTopics, updateTRUTopics]);
+  }, [selectedTRU, selectedRSUs, selectedTopics, updateTRUTopics]);
 
   // Update available topics when RSU selection changes
   useEffect(() => {

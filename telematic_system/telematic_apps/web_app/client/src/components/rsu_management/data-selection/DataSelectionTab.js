@@ -25,6 +25,7 @@ import {
   Step,
   StepLabel,
   Stepper,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { useState } from 'react';
@@ -63,6 +64,7 @@ const DataSelectionTab = () => {
   } = useTRUTopics();
 
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [saveCooldown, setSaveCooldown] = useState(false);
 
   const summary = getSelectionSummary();
 
@@ -79,17 +81,29 @@ const DataSelectionTab = () => {
   const handleSaveConfiguration = async () => {
     try {
       await saveTopicConfiguration();
+      // Check if any topics are selected
+      const hasSelectedTopics = summary.topicCount > 0;
       setSnackbar({
         open: true,
-        message: 'Topic configuration saved successfully!',
+        message: hasSelectedTopics 
+          ? 'Topic configuration saved successfully!' 
+          : 'Broadcast stopped - no topics selected',
         severity: 'success',
       });
+      
+      // Enable cooldown period to prevent rapid-fire saves
+      setSaveCooldown(true);
+      setTimeout(() => {
+        setSaveCooldown(false);
+      }, 1500); 
     } catch (err) {
-      setSnackbar({
-        open: true,
-        message: `Failed to save: ${err.message}`,
-        severity: 'error',
-      });
+      if (err.message !== 'Save operation already in progress') {
+        setSnackbar({
+          open: true,
+          message: `Failed to save: ${err.message}`,
+          severity: 'error',
+        });
+      }
     }
   };
 
@@ -211,13 +225,26 @@ const DataSelectionTab = () => {
         >
           Reset Selection
         </Button>
-        <Button
-          startIcon={<SaveIcon />}
-          onClick={handleSaveConfiguration}
-          disabled={selectedRSUs.length === 0 || summary.topicCount === 0 || loading}
+        <Tooltip 
+          title={
+            saveCooldown 
+              ? "Please wait before saving again" 
+              : summary.topicCount === 0 
+                ? "Save with no topics to stop broadcast" 
+                : "Save topic configuration"
+          }
+          arrow
         >
-          {loading ? 'Saving...' : 'Save Configuration'}
-        </Button>
+          <span>
+            <Button
+              startIcon={<SaveIcon />}
+              onClick={handleSaveConfiguration}
+              disabled={selectedRSUs.length === 0 || loading || saveCooldown}
+            >
+              {loading ? 'Saving...' : saveCooldown ? 'Saved ✓' : 'Save Configuration'}
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
 
       {/* Snackbar Notifications */}

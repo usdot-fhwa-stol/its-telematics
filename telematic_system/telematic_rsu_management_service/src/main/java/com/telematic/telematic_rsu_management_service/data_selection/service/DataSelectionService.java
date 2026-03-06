@@ -16,6 +16,7 @@
 package com.telematic.telematic_rsu_management_service.data_selection.service;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -32,7 +33,6 @@ import com.telematic.telematic_rsu_management_service.messaging.Serializer;
 import com.telematic.telematic_rsu_management_service.messaging.nats.NatsMessagingClient;
 import com.telematic.telematic_rsu_management_service.model.DataSelectionRuleConfig;
 import com.telematic.telematic_rsu_management_service.model.RSUConfigStatus;
-import com.telematic.telematic_rsu_management_service.model.RSUEndpoint;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
 import com.telematic.telematic_rsu_management_service.repository.mysql.TRUConfigStatusRepository;
 
@@ -79,20 +79,29 @@ public class DataSelectionService {
             log.info("No existing data selection rules found for TRU ID '{}'", truTopicsMessage.getUnitId());
             return responseTopicMessage;
         }
-        Map<RSUEndpoint, List<String>> endpointToRules = truConfigStatus.getRsuConfigs().stream()
+        // Build a map by IP address for matching
+        Map<String, List<String>> ipToRules = truConfigStatus.getRsuConfigs().stream()
             .collect(Collectors.toMap(
-                RSUConfigStatus::getRsu,
-                rsu -> rsu.getDataSelectionRuleConfigs().stream()
-                        .map(DataSelectionRuleConfig::getRule)
-                        .collect(Collectors.toList()),
-                (a, b) -> {
-                    a.addAll(b);
-                    return a;
+                (RSUConfigStatus rsu) -> rsu.getRsu().getIp(),
+                (RSUConfigStatus rsu) -> {
+                    if (rsu.getDataSelectionRuleConfigs() != null) {
+                        return rsu.getDataSelectionRuleConfigs().stream()
+                                .map(DataSelectionRuleConfig::getRule)
+                                .collect(Collectors.toList());
+                    } else {
+                        return new ArrayList<String>();
+                    }
+                },
+                (List<String> a, List<String> b) -> {
+                    List<String> merged = new ArrayList<>(a);
+                    merged.addAll(b);
+                    return merged;
                 }
                 ));
-        log.info("Mark available topics based on existing rules: {} ", endpointToRules);
+        log.info("Mark available topics based on existing rules by IP: {} ", ipToRules);
         for(RSUTopicsMessage rsuTopicsMessage : responseTopicMessage.getRsuTopics()) {
-            List<String> existingRules = endpointToRules.get(rsuTopicsMessage.getRsu());
+            // Match by IP address only
+            List<String> existingRules = ipToRules.get(rsuTopicsMessage.getRsu().getIp());
             for (TopicMessage topicMessage : rsuTopicsMessage.getTopics()) {
                 if (existingRules != null && existingRules.contains(topicMessage.getName())) {
                     topicMessage.setSelected(true);

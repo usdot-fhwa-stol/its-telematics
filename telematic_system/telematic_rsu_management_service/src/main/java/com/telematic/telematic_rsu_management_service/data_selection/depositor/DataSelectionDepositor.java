@@ -23,11 +23,9 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
-import com.telematic.telematic_rsu_management_service.data_selection.dto.RSUTopicsMessage;
 import com.telematic.telematic_rsu_management_service.data_selection.dto.TRUTopicsMessage;
 import com.telematic.telematic_rsu_management_service.model.DataSelectionRuleConfig;
 import com.telematic.telematic_rsu_management_service.model.RSUConfigStatus;
-import com.telematic.telematic_rsu_management_service.model.RSUEndpoint;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
 import com.telematic.telematic_rsu_management_service.repository.mysql.TRUConfigStatusRepository;
 
@@ -57,9 +55,9 @@ public class DataSelectionDepositor {
                     truTopicMessage.getUnitId());
             return false;
         }
-        Map<RSUEndpoint, List<String>> topicsByEndpoint = truTopicMessage.getRsuTopics().stream()
+        Map<String, List<String>> topicsByIp = truTopicMessage.getRsuTopics().stream()
             .collect(Collectors.toMap(
-                RSUTopicsMessage::getRsu,
+                msg -> msg.getRsu().getIp(),
                 msg -> msg.getTopics().stream()
                     .filter(topic -> topic.getSelected())  // Only include selected topics
                     .map(topic -> topic.getName())
@@ -71,12 +69,16 @@ public class DataSelectionDepositor {
                 }
             ));
         for (RSUConfigStatus rsuConfig : rsuConfigs) {
-            List<String> topics = topicsByEndpoint.get(rsuConfig.getRsu());
-            if (topics == null || topics.isEmpty()) {
+            // Match by IP address only
+            List<String> topics = topicsByIp.get(rsuConfig.getRsu().getIp());
+            
+            // Skip RSUs that are not in the incoming message
+            if (topics == null) {
+                log.debug("RSU with IP '{}' not in incoming message, skipping", rsuConfig.getRsu().getIp());
                 continue;
             }
             
-            // Replace existing rules with new ones
+            // Clear existing rules (even if empty list) to support stop broadcast
             if (rsuConfig.getDataSelectionRuleConfigs() != null) {
                 Iterator<DataSelectionRuleConfig> iter = rsuConfig.getDataSelectionRuleConfigs().iterator();
                 while (iter.hasNext()) {
@@ -88,11 +90,17 @@ public class DataSelectionDepositor {
                 rsuConfig.setDataSelectionRuleConfigs(new ArrayList<>());
             }
 
-            for (String topic : topics) {
-                DataSelectionRuleConfig ruleConfig = new DataSelectionRuleConfig();
-                ruleConfig.setRule(topic);
-                ruleConfig.setRsuConfigStatus(rsuConfig);
-                rsuConfig.getDataSelectionRuleConfigs().add(ruleConfig);
+            // Add new rules (if topics list is empty, rules remain cleared for stop broadcast)
+            if (topics.isEmpty()) {
+                log.info("Clearing all topics for RSU with IP '{}' - stopping broadcast", rsuConfig.getRsu().getIp());
+            } else {
+                log.info("Setting {} topic(s) for RSU with IP '{}'", topics.size(), rsuConfig.getRsu().getIp());
+                for (String topic : topics) {
+                    DataSelectionRuleConfig ruleConfig = new DataSelectionRuleConfig();
+                    ruleConfig.setRule(topic);
+                    ruleConfig.setRsuConfigStatus(rsuConfig);
+                    rsuConfig.getDataSelectionRuleConfigs().add(ruleConfig);
+                }
             }
         }
         truConfigStatusRepository.save(truConfigStatus);
