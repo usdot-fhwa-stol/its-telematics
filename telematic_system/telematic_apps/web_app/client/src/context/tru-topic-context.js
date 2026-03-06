@@ -100,11 +100,17 @@ export const TRUTopicsProvider = ({ children }) => {
     saveInProgressRef.current = true;
     setLoading(true);
     setError(null);
+    
+    // Preserve current selections to re-sync after refresh
+    const currentSelectedRSUs = selectedRSUs;
+    const currentSelectedTRU = selectedTRU;
+    
     try {
       // Call API to confirm data selection
       const result = await rsuService.confirmDataSelection(topicsData);
       
-      // Refresh the topics from backend to get the latest selection state
+      // Refresh topics from backend to get the complete list of RSUs and topics
+      // The backend returns all available topics with correct selected flags
       // Use internal fetch to avoid nested loading state management
       const updatedTopics = await fetchTopicsInternal(unitId);
       
@@ -120,6 +126,22 @@ export const TRUTopicsProvider = ({ children }) => {
           }
           return updated;
         });
+        
+        // Re-sync selectedTopics with the fresh data from backend
+        // This ensures UI reflects the backend's selected state
+        if (currentSelectedRSUs.length > 0 && currentSelectedTRU === unitId) {
+          const topicsByRSU = {};
+          updatedTopics.rsuTopics.forEach(rsuTopic => {
+            const rsuKey = `${rsuTopic.rsu.ip}:${rsuTopic.rsu.port}`;
+            // Only include topics for currently selected RSUs (match by IP only)
+            if (currentSelectedRSUs.some(ep => ep.ip === rsuTopic.rsu.ip)) {
+              topicsByRSU[rsuKey] = rsuTopic.topics
+                .filter(t => t.selected)
+                .map(t => t.name);
+            }
+          });
+          setSelectedTopics(topicsByRSU);
+        }
       }
       
       return { success: true, message: 'Topics configuration saved successfully', data: result };
@@ -131,7 +153,7 @@ export const TRUTopicsProvider = ({ children }) => {
       setLoading(false);
       saveInProgressRef.current = false;
     }
-  }, [fetchTopicsInternal]);
+  }, [fetchTopicsInternal, selectedRSUs, selectedTRU]);
 
   /**
    * Select a TRU for topic configuration
@@ -183,8 +205,8 @@ export const TRUTopicsProvider = ({ children }) => {
         const topicsByRSU = {};
         truData.rsuTopics.forEach(rsuTopic => {
           const rsuKey = `${rsuTopic.rsu.ip}:${rsuTopic.rsu.port}`;
-          // Only include topics for selected RSUs
-          if (rsuEndpoints.some(ep => ep.ip === rsuTopic.rsu.ip && ep.port === rsuTopic.rsu.port)) {
+          // Only include topics for selected RSUs (match by IP only)
+          if (rsuEndpoints.some(ep => ep.ip === rsuTopic.rsu.ip)) {
             topicsByRSU[rsuKey] = rsuTopic.topics
               .filter(t => t.selected)
               .map(t => t.name);
@@ -268,7 +290,7 @@ export const TRUTopicsProvider = ({ children }) => {
 
     return selectedRSUs.map(rsu => {
       const rsuData = truData.rsuTopics?.find(
-        rt => rt.rsu.ip === rsu.ip && rt.rsu.port === rsu.port
+        rt => rt.rsu.ip === rsu.ip
       );
       
       return {

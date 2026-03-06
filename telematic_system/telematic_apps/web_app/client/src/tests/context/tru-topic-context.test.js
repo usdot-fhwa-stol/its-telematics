@@ -531,7 +531,7 @@ test("saveTopicConfiguration should reset save lock after error", async () => {
   expect(rsuService.default.confirmDataSelection).toHaveBeenCalledTimes(2);
 });
 
-test("saveTopicConfiguration should only fetch available topics once after save", async () => {
+test("saveTopicConfiguration should fetch available topics after save to get complete RSU list with correct selections", async () => {
   const { result } = renderHook(() => useTRUTopics(), { wrapper });
 
   // Setup
@@ -552,10 +552,10 @@ test("saveTopicConfiguration should only fetch available topics once after save"
   // Should call confirmDataSelection once
   expect(rsuService.default.confirmDataSelection).toHaveBeenCalledTimes(1);
   
-  // Should call getAvailableTopics once (to refresh after save)
+  // Should call getAvailableTopics once to refresh all RSUs with correct selected flags
   expect(rsuService.default.getAvailableTopics).toHaveBeenCalledTimes(1);
   
-  // The getAvailableTopics call should be with empty rsuTopics to fetch all available
+  // The getAvailableTopics call should be with empty rsuTopics to fetch all available RSUs
   expect(rsuService.default.getAvailableTopics).toHaveBeenCalledWith(
     expect.objectContaining({
       unitId: 'TRU-001',

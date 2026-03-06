@@ -17,15 +17,15 @@
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import SettingsInputAntennaIcon from '@mui/icons-material/SettingsInputAntenna';
 import {
-  Box,
-  Checkbox,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Paper,
-  Tooltip,
-  Typography
+    Box,
+    Checkbox,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
+    Paper,
+    Tooltip,
+    Typography
 } from '@mui/material';
 
 /**
@@ -35,16 +35,16 @@ import {
 const RSUSelector = ({ rsuList, selectedRSUs = [], onSelect, disabled }) => {
   const isRSUSelected = (rsu) => {
     return selectedRSUs.some(selected => 
-      selected.ip === rsu.ip && selected.port === rsu.port
+      selected.ip === rsu.ip
     );
   };
 
   const handleToggle = (rsu) => {
     const isSelected = isRSUSelected(rsu);
     if (isSelected) {
-      // Remove RSU from selection
+      // Remove RSU from selection (match by IP only)
       onSelect(selectedRSUs.filter(selected => 
-        !(selected.ip === rsu.ip && selected.port === rsu.port)
+        selected.ip !== rsu.ip
       ));
     } else {
       // Add RSU to selection
