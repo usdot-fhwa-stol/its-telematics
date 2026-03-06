@@ -81,8 +81,8 @@ test("TopicSelectionList should render RSU groups", () => {
     />
   );
 
-  expect(screen.getByText("192.168.1.1:8080")).toBeInTheDocument();
-  expect(screen.getByText("192.168.1.2:8081")).toBeInTheDocument();
+  expect(screen.getByText("192.168.1.1")).toBeInTheDocument();
+  expect(screen.getByText("192.168.1.2")).toBeInTheDocument();
 });
 
 test("TopicSelectionList should render topics for each RSU", () => {
@@ -308,7 +308,7 @@ test("TopicSelectionList should not render topics when disabled", () => {
     />
   );
 
-  expect(screen.queryByText("192.168.1.1:8080")).not.toBeInTheDocument();
+  expect(screen.queryByText("192.168.1.1")).not.toBeInTheDocument();
 });
 
 test("TopicSelectionList should display empty message when no topics", () => {
