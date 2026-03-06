@@ -113,10 +113,42 @@ export const TRUTopicsProvider = ({ children }) => {
       // Call API to confirm data selection (save to backend)
       const result = await rsuService.confirmDataSelection(topicsData);
       
-      // Don't update truTopics after save - keep existing data intact
-      // The topicsData only contains selected RSUs, not all RSUs for the TRU
-      // selectedTopics state already maintains user selections for UI rendering
-      // truTopics will be refreshed when user re-selects the TRU
+      // Update truTopics with the saved data to keep selections in sync
+      // When user deselects and re-selects RSUs, they'll see their saved selections
+      setTruTopics(prev => {
+        const updated = [...prev];
+        const index = updated.findIndex(t => t.unitId === unitId);
+        
+        if (index !== -1) {
+          // Merge saved data with existing truTopics
+          // For each RSU in topicsData, update its topics in truTopics
+          const existingTRU = updated[index];
+          const updatedRsuTopics = existingTRU.rsuTopics.map(rsuTopic => {
+            // Find matching RSU in saved data (match by IP)
+            const savedRsu = topicsData.rsuTopics.find(
+              saved => saved.rsu.ip === rsuTopic.rsu.ip
+            );
+            
+            // If this RSU was in the save, update its topics
+            if (savedRsu) {
+              return {
+                ...rsuTopic,
+                topics: savedRsu.topics
+              };
+            }
+            
+            // Otherwise keep existing data
+            return rsuTopic;
+          });
+          
+          updated[index] = {
+            ...existingTRU,
+            rsuTopics: updatedRsuTopics
+          };
+        }
+        
+        return updated;
+      });
       
       return { success: true, message: 'Topics configuration saved successfully', data: result };
     } catch (err) {

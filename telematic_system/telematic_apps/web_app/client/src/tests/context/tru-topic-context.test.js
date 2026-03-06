@@ -601,10 +601,28 @@ test("saveTopicConfiguration should update truTopics locally without fetching fr
   expect(result.current.selectedRSUs).toEqual(selectedRSUsBeforeSave);
   expect(result.current.selectedTopics).toEqual(selectedTopicsBeforeSave);
   
-  // truTopics should remain unchanged (not updated with saved data)
-  // This prevents data corruption since topicsData only contains selected RSUs
+  // truTopics should be updated with saved selections for the saved RSU
+  // Other RSUs remain unchanged
   const savedTRU = result.current.truTopics.find(t => t.unitId === 'TRU-001');
   expect(savedTRU).toBeDefined();
   expect(savedTRU.rsuTopics).toHaveLength(2); // Should still have both RSUs from initial load
-  expect(savedTRU.rsuTopics[0].topics).toHaveLength(4); // All topics should still be there
+  
+  // First RSU (192.168.1.100) should have updated topics with bsm selected
+  const savedRSU = savedTRU.rsuTopics.find(rt => rt.rsu.ip === '192.168.1.100');
+  expect(savedRSU).toBeDefined();
+  expect(savedRSU.topics).toEqual([
+    { name: 'bsm', selected: true },
+    { name: 'tim', selected: false },
+    { name: 'spat', selected: false },
+    { name: 'map', selected: false }
+  ]);
+  
+  // Second RSU (192.168.1.101) should remain unchanged
+  const unchangedRSU = savedTRU.rsuTopics.find(rt => rt.rsu.ip === '192.168.1.101');
+  expect(unchangedRSU).toBeDefined();
+  expect(unchangedRSU.topics).toEqual([
+    { name: 'bsm', selected: false },
+    { name: 'spat', selected: false },
+    { name: 'map', selected: false }
+  ]);
 });
