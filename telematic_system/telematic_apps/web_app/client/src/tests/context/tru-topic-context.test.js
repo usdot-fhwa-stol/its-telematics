@@ -39,7 +39,20 @@ const mockAvailableTopics = {
   rsuTopics: [
     {
       rsu: { ip: '192.168.1.100', port: 1516 },
-      topics: ['bsm', 'tim', 'spat', 'map']
+      topics: [
+        { name: 'bsm', selected: false },
+        { name: 'tim', selected: false },
+        { name: 'spat', selected: false },
+        { name: 'map', selected: false }
+      ]
+    },
+    {
+      rsu: { ip: '192.168.1.101', port: 1517 },
+      topics: [
+        { name: 'bsm', selected: false },
+        { name: 'spat', selected: false },
+        { name: 'map', selected: false }
+      ]
     }
   ]
 };
@@ -296,7 +309,7 @@ test("saveTopicConfiguration should correctly map selected topics to topic objec
     await result.current.saveTopicConfiguration();
   });
 
-  // Verify the API was called with correctly mapped topics
+  // Verify the API was called with ALL topics (selected and unselected)
   expect(rsuService.default.confirmDataSelection).toHaveBeenCalledWith(
     expect.objectContaining({
       unitId: 'TRU-001',
@@ -305,7 +318,9 @@ test("saveTopicConfiguration should correctly map selected topics to topic objec
           rsu: { ip: '192.168.1.100', port: 1516 },
           topics: [
             { name: 'bsm', selected: true },
-            { name: 'tim', selected: true }
+            { name: 'tim', selected: true },
+            { name: 'spat', selected: false },
+            { name: 'map', selected: false }
           ]
         }
       ]
@@ -331,7 +346,12 @@ test("saveTopicConfiguration should handle single RSU with single topic", async 
       rsuTopics: [
         {
           rsu: { ip: '192.168.1.100', port: 1516 },
-          topics: [{ name: 'bsm', selected: true }]
+          topics: [
+            { name: 'bsm', selected: true },
+            { name: 'tim', selected: false },
+            { name: 'spat', selected: false },
+            { name: 'map', selected: false }
+          ]
         }
       ]
     })
@@ -364,12 +384,18 @@ test("saveTopicConfiguration should handle multiple RSUs with different topic se
           rsu: { ip: '192.168.1.100', port: 1516 },
           topics: [
             { name: 'bsm', selected: true },
-            { name: 'tim', selected: true }
+            { name: 'tim', selected: true },
+            { name: 'spat', selected: false },
+            { name: 'map', selected: false }
           ]
         },
         {
           rsu: { ip: '192.168.1.101', port: 1517 },
-          topics: [{ name: 'spat', selected: true }]
+          topics: [
+            { name: 'bsm', selected: false },
+            { name: 'spat', selected: true },
+            { name: 'map', selected: false }
+          ]
         }
       ]
     })
@@ -394,7 +420,12 @@ test("saveTopicConfiguration should handle RSU with no selected topics (empty ar
       rsuTopics: [
         {
           rsu: { ip: '192.168.1.100', port: 1516 },
-          topics: [] // Empty topics array
+          topics: [
+            { name: 'bsm', selected: false },
+            { name: 'tim', selected: false },
+            { name: 'spat', selected: false },
+            { name: 'map', selected: false }
+          ]
         }
       ]
     })
@@ -534,12 +565,19 @@ test("saveTopicConfiguration should reset save lock after error", async () => {
 test("saveTopicConfiguration should update truTopics locally without fetching from backend", async () => {
   const { result } = renderHook(() => useTRUTopics(), { wrapper });
 
-  // Setup
+  // Setup - separate act blocks to ensure proper state updates
   await act(async () => {
     await result.current.selectTRU('TRU-001');
+  });
+
+  await act(async () => {
     result.current.selectRSUs([{ ip: '192.168.1.100', port: 1516 }]);
+  });
+
+  await act(async () => {
     result.current.toggleTopic('192.168.1.100:1516', 'bsm');
   });
+
 
   // Store initial selection state
   const selectedRSUsBeforeSave = result.current.selectedRSUs;
@@ -563,10 +601,10 @@ test("saveTopicConfiguration should update truTopics locally without fetching fr
   expect(result.current.selectedRSUs).toEqual(selectedRSUsBeforeSave);
   expect(result.current.selectedTopics).toEqual(selectedTopicsBeforeSave);
   
-  // truTopics should be updated locally with the saved data
+  // truTopics should remain unchanged (not updated with saved data)
+  // This prevents data corruption since topicsData only contains selected RSUs
   const savedTRU = result.current.truTopics.find(t => t.unitId === 'TRU-001');
   expect(savedTRU).toBeDefined();
-  expect(savedTRU.rsuTopics).toHaveLength(1);
-  expect(savedTRU.rsuTopics[0].rsu).toEqual({ ip: '192.168.1.100', port: 1516 });
-  expect(savedTRU.rsuTopics[0].topics).toEqual([{ name: 'bsm', selected: true }]);
+  expect(savedTRU.rsuTopics).toHaveLength(2); // Should still have both RSUs from initial load
+  expect(savedTRU.rsuTopics[0].topics).toHaveLength(4); // All topics should still be there
 });

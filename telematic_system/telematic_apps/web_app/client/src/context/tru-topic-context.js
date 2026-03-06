@@ -37,10 +37,17 @@ export const TRUTopicsProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const saveInProgressRef = useRef(false);
+  const truTopicsRef = useRef([]);
+
+  // Keep ref in sync with truTopics state
+  useEffect(() => {
+    truTopicsRef.current = truTopics;
+  }, [truTopics]);
 
   // Initialize truTopics from truStatuses
+  // Only initialize if truTopics is empty (don't overwrite fetched data)
   useEffect(() => {
-    if (Array.isArray(truStatuses) && truStatuses.length > 0) {
+    if (Array.isArray(truStatuses) && truStatuses.length > 0 && truTopics.length === 0) {
       const topics = truStatuses.map(tru => ({
         unitId: tru.unitConfig?.unitId || '',
         rsuTopics: tru.rsuConfigs?.map(rsu => ({
@@ -53,7 +60,7 @@ export const TRUTopicsProvider = ({ children }) => {
       }));
       setTruTopics(topics);
     }
-  }, [truStatuses]);
+  }, [truStatuses, truTopics]);
 
   /**
    * Internal helper to fetch topics without managing loading state
@@ -106,19 +113,10 @@ export const TRUTopicsProvider = ({ children }) => {
       // Call API to confirm data selection (save to backend)
       const result = await rsuService.confirmDataSelection(topicsData);
       
-      // Update truTopics context locally with the saved data
-      // No need to fetch from backend - just use what we saved
-      // This keeps the UI selections intact and avoids race conditions
-      setTruTopics(prev => {
-        const updated = [...prev];
-        const index = updated.findIndex(t => t.unitId === unitId);
-        if (index !== -1) {
-          updated[index] = topicsData;
-        } else {
-          updated.push(topicsData);
-        }
-        return updated;
-      });
+      // Don't update truTopics after save - keep existing data intact
+      // The topicsData only contains selected RSUs, not all RSUs for the TRU
+      // selectedTopics state already maintains user selections for UI rendering
+      // truTopics will be refreshed when user re-selects the TRU
       
       return { success: true, message: 'Topics configuration saved successfully', data: result };
     } catch (err) {
@@ -361,14 +359,22 @@ export const TRUTopicsProvider = ({ children }) => {
     }
 
     // Build TRUTopicsMessage matching API model
-    // Only include selected RSUs with their topic selections
+    // Include selected RSUs with ALL their topics, marking each as selected or not
+    // Use ref to get fresh truTopics data (avoids closure/dependency issues)
+    const truData = truTopicsRef.current.find(t => t.unitId === selectedTRU);
+    
     const rsuTopicsMessages = selectedRSUs.map(rsu => {
       const rsuKey = `${rsu.ip}:${rsu.port}`;
       const selectedForRSU = selectedTopics[rsuKey] || [];
       
-      const topics = selectedForRSU.map(topicName => ({
-        name: topicName,
-        selected: true
+      // Get all available topics for this RSU from truTopics
+      const rsuData = truData?.rsuTopics?.find(rt => rt.rsu.ip === rsu.ip);
+      const allTopics = rsuData?.topics || [];
+      
+      // Map all topics with their selected status
+      const topics = allTopics.map(topic => ({
+        name: topic.name,
+        selected: selectedForRSU.includes(topic.name)
       }));
 
       return {
@@ -388,7 +394,7 @@ export const TRUTopicsProvider = ({ children }) => {
     };
 
     return await updateTRUTopics(selectedTRU, truTopicsMessage);
-  }, [selectedTRU, selectedRSUs, selectedTopics, truTopics, updateTRUTopics]);
+  }, [selectedTRU, selectedRSUs, selectedTopics, updateTRUTopics]);
 
   // Update available topics when RSU selection changes
   useEffect(() => {
