@@ -252,3 +252,210 @@ test("useTRUTopics should select all topics for RSU", async () => {
 
   expect(result.current.selectedTopics['192.168.1.100:1516']).toEqual(['bsm', 'tim', 'spat', 'map']);
 });
+
+test("saveTopicConfiguration should throw error when no TRU is selected", async () => {
+  const { result } = renderHook(() => useTRUTopics(), { wrapper });
+
+  await expect(act(async () => {
+    await result.current.saveTopicConfiguration();
+  })).rejects.toThrow('No TRU selected');
+});
+
+test("saveTopicConfiguration should throw error when no RSUs are selected", async () => {
+  const { result } = renderHook(() => useTRUTopics(), { wrapper });
+
+  await act(async () => {
+    result.current.selectTRU('TRU-001');
+  });
+
+  await expect(act(async () => {
+    await result.current.saveTopicConfiguration();
+  })).rejects.toThrow('No RSUs selected');
+});
+
+test("saveTopicConfiguration should correctly map selected topics to topic objects with name and selected properties", async () => {
+  const { result } = renderHook(() => useTRUTopics(), { wrapper });
+
+  // Setup: Select TRU and RSU
+  await act(async () => {
+    await result.current.selectTRU('TRU-001');
+  });
+
+  await act(async () => {
+    result.current.selectRSUs([{ ip: '192.168.1.100', port: 1516 }]);
+  });
+
+  // Select topics
+  await act(async () => {
+    result.current.toggleTopic('192.168.1.100:1516', 'bsm');
+    result.current.toggleTopic('192.168.1.100:1516', 'tim');
+  });
+
+  // Save configuration
+  await act(async () => {
+    await result.current.saveTopicConfiguration();
+  });
+
+  // Verify the API was called with correctly mapped topics
+  expect(rsuService.default.confirmDataSelection).toHaveBeenCalledWith(
+    expect.objectContaining({
+      unitId: 'TRU-001',
+      rsuTopics: [
+        {
+          rsu: { ip: '192.168.1.100', port: 1516 },
+          topics: [
+            { name: 'bsm', selected: true },
+            { name: 'tim', selected: true }
+          ]
+        }
+      ]
+    })
+  );
+});
+
+test("saveTopicConfiguration should handle single RSU with single topic", async () => {
+  const { result } = renderHook(() => useTRUTopics(), { wrapper });
+
+  await act(async () => {
+    await result.current.selectTRU('TRU-001');
+    result.current.selectRSUs([{ ip: '192.168.1.100', port: 1516 }]);
+    result.current.toggleTopic('192.168.1.100:1516', 'bsm');
+  });
+
+  await act(async () => {
+    await result.current.saveTopicConfiguration();
+  });
+
+  expect(rsuService.default.confirmDataSelection).toHaveBeenCalledWith(
+    expect.objectContaining({
+      rsuTopics: [
+        {
+          rsu: { ip: '192.168.1.100', port: 1516 },
+          topics: [{ name: 'bsm', selected: true }]
+        }
+      ]
+    })
+  );
+});
+
+test("saveTopicConfiguration should handle multiple RSUs with different topic selections", async () => {
+  const { result } = renderHook(() => useTRUTopics(), { wrapper });
+
+  await act(async () => {
+    await result.current.selectTRU('TRU-001');
+    result.current.selectRSUs([
+      { ip: '192.168.1.100', port: 1516 },
+      { ip: '192.168.1.101', port: 1517 }
+    ]);
+    result.current.toggleTopic('192.168.1.100:1516', 'bsm');
+    result.current.toggleTopic('192.168.1.100:1516', 'tim');
+    result.current.toggleTopic('192.168.1.101:1517', 'spat');
+  });
+
+  await act(async () => {
+    await result.current.saveTopicConfiguration();
+  });
+
+  expect(rsuService.default.confirmDataSelection).toHaveBeenCalledWith(
+    expect.objectContaining({
+      unitId: 'TRU-001',
+      rsuTopics: [
+        {
+          rsu: { ip: '192.168.1.100', port: 1516 },
+          topics: [
+            { name: 'bsm', selected: true },
+            { name: 'tim', selected: true }
+          ]
+        },
+        {
+          rsu: { ip: '192.168.1.101', port: 1517 },
+          topics: [{ name: 'spat', selected: true }]
+        }
+      ]
+    })
+  );
+});
+
+test("saveTopicConfiguration should handle RSU with no selected topics (empty array)", async () => {
+  const { result } = renderHook(() => useTRUTopics(), { wrapper });
+
+  await act(async () => {
+    await result.current.selectTRU('TRU-001');
+    result.current.selectRSUs([{ ip: '192.168.1.100', port: 1516 }]);
+    // Don't select any topics
+  });
+
+  await act(async () => {
+    await result.current.saveTopicConfiguration();
+  });
+
+  expect(rsuService.default.confirmDataSelection).toHaveBeenCalledWith(
+    expect.objectContaining({
+      rsuTopics: [
+        {
+          rsu: { ip: '192.168.1.100', port: 1516 },
+          topics: [] // Empty topics array
+        }
+      ]
+    })
+  );
+});
+
+test("saveTopicConfiguration should include timestamp in TRUTopicsMessage", async () => {
+  const { result } = renderHook(() => useTRUTopics(), { wrapper });
+
+  const beforeTimestamp = Date.now();
+
+  await act(async () => {
+    await result.current.selectTRU('TRU-001');
+    result.current.selectRSUs([{ ip: '192.168.1.100', port: 1516 }]);
+    result.current.toggleTopic('192.168.1.100:1516', 'bsm');
+  });
+
+  await act(async () => {
+    await result.current.saveTopicConfiguration();
+  });
+
+  const afterTimestamp = Date.now();
+
+  expect(rsuService.default.confirmDataSelection).toHaveBeenCalledWith(
+    expect.objectContaining({
+      unitId: 'TRU-001',
+      timestamp: expect.any(Number)
+    })
+  );
+
+  const callArg = rsuService.default.confirmDataSelection.mock.calls[0][0];
+  expect(callArg.timestamp).toBeGreaterThanOrEqual(beforeTimestamp);
+  expect(callArg.timestamp).toBeLessThanOrEqual(afterTimestamp);
+});
+
+test("saveTopicConfiguration should map topic names correctly preserving order", async () => {
+  const { result } = renderHook(() => useTRUTopics(), { wrapper });
+
+  await act(async () => {
+    await result.current.selectTRU('TRU-001');
+    result.current.selectRSUs([{ ip: '192.168.1.100', port: 1516 }]);
+    // Add topics in specific order
+    result.current.toggleTopic('192.168.1.100:1516', 'bsm');
+    result.current.toggleTopic('192.168.1.100:1516', 'tim');
+    result.current.toggleTopic('192.168.1.100:1516', 'spat');
+    result.current.toggleTopic('192.168.1.100:1516', 'map');
+  });
+
+  await act(async () => {
+    await result.current.saveTopicConfiguration();
+  });
+
+  const callArg = rsuService.default.confirmDataSelection.mock.calls[0][0];
+  const topics = callArg.rsuTopics[0].topics;
+  
+  // Verify all topics have correct structure
+  expect(topics).toHaveLength(4);
+  topics.forEach(topic => {
+    expect(topic).toHaveProperty('name');
+    expect(topic).toHaveProperty('selected');
+    expect(topic.selected).toBe(true);
+    expect(typeof topic.name).toBe('string');
+  });
+});
