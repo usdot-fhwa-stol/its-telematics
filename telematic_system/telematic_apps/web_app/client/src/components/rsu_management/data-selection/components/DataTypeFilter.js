@@ -85,7 +85,7 @@ const DataTypeFilter = ({ value, onChange, disabled, availableDataTypes = [] }) 
           </MenuItem>
           {availableDataTypes.map((rsuGroup) => [
             <ListSubheader key={`header-${rsuGroup.rsuKey}`}>
-              {rsuGroup.rsuKey}
+              {rsuGroup.rsuKey.split(':')[0]}
             </ListSubheader>,
             ...rsuGroup.topics.map((topic) => (
               <MenuItem key={`${rsuGroup.rsuKey}-${topic}`} value={`${rsuGroup.rsuKey}-${topic}`} sx={{ pl: 4 }}>

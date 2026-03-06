@@ -93,8 +93,7 @@ const RSUSelector = ({ rsuList, selectedRSUs = [], onSelect, disabled }) => {
                   />
                 </ListItemIcon>
                 <ListItemText
-                  primary={rsuKey}
-                  secondary={`IP: ${rsu.ip} | Port: ${rsu.port}`}
+                  primary={rsu.ip}
                 />
               </ListItem>
             );

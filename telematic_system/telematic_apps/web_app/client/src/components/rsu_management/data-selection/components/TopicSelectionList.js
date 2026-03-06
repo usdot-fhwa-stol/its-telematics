@@ -154,7 +154,7 @@ const TopicSelectionList = ({
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                   <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
                     <Typography variant="subtitle2">
-                      {rsuGroup.rsuKey}
+                      {rsuGroup.rsuKey.split(':')[0]}
                     </Typography>
                     <Chip
                       label={`${selected}/${total}`}

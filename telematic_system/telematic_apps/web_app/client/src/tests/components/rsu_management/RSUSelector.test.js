@@ -31,9 +31,9 @@ test("RSUSelector should render RSU list", () => {
     />
   );
 
-  expect(screen.getByText("192.168.1.1:8080")).toBeInTheDocument();
-  expect(screen.getByText("192.168.1.2:8081")).toBeInTheDocument();
-  expect(screen.getByText("192.168.1.3:8082")).toBeInTheDocument();
+  expect(screen.getByText("192.168.1.1")).toBeInTheDocument();
+  expect(screen.getByText("192.168.1.2")).toBeInTheDocument();
+  expect(screen.getByText("192.168.1.3")).toBeInTheDocument();
 });
 
 test("RSUSelector should show selection count", () => {
@@ -168,7 +168,7 @@ test("RSUSelector should not render RSU list when disabled", () => {
     />
   );
 
-  expect(screen.queryByText("192.168.1.1:8080")).not.toBeInTheDocument();
+  expect(screen.queryByText("192.168.1.1")).not.toBeInTheDocument();
 });
 
 test("RSUSelector should display empty message when no RSUs", () => {
@@ -197,7 +197,7 @@ test("RSUSelector should show 0 of 0 when empty list", () => {
   expect(screen.getByText("0 of 0 selected")).toBeInTheDocument();
 });
 
-test("RSUSelector should render IP and port in secondary text", () => {
+test("RSUSelector should render IP addresses", () => {
   render(
     <RSUSelector
       rsuList={mockRSUList}
@@ -207,8 +207,8 @@ test("RSUSelector should render IP and port in secondary text", () => {
     />
   );
 
-  expect(screen.getByText("IP: 192.168.1.1 | Port: 8080")).toBeInTheDocument();
-  expect(screen.getByText("IP: 192.168.1.2 | Port: 8081")).toBeInTheDocument();
+  expect(screen.getByText("192.168.1.1")).toBeInTheDocument();
+  expect(screen.getByText("192.168.1.2")).toBeInTheDocument();
 });
 
 test("RSUSelector should handle empty selectedRSUs prop", () => {
