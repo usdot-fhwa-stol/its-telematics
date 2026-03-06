@@ -14,7 +14,7 @@
  * the License.
  */
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import rsuService from '../api/api-rsu';
 import { useTRUStatus } from './tru-status-context';
 
@@ -35,6 +35,7 @@ export const TRUTopicsProvider = ({ children }) => {
   const [filteredTopicsByRSU, setFilteredTopicsByRSU] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const saveInProgressRef = useRef(false);
 
   // Initialize truTopics from truStatuses
   useEffect(() => {
@@ -82,6 +83,13 @@ export const TRUTopicsProvider = ({ children }) => {
    * Update TRU topics configuration
    */
   const updateTRUTopics = useCallback(async (unitId, topicsData) => {
+    // Prevent concurrent save operations
+    if (saveInProgressRef.current) {
+      console.warn('Save already in progress, ignoring duplicate request');
+      throw new Error('Save operation already in progress');
+    }
+
+    saveInProgressRef.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -112,8 +120,9 @@ export const TRUTopicsProvider = ({ children }) => {
       throw err;
     } finally {
       setLoading(false);
+      saveInProgressRef.current = false;
     }
-  }, []);
+  }, [fetchTRUTopicsById]);
 
   /**
    * Select a TRU for topic configuration

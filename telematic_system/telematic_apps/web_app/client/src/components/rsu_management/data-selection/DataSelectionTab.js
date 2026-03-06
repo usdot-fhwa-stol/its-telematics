@@ -90,11 +90,14 @@ const DataSelectionTab = () => {
         severity: 'success',
       });
     } catch (err) {
-      setSnackbar({
-        open: true,
-        message: `Failed to save: ${err.message}`,
-        severity: 'error',
-      });
+      // Don't show error if it's just a duplicate save attempt
+      if (err.message !== 'Save operation already in progress') {
+        setSnackbar({
+          open: true,
+          message: `Failed to save: ${err.message}`,
+          severity: 'error',
+        });
+      }
     }
   };
 

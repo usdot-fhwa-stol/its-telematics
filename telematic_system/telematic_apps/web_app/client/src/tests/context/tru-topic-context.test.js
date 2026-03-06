@@ -459,3 +459,74 @@ test("saveTopicConfiguration should map topic names correctly preserving order",
     expect(typeof topic.name).toBe('string');
   });
 });
+
+test("saveTopicConfiguration should prevent concurrent save operations", async () => {
+  const { result } = renderHook(() => useTRUTopics(), { wrapper });
+
+  // Setup
+  await act(async () => {
+    await result.current.selectTRU('TRU-001');
+    result.current.selectRSUs([{ ip: '192.168.1.100', port: 1516 }]);
+    result.current.toggleTopic('192.168.1.100:1516', 'bsm');
+  });
+
+  // Mock a slow API call
+  rsuService.default.confirmDataSelection.mockImplementation(() => 
+    new Promise(resolve => setTimeout(() => resolve({}), 100))
+  );
+
+  // Start first save
+  const firstSave = act(async () => {
+    await result.current.saveTopicConfiguration();
+  });
+
+  // Try to start second save immediately (should be blocked)
+  await expect(act(async () => {
+    await result.current.saveTopicConfiguration();
+  })).rejects.toThrow('Save operation already in progress');
+
+  // Wait for first save to complete
+  await firstSave;
+
+  // After first save completes, second save should work
+  await act(async () => {
+    await result.current.saveTopicConfiguration();
+  });
+
+  // Should have been called twice (first save + retry after completion)
+  expect(rsuService.default.confirmDataSelection).toHaveBeenCalledTimes(2);
+});
+
+test("saveTopicConfiguration should reset save lock after error", async () => {
+  const { result } = renderHook(() => useTRUTopics(), { wrapper });
+
+  // Setup
+  await act(async () => {
+    await result.current.selectTRU('TRU-001');
+    result.current.selectRSUs([{ ip: '192.168.1.100', port: 1516 }]);
+    result.current.toggleTopic('192.168.1.100:1516', 'bsm');
+  });
+
+  // Mock API to fail
+  rsuService.default.confirmDataSelection.mockRejectedValueOnce(new Error('Network error'));
+
+  // First save fails
+  try {
+    await act(async () => {
+      await result.current.saveTopicConfiguration();
+    });
+  } catch (err) {
+    // Expected to fail
+    expect(err.message).toBe('Network error');
+  }
+
+  // Reset mock to succeed
+  rsuService.default.confirmDataSelection.mockResolvedValueOnce({});
+
+  // Second save should work (lock should be released after error)
+  await act(async () => {
+    await result.current.saveTopicConfiguration();
+  });
+
+  expect(rsuService.default.confirmDataSelection).toHaveBeenCalledTimes(2);
+});
