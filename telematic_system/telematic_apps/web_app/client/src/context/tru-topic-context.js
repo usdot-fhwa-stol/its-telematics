@@ -55,21 +55,29 @@ export const TRUTopicsProvider = ({ children }) => {
   }, [truStatuses]);
 
   /**
+   * Internal helper to fetch topics without managing loading state
+   * Used when already within another operation that manages loading
+   * This prevents nested loading state management and double API calls
+   */
+  const fetchTopicsInternal = useCallback(async (unitId) => {
+    const truTopicsMessage = {
+      unitId: unitId,
+      rsuTopics: [], // Empty for fetching available topics
+      timestamp: Date.now()
+    };
+    
+    const result = await rsuService.getAvailableTopics(truTopicsMessage);
+    return result;
+  }, []);
+
+  /**
    * Fetch TRU topics by unit ID
    */
   const fetchTRUTopicsById = useCallback(async (unitId) => {
     setLoading(true);
     setError(null);
     try {
-      // Call API to get available topics for this TRU
-      const truTopicsMessage = {
-        unitId: unitId,
-        rsuTopics: [], // Empty for fetching available topics
-        timestamp: Date.now()
-      };
-      
-      const result = await rsuService.getAvailableTopics(truTopicsMessage);
-      return result;
+      return await fetchTopicsInternal(unitId);
     } catch (err) {
       setError(err.message || `Failed to fetch TRU topics for ${unitId}`);
       console.error(`Error fetching TRU topics for ${unitId}:`, err);
@@ -77,7 +85,7 @@ export const TRUTopicsProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchTopicsInternal]);
 
   /**
    * Update TRU topics configuration
@@ -97,7 +105,8 @@ export const TRUTopicsProvider = ({ children }) => {
       const result = await rsuService.confirmDataSelection(topicsData);
       
       // Refresh the topics from backend to get the latest selection state
-      const updatedTopics = await fetchTRUTopicsById(unitId);
+      // Use internal fetch to avoid nested loading state management
+      const updatedTopics = await fetchTopicsInternal(unitId);
       
       // Update truTopics context with the fresh data
       if (updatedTopics && updatedTopics.rsuTopics) {
@@ -122,7 +131,7 @@ export const TRUTopicsProvider = ({ children }) => {
       setLoading(false);
       saveInProgressRef.current = false;
     }
-  }, [fetchTRUTopicsById]);
+  }, [fetchTopicsInternal]);
 
   /**
    * Select a TRU for topic configuration

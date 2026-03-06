@@ -530,3 +530,36 @@ test("saveTopicConfiguration should reset save lock after error", async () => {
 
   expect(rsuService.default.confirmDataSelection).toHaveBeenCalledTimes(2);
 });
+
+test("saveTopicConfiguration should only fetch available topics once after save", async () => {
+  const { result } = renderHook(() => useTRUTopics(), { wrapper });
+
+  // Setup
+  await act(async () => {
+    await result.current.selectTRU('TRU-001');
+    result.current.selectRSUs([{ ip: '192.168.1.100', port: 1516 }]);
+    result.current.toggleTopic('192.168.1.100:1516', 'bsm');
+  });
+
+  // Reset mock call counts
+  jest.clearAllMocks();
+
+  // Save configuration
+  await act(async () => {
+    await result.current.saveTopicConfiguration();
+  });
+
+  // Should call confirmDataSelection once
+  expect(rsuService.default.confirmDataSelection).toHaveBeenCalledTimes(1);
+  
+  // Should call getAvailableTopics once (to refresh after save)
+  expect(rsuService.default.getAvailableTopics).toHaveBeenCalledTimes(1);
+  
+  // The getAvailableTopics call should be with empty rsuTopics to fetch all available
+  expect(rsuService.default.getAvailableTopics).toHaveBeenCalledWith(
+    expect.objectContaining({
+      unitId: 'TRU-001',
+      rsuTopics: []
+    })
+  );
+});
