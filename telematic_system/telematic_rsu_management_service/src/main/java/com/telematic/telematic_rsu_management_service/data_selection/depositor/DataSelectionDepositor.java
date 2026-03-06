@@ -23,11 +23,9 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
-import com.telematic.telematic_rsu_management_service.data_selection.dto.RSUTopicsMessage;
 import com.telematic.telematic_rsu_management_service.data_selection.dto.TRUTopicsMessage;
 import com.telematic.telematic_rsu_management_service.model.DataSelectionRuleConfig;
 import com.telematic.telematic_rsu_management_service.model.RSUConfigStatus;
-import com.telematic.telematic_rsu_management_service.model.RSUEndpoint;
 import com.telematic.telematic_rsu_management_service.model.TRUConfigStatus;
 import com.telematic.telematic_rsu_management_service.repository.mysql.TRUConfigStatusRepository;
 
@@ -57,9 +55,9 @@ public class DataSelectionDepositor {
                     truTopicMessage.getUnitId());
             return false;
         }
-        Map<RSUEndpoint, List<String>> topicsByEndpoint = truTopicMessage.getRsuTopics().stream()
+        Map<String, List<String>> topicsByIp = truTopicMessage.getRsuTopics().stream()
             .collect(Collectors.toMap(
-                RSUTopicsMessage::getRsu,
+                msg -> msg.getRsu().getIp(),
                 msg -> msg.getTopics().stream()
                     .filter(topic -> topic.getSelected())  // Only include selected topics
                     .map(topic -> topic.getName())
@@ -71,8 +69,10 @@ public class DataSelectionDepositor {
                 }
             ));
         for (RSUConfigStatus rsuConfig : rsuConfigs) {
-            List<String> topics = topicsByEndpoint.get(rsuConfig.getRsu());
+            // Match by IP address only
+            List<String> topics = topicsByIp.get(rsuConfig.getRsu().getIp());
             if (topics == null || topics.isEmpty()) {
+                log.debug("No selected topics found for RSU with IP '{}'", rsuConfig.getRsu().getIp());
                 continue;
             }
             
