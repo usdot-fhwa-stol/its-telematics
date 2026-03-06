@@ -25,6 +25,7 @@ import {
   Step,
   StepLabel,
   Stepper,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { useState } from 'react';
@@ -79,9 +80,13 @@ const DataSelectionTab = () => {
   const handleSaveConfiguration = async () => {
     try {
       await saveTopicConfiguration();
+      // Check if any topics are selected
+      const hasSelectedTopics = summary.topicCount > 0;
       setSnackbar({
         open: true,
-        message: 'Topic configuration saved successfully!',
+        message: hasSelectedTopics 
+          ? 'Topic configuration saved successfully!' 
+          : 'Broadcast stopped - no topics selected',
         severity: 'success',
       });
     } catch (err) {
@@ -211,13 +216,20 @@ const DataSelectionTab = () => {
         >
           Reset Selection
         </Button>
-        <Button
-          startIcon={<SaveIcon />}
-          onClick={handleSaveConfiguration}
-          disabled={selectedRSUs.length === 0 || summary.topicCount === 0 || loading}
+        <Tooltip 
+          title={summary.topicCount === 0 ? "Save with no topics to stop broadcast" : "Save topic configuration"}
+          arrow
         >
-          {loading ? 'Saving...' : 'Save Configuration'}
-        </Button>
+          <span>
+            <Button
+              startIcon={<SaveIcon />}
+              onClick={handleSaveConfiguration}
+              disabled={selectedRSUs.length === 0 || loading}
+            >
+              {loading ? 'Saving...' : 'Save Configuration'}
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
 
       {/* Snackbar Notifications */}

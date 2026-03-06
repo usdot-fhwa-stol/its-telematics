@@ -13,8 +13,8 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-import { DataSelectionRepository } from './ports/data_selection.repository';
 import { TRUTopicsMessage } from '../../models/rsu_management/tru_topics_message.model';
+import { DataSelectionRepository } from './ports/data_selection.repository';
 
 export class ConfirmDataSelection {
     private readonly dataSelectionRepository: DataSelectionRepository;
@@ -34,11 +34,20 @@ export class ConfirmDataSelection {
             throw new Error('Unit ID is required');
         }
 
-        if (!truTopicsMessage.rsuTopics || truTopicsMessage.rsuTopics.length === 0) {
-            throw new Error('At least one RSU topic configuration is required');
+        // Allow empty rsuTopics for stop broadcast functionality
+        if (!truTopicsMessage.rsuTopics) {
+            truTopicsMessage.rsuTopics = [];
         }
 
-        console.log(`ConfirmDataSelection: Confirming data selection for unit ${truTopicsMessage.unitId}`);
+        const hasSelectedTopics = truTopicsMessage.rsuTopics.some(rsu => 
+            rsu.topics?.some(topic => topic.selected)
+        );
+
+        if (hasSelectedTopics) {
+            console.log(`ConfirmDataSelection: Confirming data selection for unit ${truTopicsMessage.unitId}`);
+        } else {
+            console.log(`ConfirmDataSelection: Stopping broadcast for unit ${truTopicsMessage.unitId} - no topics selected`);
+        }
         
         const result = await this.dataSelectionRepository.confirmDataSelection(truTopicsMessage);
         
