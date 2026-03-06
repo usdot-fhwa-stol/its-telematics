@@ -338,16 +338,9 @@ export const TRUTopicsProvider = ({ children }) => {
       const rsuKey = `${rsu.ip}:${rsu.port}`;
       const selectedForRSU = selectedTopics[rsuKey] || [];
       
-      // Get available topics for this RSU from truTopics
-      const truData = truTopics.find(t => t.unitId === selectedTRU);
-      const rsuData = truData?.rsuTopics?.find(
-        rt => rt.rsu.ip === rsu.ip && rt.rsu.port === rsu.port
-      );
-      
-      // Create topics array with selected status
-      const topics = (rsuData?.topics || []).map(topic => ({
-        name: topic.name,
-        selected: selectedForRSU.includes(topic.name)
+      const topics = selectedForRSU.map(topicName => ({
+        name: topicName,
+        selected: true
       }));
 
       return {
