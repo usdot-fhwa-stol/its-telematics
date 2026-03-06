@@ -268,7 +268,7 @@ jobs:
           cat <<EOF > /tmp/sonar-scanner.properties
           sonar.host.url=https://sonarcloud.io
           sonar.coverage.jacoco.xmlReportPaths=$GITHUB_WORKSPACE/telematic_system/telematic_rsu_management_service/target/site/jacoco/jacoco.xml
-          sonar.exclusions=**/__init__.py,**/*test*.py,**/test/**,**/scripts/**,**/coverage/**
+          sonar.exclusions=**/__init__.py,**/*test*.py,**/test/**,**/scripts/**,**/coverage/**,**/tests/**,**/scripts/**
           sonar.coverage.exclusions=**/__init__.py,**/*test*.py,**/test/**,setup.py
           sonar.java.binaries=$GITHUB_WORKSPACE/telematic_system/telematic_rsu_management_service/target/
           sonar.javascript.lcov.reportPaths=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/coverage/lcov.info
@@ -300,11 +300,9 @@ jobs:
           web_app_client.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/client
           web_app_client.sonar.sources=src
           web_app_client.sonar.tests=src/tests
-          web_app_client.sonar.exclusions=src/tests/**
           web_app_server.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/server
           web_app_server.sonar.sources=.
           web_app_server.sonar.tests=tests
-          web_app_server.sonar.exclusions=tests/**,scripts/**
           EOF
           cp /tmp/sonar-scanner.properties $GITHUB_WORKSPACE/sonar-project.properties
       - name: Run SonarScanner
