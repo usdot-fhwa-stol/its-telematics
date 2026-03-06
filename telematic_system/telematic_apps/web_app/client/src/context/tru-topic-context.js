@@ -15,6 +15,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import rsuService from '../api/api-rsu';
 import { useTRUStatus } from './tru-status-context';
 
@@ -115,20 +116,22 @@ export const TRUTopicsProvider = ({ children }) => {
       const updatedTopics = await fetchTopicsInternal(unitId);
       
       // Update truTopics context with the fresh data
+      // Use flushSync to ensure this state update completes before we update selectedTopics
       if (updatedTopics && updatedTopics.rsuTopics) {
-        setTruTopics(prev => {
-          const updated = [...prev];
-          const index = updated.findIndex(t => t.unitId === unitId);
-          if (index !== -1) {
-            updated[index] = updatedTopics;
-          } else {
-            updated.push(updatedTopics);
-          }
-          return updated;
+        flushSync(() => {
+          setTruTopics(prev => {
+            const updated = [...prev];
+            const index = updated.findIndex(t => t.unitId === unitId);
+            if (index !== -1) {
+              updated[index] = updatedTopics;
+            } else {
+              updated.push(updatedTopics);
+            }
+            return updated;
+          });
         });
         
         // Re-sync selectedTopics with the fresh data from backend
-        // This ensures UI reflects the backend's selected state
         if (currentSelectedRSUs.length > 0 && currentSelectedTRU === unitId) {
           const topicsByRSU = {};
           updatedTopics.rsuTopics.forEach(rsuTopic => {

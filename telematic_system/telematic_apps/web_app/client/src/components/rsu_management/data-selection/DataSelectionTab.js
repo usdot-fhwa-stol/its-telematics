@@ -64,6 +64,7 @@ const DataSelectionTab = () => {
   } = useTRUTopics();
 
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [saveCooldown, setSaveCooldown] = useState(false);
 
   const summary = getSelectionSummary();
 
@@ -89,6 +90,12 @@ const DataSelectionTab = () => {
           : 'Broadcast stopped - no topics selected',
         severity: 'success',
       });
+      
+      // Enable cooldown period to prevent rapid-fire saves
+      setSaveCooldown(true);
+      setTimeout(() => {
+        setSaveCooldown(false);
+      }, 1500); // 1.5 second cooldown
     } catch (err) {
       // Don't show error if it's just a duplicate save attempt
       if (err.message !== 'Save operation already in progress') {
@@ -220,16 +227,22 @@ const DataSelectionTab = () => {
           Reset Selection
         </Button>
         <Tooltip 
-          title={summary.topicCount === 0 ? "Save with no topics to stop broadcast" : "Save topic configuration"}
+          title={
+            saveCooldown 
+              ? "Please wait before saving again" 
+              : summary.topicCount === 0 
+                ? "Save with no topics to stop broadcast" 
+                : "Save topic configuration"
+          }
           arrow
         >
           <span>
             <Button
               startIcon={<SaveIcon />}
               onClick={handleSaveConfiguration}
-              disabled={selectedRSUs.length === 0 || loading}
+              disabled={selectedRSUs.length === 0 || loading || saveCooldown}
             >
-              {loading ? 'Saving...' : 'Save Configuration'}
+              {loading ? 'Saving...' : saveCooldown ? 'Saved ✓' : 'Save Configuration'}
             </Button>
           </span>
         </Tooltip>
