@@ -531,7 +531,7 @@ test("saveTopicConfiguration should reset save lock after error", async () => {
   expect(rsuService.default.confirmDataSelection).toHaveBeenCalledTimes(2);
 });
 
-test("saveTopicConfiguration should fetch available topics after save to get complete RSU list with correct selections", async () => {
+test("saveTopicConfiguration should update truTopics locally without fetching from backend", async () => {
   const { result } = renderHook(() => useTRUTopics(), { wrapper });
 
   // Setup
@@ -541,6 +541,10 @@ test("saveTopicConfiguration should fetch available topics after save to get com
     result.current.toggleTopic('192.168.1.100:1516', 'bsm');
   });
 
+  // Store initial selection state
+  const selectedRSUsBeforeSave = result.current.selectedRSUs;
+  const selectedTopicsBeforeSave = result.current.selectedTopics;
+
   // Reset mock call counts
   jest.clearAllMocks();
 
@@ -549,17 +553,20 @@ test("saveTopicConfiguration should fetch available topics after save to get com
     await result.current.saveTopicConfiguration();
   });
 
-  // Should call confirmDataSelection once
+  // Should call confirmDataSelection once to save to backend
   expect(rsuService.default.confirmDataSelection).toHaveBeenCalledTimes(1);
   
-  // Should call getAvailableTopics once to refresh all RSUs with correct selected flags
-  expect(rsuService.default.getAvailableTopics).toHaveBeenCalledTimes(1);
+  // Should NOT call getAvailableTopics - we don't fetch after save anymore
+  expect(rsuService.default.getAvailableTopics).not.toHaveBeenCalled();
   
-  // The getAvailableTopics call should be with empty rsuTopics to fetch all available RSUs
-  expect(rsuService.default.getAvailableTopics).toHaveBeenCalledWith(
-    expect.objectContaining({
-      unitId: 'TRU-001',
-      rsuTopics: []
-    })
-  );
+  // Selections should remain unchanged after save
+  expect(result.current.selectedRSUs).toEqual(selectedRSUsBeforeSave);
+  expect(result.current.selectedTopics).toEqual(selectedTopicsBeforeSave);
+  
+  // truTopics should be updated locally with the saved data
+  const savedTRU = result.current.truTopics.find(t => t.unitId === 'TRU-001');
+  expect(savedTRU).toBeDefined();
+  expect(savedTRU.rsuTopics).toHaveLength(1);
+  expect(savedTRU.rsuTopics[0].rsu).toEqual({ ip: '192.168.1.100', port: 1516 });
+  expect(savedTRU.rsuTopics[0].topics).toEqual([{ name: 'bsm', selected: true }]);
 });

@@ -102,52 +102,23 @@ export const TRUTopicsProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     
-    // Preserve current selections to re-sync after refresh
-    const currentSelectedRSUs = selectedRSUs;
-    const currentSelectedTRU = selectedTRU;
-    
     try {
-      // Call API to confirm data selection
+      // Call API to confirm data selection (save to backend)
       const result = await rsuService.confirmDataSelection(topicsData);
       
-      // Refresh topics from backend to get the complete list of RSUs and topics
-      // The backend returns all available topics with correct selected flags
-      // Use internal fetch to avoid nested loading state management
-      const updatedTopics = await fetchTopicsInternal(unitId);
-      
-      // Update truTopics context with the fresh data
-      // Calculate selectedTopics from the fresh backend data
-      // Use SINGLE flushSync to update both states atomically, preventing race conditions
-      if (updatedTopics && updatedTopics.rsuTopics) {
-        // Calculate new selectedTopics before flushSync
-        let newSelectedTopics = {};
-        if (currentSelectedRSUs.length > 0 && currentSelectedTRU === unitId) {
-          updatedTopics.rsuTopics.forEach(rsuTopic => {
-            const rsuKey = `${rsuTopic.rsu.ip}:${rsuTopic.rsu.port}`;
-            // Only include topics for currently selected RSUs (match by IP only)
-            if (currentSelectedRSUs.some(ep => ep.ip === rsuTopic.rsu.ip)) {
-              newSelectedTopics[rsuKey] = rsuTopic.topics
-                .filter(t => t.selected)
-                .map(t => t.name);
-            }
-          });
+      // Update truTopics context locally with the saved data
+      // No need to fetch from backend - just use what we saved
+      // This keeps the UI selections intact and avoids race conditions
+      setTruTopics(prev => {
+        const updated = [...prev];
+        const index = updated.findIndex(t => t.unitId === unitId);
+        if (index !== -1) {
+          updated[index] = topicsData;
+        } else {
+          updated.push(topicsData);
         }
-        
-        // Update both states atomically in a single flushSync block
-        flushSync(() => {
-          setTruTopics(prev => {
-            const updated = [...prev];
-            const index = updated.findIndex(t => t.unitId === unitId);
-            if (index !== -1) {
-              updated[index] = updatedTopics;
-            } else {
-              updated.push(updatedTopics);
-            }
-            return updated;
-          });
-          setSelectedTopics(newSelectedTopics);
-        });
-      }
+        return updated;
+      });
       
       return { success: true, message: 'Topics configuration saved successfully', data: result };
     } catch (err) {
@@ -158,7 +129,7 @@ export const TRUTopicsProvider = ({ children }) => {
       setLoading(false);
       saveInProgressRef.current = false;
     }
-  }, [fetchTopicsInternal, selectedRSUs, selectedTRU]);
+  }, []);
 
   /**
    * Select a TRU for topic configuration
