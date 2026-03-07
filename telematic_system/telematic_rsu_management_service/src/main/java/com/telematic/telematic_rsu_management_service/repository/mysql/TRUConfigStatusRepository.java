@@ -29,20 +29,22 @@ public interface TRUConfigStatusRepository extends JpaRepository<TRUConfigStatus
 	TRUConfigStatus findByUnitId(@Param("unitId") String unitId);
 
 	@EntityGraph(attributePaths = {
-		"unitConfig",
-		"pluginConfigStatus",
-		"rsuConfigs",
-		"rsuConfigs.rsu"
+			"unitConfig",
+			"pluginConfigStatus",
+			"rsuConfigs",
+			"rsuConfigs.rsu"
 	})
 	@Query("select t from TRUConfigStatus t")
 	List<TRUConfigStatus> findAllWithAssociations();
 
 	@EntityGraph(attributePaths = {
-		"unitConfig",
-		"pluginConfigStatus",
-		"rsuConfigs",
-		"rsuConfigs.rsu"
+			"unitConfig",
+			"pluginConfigStatus",
+			"rsuConfigs",
+			"rsuConfigs.rsu"
 	})
 	@Query("select t from TRUConfigStatus t where t.unitConfig.unitId = :unitId")
 	TRUConfigStatus findByUnitIdWithAssociations(@Param("unitId") String unitId);
+
+	boolean existsByRsuConfigs_Rsu_Ip(String ip);
 }
