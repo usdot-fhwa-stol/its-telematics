@@ -263,7 +263,6 @@ jobs:
           find "$GITHUB_WORKSPACE" -name "lcov*.info"
           ls $GITHUB_WORKSPACE/telematic_system/telematic_rsu_management_service/target
           echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
-          ls /home/runner/work/cda-telematics/cda-telematics/telematic_system/telematic_rsu_management_service/telematic_system/telematic_rsu_management_service/target
           pwd
       - name: Run SonarScanner
         uses: usdot-fhwa-stol/actions/sonar-scanner@main
