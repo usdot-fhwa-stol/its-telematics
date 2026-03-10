@@ -71,6 +71,7 @@ public class TRUConfigMessageDepositor {
                             rsuConfigStatus.setEvent(rsuConfigItemMessage.getEvent());
                             rsuConfigStatus.setTimestamp(Instant.now().toEpochMilli());
                             rsuConfigStatus.setRsu(rsuConfigItemMessage.getRsu());
+                            rsuConfigStatus.setStatus(null);
                             truConfigStatusRepository.save(existingTruConfig);
                             log.info("Updated RSU Config IP: {} port: {} for TRU of Unit ID: {}, TRU ID: {}",
                                     rsuConfigStatus.getRsu().getIp(),
