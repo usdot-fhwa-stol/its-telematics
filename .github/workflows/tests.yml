@@ -268,3 +268,4 @@ jobs:
         uses: usdot-fhwa-stol/actions/sonar-scanner@main
         with:
           sonar-token: ${{ secrets.SONAR_TOKEN }}
+          working-dir: ${{ github.workspace }}
