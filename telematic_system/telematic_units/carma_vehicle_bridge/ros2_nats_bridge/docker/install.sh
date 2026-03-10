@@ -15,4 +15,4 @@
 #  the License.
 
 source /opt/ros/foxy/setup.bash
-colcon build --catkin-skip-building-tests --cmake-args -DBUILD_TESTING=OFF
+colcon build
