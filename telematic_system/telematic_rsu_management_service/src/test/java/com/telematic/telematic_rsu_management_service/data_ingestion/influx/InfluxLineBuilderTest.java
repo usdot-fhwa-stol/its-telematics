@@ -159,12 +159,12 @@ class InfluxLineBuilderTest {
             .thenAnswer(invocation -> {
                 LineRecordContext ctx = invocation.getArgument(0);
                 assertEquals("array_event", ctx.getMeasurement());
-                assertTrue(ctx.getFields().containsKey("payload.values[0]"));
-                assertTrue(ctx.getFields().containsKey("payload.values[1]"));
-                assertTrue(ctx.getFields().containsKey("payload.values[2]"));
-                assertTrue(ctx.getFields().containsKey("payload.names[0]"));
-                assertTrue(ctx.getFields().containsKey("payload.names[1]"));
-                assertTrue(ctx.getFields().containsKey("payload.names[2]"));
+                assertTrue(ctx.getFields().containsKey("payload.values.0"));
+                assertTrue(ctx.getFields().containsKey("payload.values.1"));
+                assertTrue(ctx.getFields().containsKey("payload.values.2"));
+                assertTrue(ctx.getFields().containsKey("payload.names.0"));
+                assertTrue(ctx.getFields().containsKey("payload.names.1"));
+                assertTrue(ctx.getFields().containsKey("payload.names.2"));
                 return "mocked_line_with_arrays";
             });
 
@@ -321,10 +321,10 @@ class InfluxLineBuilderTest {
             .thenAnswer(invocation -> {
                 LineRecordContext ctx = invocation.getArgument(0);
                 assertTrue(ctx.getFields().containsKey("payload.level1.level2.level3.deepValue"));
-                assertTrue(ctx.getFields().containsKey("payload.mixedArray[0].id"));
-                assertTrue(ctx.getFields().containsKey("payload.mixedArray[0].name"));
-                assertTrue(ctx.getFields().containsKey("payload.mixedArray[1].id"));
-                assertTrue(ctx.getFields().containsKey("payload.mixedArray[1].name"));
+                assertTrue(ctx.getFields().containsKey("payload.mixedArray.0.id"));
+                assertTrue(ctx.getFields().containsKey("payload.mixedArray.0.name"));
+                assertTrue(ctx.getFields().containsKey("payload.mixedArray.1.id"));
+                assertTrue(ctx.getFields().containsKey("payload.mixedArray.1.name"));
                 return "complex_line";
             });
 
@@ -333,6 +333,177 @@ class InfluxLineBuilderTest {
 
         // Then
         assertEquals("complex_line", result);
+        verify(pipelineLineBuilder, times(1)).build(any(LineRecordContext.class));
+    }
+
+    @Test
+    void testBuildLine_withBsmPayload() throws Exception {
+        // Given – trimmed J2735 BSM structure matching real RSU output
+        String json = """
+            {
+                "metadata": {
+                    "event": "IntegrationTest2",
+                    "unitId": "Unit001",
+                    "rsu": {
+                        "ip": "192.168.55.73",
+                        "port": "161"
+                    },
+                    "topicName": "J2735_BSM_MessageReceiver",
+                    "timestamp": 1773256928799
+                },
+                "payload": {
+                    "channel": -1,
+                    "encoding": "asn.1-uper/hexstring",
+                    "flags": 0,
+                    "payload": {
+                        "messageId": 20,
+                        "value": {
+                            "BasicSafetyMessage": {
+                                "coreData": {
+                                    "msgCnt": 33,
+                                    "id": "2DC05B91",
+                                    "secMark": 8599,
+                                    "lat": 389563900,
+                                    "long": -771504776,
+                                    "elev": 305,
+                                    "heading": 27488,
+                                    "speed": 2,
+                                    "transmission": "unavailable",
+                                    "angle": 127,
+                                    "accelSet": {
+                                        "long": 8,
+                                        "lat": 2001,
+                                        "vert": -127,
+                                        "yaw": 0
+                                    },
+                                    "brakes": {
+                                        "wheelBrakes": 80,
+                                        "traction": "unavailable",
+                                        "abs": "unavailable",
+                                        "scs": "unavailable",
+                                        "brakeBoost": "unavailable",
+                                        "auxBrakes": "unavailable"
+                                    },
+                                    "accuracy": {
+                                        "semiMajor": 11,
+                                        "semiMinor": 11,
+                                        "orientation": 0
+                                    },
+                                    "size": {
+                                        "width": 0,
+                                        "length": 0
+                                    }
+                                },
+                                "partII": [
+                                    {
+                                        "partII-Id": 0,
+                                        "partII-Value": {
+                                            "VehicleSafetyExtensions": {
+                                                "pathPrediction": {
+                                                    "radiusOfCurve": 32767,
+                                                    "confidence": 200
+                                                },
+                                                "pathHistory": {
+                                                    "crumbData": [
+                                                        {
+                                                            "elevationOffset": -27,
+                                                            "latOffset": -143,
+                                                            "lonOffset": 220,
+                                                            "timeOffset": 1150
+                                                        },
+                                                        {
+                                                            "elevationOffset": -48,
+                                                            "latOffset": -200,
+                                                            "lonOffset": 244,
+                                                            "timeOffset": 5040
+                                                        }
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "psid": -1,
+                    "source": "MessageReceiver",
+                    "sourceId": 37,
+                    "subType": "BSM",
+                    "timestamp": 1773256928786,
+                    "type": "J2735"
+                }
+            }
+            """;
+
+        when(pipelineLineBuilder.build(any(LineRecordContext.class)))
+            .thenAnswer(invocation -> {
+                LineRecordContext ctx = invocation.getArgument(0);
+
+                // Metadata / tags
+                assertEquals("IntegrationTest2", ctx.getMeasurement());
+                assertEquals("Unit001", ctx.getTags().get("unitId"));
+                assertEquals("192.168.55.73", ctx.getTags().get("rsuIp"));
+                assertEquals("J2735_BSM_MessageReceiver", ctx.getTags().get("topicName"));
+                assertEquals("161", ctx.getTags().get("port"));
+                assertEquals(1773256928799L, ctx.getTimestamp());
+
+                Map<String, Object> f = ctx.getFields();
+
+                // Top-level payload scalars
+                assertEquals("-1", f.get("payload.channel"));
+                assertEquals("asn.1-uper/hexstring", f.get("payload.encoding"));
+                assertEquals("BSM", f.get("payload.subType"));
+                assertEquals("J2735", f.get("payload.type"));
+
+                // BSM coreData
+                String core = "payload.payload.value.BasicSafetyMessage.coreData";
+                assertEquals("33", f.get(core + ".msgCnt"));
+                assertEquals("2DC05B91", f.get(core + ".id"));
+                assertEquals("389563900", f.get(core + ".lat"));
+                assertEquals("-771504776", f.get(core + ".long"));
+                assertEquals("27488", f.get(core + ".heading"));
+                assertEquals("2", f.get(core + ".speed"));
+                assertEquals("unavailable", f.get(core + ".transmission"));
+                assertEquals("8", f.get(core + ".accelSet.long"));
+                assertEquals("2001", f.get(core + ".accelSet.lat"));
+                assertEquals("80", f.get(core + ".brakes.wheelBrakes"));
+                assertEquals("unavailable", f.get(core + ".brakes.abs"));
+                assertEquals("0", f.get(core + ".size.width"));
+
+                // partII array uses dot notation (not brackets)
+                String partII0 = "payload.payload.value.BasicSafetyMessage.partII.0";
+                assertTrue(f.containsKey(partII0 + ".partII-Id"));
+                assertEquals("0", f.get(partII0 + ".partII-Id"));
+
+                // pathHistory crumbData array – also dot notation
+                String crumb = partII0 + ".partII-Value.VehicleSafetyExtensions.pathHistory.crumbData";
+                assertEquals("-27", f.get(crumb + ".0.elevationOffset"));
+                assertEquals("-143", f.get(crumb + ".0.latOffset"));
+                assertEquals("220", f.get(crumb + ".0.lonOffset"));
+                assertEquals("1150", f.get(crumb + ".0.timeOffset"));
+                assertEquals("-48", f.get(crumb + ".1.elevationOffset"));
+                assertEquals("5040", f.get(crumb + ".1.timeOffset"));
+
+                // pathPrediction
+                String pred = partII0 + ".partII-Value.VehicleSafetyExtensions.pathPrediction";
+                assertEquals("32767", f.get(pred + ".radiusOfCurve"));
+                assertEquals("200", f.get(pred + ".confidence"));
+
+                // No field key should contain '[' or ']'
+                for (String key : f.keySet()) {
+                    assertTrue(!key.contains("[") && !key.contains("]"),
+                            "Field key must not contain brackets: " + key);
+                }
+
+                return "bsm_line";
+            });
+
+        // When
+        String result = influxLineBuilder.buildLine(json);
+
+        // Then
+        assertEquals("bsm_line", result);
         verify(pipelineLineBuilder, times(1)).build(any(LineRecordContext.class));
     }
 
