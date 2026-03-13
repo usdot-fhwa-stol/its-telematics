@@ -33,7 +33,7 @@ const rsuService = {
       const response = await axios.get(`${API_BASE_URL}/rsu-registration/all-tru-config`, { withCredentials: true });
       console.log('Fetched TRU statuses:', response.data);
       // API returns {message, data, count} - extract the data array
-      return response.data.data || response.data;
+      return 'data' in response.data ? response.data.data : response.data;
     } catch (error) {
       console.error('Error fetching TRU statuses:', error);
       throw error;
@@ -49,7 +49,7 @@ const rsuService = {
     try {
       const response = await axios.post(`${API_BASE_URL}/rsu-registration/assign-rsu`, truConfigMessage, { withCredentials: true });
       console.log('RSU assigned successfully:', response.data);
-      return response.data.data || response.data;
+      return 'data' in response.data ? response.data.data : response.data;
     } catch (error) {
       console.error('Error assigning RSU:', error);
       throw error;
@@ -65,7 +65,7 @@ const rsuService = {
     try {
       const response = await axios.post(`${API_BASE_URL}/rsu-registration/update-rsu-config`, truConfigMessage, { withCredentials: true });
       console.log('RSU config updated successfully:', response.data);
-      return response.data.data || response.data;
+      return 'data' in response.data ? response.data.data : response.data;
     } catch (error) {
       console.error('Error updating RSU config:', error);
       throw error;
@@ -81,7 +81,7 @@ const rsuService = {
     try {
       const response = await axios.post(`${API_BASE_URL}/rsu-registration/remove-rsu`, truConfigMessage, { withCredentials: true });
       console.log('RSU removed successfully:', response.data);
-      return response.data.data || response.data;
+      return 'data' in response.data ? response.data.data : response.data;
     } catch (error) {
       console.error('Error removing RSU:', error);
       throw error;
@@ -100,7 +100,7 @@ const rsuService = {
         withCredentials: true
       });
       console.log('Fetched available topics:', response.data);
-      return response.data.data || response.data;
+      return 'data' in response.data ? response.data.data : response.data;
     } catch (error) {
       console.error('Error fetching available topics:', error);
       throw error;
@@ -117,7 +117,7 @@ const rsuService = {
       console.log('Confirming data selection with message:', truTopicsMessage);
       const response = await axios.post(`${API_BASE_URL}/data-selection/confirm-topics`, truTopicsMessage, { withCredentials: true });
       console.log('Data selection confirmed:', response.data);
-      return response.data.data || response.data;
+      return 'data' in response.data ? response.data.data : response.data;
     } catch (error) {
       console.error('Error confirming data selection:', error);
       throw error;

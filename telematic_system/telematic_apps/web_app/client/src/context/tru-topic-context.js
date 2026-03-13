@@ -371,9 +371,10 @@ export const TRUTopicsProvider = ({ children }) => {
   }, [selectedTRU, selectedRSUs, selectedTopics, filteredTopicsByRSU]);
 
   /**
-   * Reset selection
+   * Reset selection and reinitialize truTopics from truStatuses
    */
   const resetSelection = useCallback(() => {
+    setTruTopics([]);
     selectTRU(null);
     setDataTypeFilter(['all']);
   }, [selectTRU]);

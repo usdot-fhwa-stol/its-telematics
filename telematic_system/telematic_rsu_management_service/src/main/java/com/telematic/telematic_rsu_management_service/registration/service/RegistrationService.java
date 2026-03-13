@@ -55,11 +55,12 @@ public class RegistrationService {
 
     public Message requestTruConfig(String truConfigSubject, TruConfigMessage truConfigMessage, long timeout) {
         byte[] payload = serializer.encode(truConfigMessage);
-        if(truConfigMessage.getUnitConfig().getUnitId() == null || truConfigMessage.getUnitConfig().getUnitId().isEmpty()) {
+        if (truConfigMessage.getUnitConfig().getUnitId() == null
+                || truConfigMessage.getUnitConfig().getUnitId().isEmpty()) {
             throw new IllegalArgumentException("TRU config message must contain a unit ID");
         }
         String unitId = truConfigMessage.getUnitConfig().getUnitId();
-        truConfigSubject= truConfigSubject.replace("*", unitId);
+        truConfigSubject = truConfigSubject.replace("*", unitId);
         log.info("Request for RSU configuration update on subject '{}': {}", truConfigSubject, truConfigMessage);
         if (isAddAction(truConfigMessage.getRsuConfigs().get(0).getAction()) && isRSUAssignedToTRU(truConfigMessage)) {
             log.info("RSU is already assigned to TRU Unit ID: {}, skipping request", unitId);
@@ -84,18 +85,11 @@ public class RegistrationService {
     }
 
     private boolean isRSUAssignedToTRU(TruConfigMessage truConfigMessage) {
-        TRUConfigStatus truConfigStatus = truConfigStatusRepository
-                .findByUnitId(truConfigMessage.getUnitConfig().getUnitId());
         RSUEndpoint rsuEndpointToCheck = truConfigMessage.getRsuConfigs().get(0).getRsu();
-        if (truConfigStatus != null) {
-            for (RSUEndpoint rsuEndpoint : truConfigStatus.getRsuConfigs().stream().map(RSUConfigStatus::getRsu)
-                    .toList()) {
-                if (rsuEndpoint.getIp().equals(rsuEndpointToCheck.getIp())
-                        && rsuEndpoint.getPort().equals(rsuEndpointToCheck.getPort())) {
-                    return true;
-                }
-            }
+        if (rsuEndpointToCheck == null || rsuEndpointToCheck.getIp() == null) {
+            return false;
         }
-        return false;
+
+        return truConfigStatusRepository.existsByRsuConfigs_Rsu_Ip(rsuEndpointToCheck.getIp());
     }
 }
