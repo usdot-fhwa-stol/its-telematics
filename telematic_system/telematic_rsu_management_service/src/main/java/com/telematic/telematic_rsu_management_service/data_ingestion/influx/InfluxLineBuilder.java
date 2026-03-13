@@ -73,7 +73,7 @@ public class InfluxLineBuilder {
         } else if (node.isArray()) {
             int idx = 0;
             for (JsonNode item : node) {
-                String key = prefix + "[" + idx + "]";
+                String key = prefix + "." + idx;
                 flatten(key, item, out);
                 idx++;
             }
