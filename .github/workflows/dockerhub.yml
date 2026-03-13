@@ -6,6 +6,7 @@ on:
       - "develop"
       - "master"
       - "release/*"
+      - 'feature/**'
     tags:
       - "carma-system-*"
 
@@ -19,7 +20,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0      
+          fetch-depth: 0
       - id: docker-org-and-tag
         uses: usdot-fhwa-stol/actions/docker-org-and-tag@main
 
@@ -32,7 +33,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0       
+          fetch-depth: 0
       - name: Determine Build Metadata
         id: build-metadata
         uses: usdot-fhwa-stol/actions/docker-build-metadata@main
@@ -59,7 +60,7 @@ jobs:
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
-    
+
   dockerhub-telematic-rsu-management-service:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
     runs-on: ubuntu-latest
@@ -81,7 +82,7 @@ jobs:
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_rsu_management_service:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
-            VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}          
+            VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
 
   dockerhub-carma-streets-bridge:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
