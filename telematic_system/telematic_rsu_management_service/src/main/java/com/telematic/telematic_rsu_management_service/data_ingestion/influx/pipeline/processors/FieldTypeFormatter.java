@@ -66,6 +66,9 @@ public class FieldTypeFormatter implements Processor {
         String s = String.valueOf(v);
         s = s.replace("\\", "\\\\");
         s = s.replace("\"", "\\\"");
+        s = s.replace("\n", "\\n");
+        s = s.replace("\r", "\\r");
+        s = s.replace("\t", "\\t");
 
         return '"' + s + '"';
     }
