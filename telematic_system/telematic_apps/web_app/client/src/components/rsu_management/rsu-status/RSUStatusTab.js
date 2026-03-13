@@ -188,6 +188,11 @@ const RSUStatusTab = () => {
               color="error"
               size="small"
             />
+            <Chip
+              label={`Unavailable: ${getRSUStatusCount('unavailable')}`}
+              color="info"
+              size="small"
+            />
           </Stack>
         </Box>
         <Stack direction="row" spacing={2}>

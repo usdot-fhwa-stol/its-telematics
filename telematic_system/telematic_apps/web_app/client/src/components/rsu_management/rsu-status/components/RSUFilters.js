@@ -58,6 +58,7 @@ const RSUFilters = ({ filters, onFilterChange }) => {
               <MenuItem value="fault">Fault</MenuItem>
               <MenuItem value="other">Other</MenuItem>
               <MenuItem value="off">Off</MenuItem>
+              <MenuItem value="unavailable">Unavailable</MenuItem>
               <MenuItem value="pending">Pending</MenuItem>
             </Select>
           </FormControl>

@@ -48,6 +48,10 @@ const StatusBadge = ({ online, status, size = 'small' }) => {
         statusLabel = 'Off';
         statusColor = 'error';
         break;
+      case 'unavailable':
+        statusLabel = 'Unavailable';
+        statusColor = 'info';
+        break;
       case 'other':
         statusLabel = 'Other';
         statusColor = 'default';
