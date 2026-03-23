@@ -190,17 +190,17 @@ const Login = React.memo(() => {
                                         </Link>
                                     </Box>
                                 )}
+                                {isMobile && serverContext.webServerUri && (
+                                    <Box sx={{ mt: 1 }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {serverContext.webServerUri}
+                                        </Typography>
+                                    </Box>
+                                )}
                             </Box>
                         </Box>
                     </Container>
                 </Box>
-                {isMobile && serverContext.webServerUri && (
-                    <Box sx={{ position: 'fixed', bottom: 16, left: 0, right: 0, textAlign: 'center' }}>
-                        <Typography variant="caption" color="text.secondary">
-                            {serverContext.webServerUri}
-                        </Typography>
-                    </Box>
-                )}
             </ThemeProvider>
         </React.Fragment >
     );
