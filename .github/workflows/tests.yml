@@ -261,7 +261,7 @@ jobs:
         shell: bash
         run: |
           find "$GITHUB_WORKSPACE" -name "lcov*.info"
-          ls $GITHUB_WORKSPACE/telematic_system/telematic_rsu_management_service/target
+          ls $GITHUB_WORKSPACE/telematic_system/telematic_rsu_management_service/target/classes/
           echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
           pwd
       - name: Run SonarScanner
