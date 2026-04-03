@@ -3,7 +3,7 @@ import KeyboardDoubleArrowLeftIcon from '@mui/icons-material/KeyboardDoubleArrow
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { Alert, Avatar, Button, Container, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControl, Grid, InputLabel, Link, MenuItem, Select, Snackbar, TextField } from '@mui/material';
 import { Box } from '@mui/system';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { useForm } from 'react-hook-form';
 import * as Yup from 'yup';
 import { Capacitor } from '@capacitor/core';
@@ -11,6 +11,7 @@ import { listOrgs } from '../../api/api-org';
 import { registerNewUser } from '../../api/api-user';
 import { SEVERITY } from './UserMetadata';
 import { getMobileWrapperStyles, getMobileContainerStyles, getMobileBoxStyles, getTextFieldStyles } from '../../utils/mobileStyles';
+import ServerContext from '../../context/server-context';
 
 const RegisterUser = () => {
     const [open, setOpen] = useState(false);
@@ -24,6 +25,7 @@ const RegisterUser = () => {
     const [allOrgs, setAllOrgs] = useState([]);
     const [adminEmails, setAdminEmails] = useState(['Ankur.Tyagi@leidos.com', 'dan.du@leidos.com', 'abey.yoseph@leidos.com', 'anish.deva@leidos.com']);
     const [isMobile] = useState(Capacitor.isNativePlatform());
+    const serverContext = useContext(ServerContext);
     const handleClose = () => {
         setErrorMsg('')
         setOpen(false);
@@ -84,8 +86,11 @@ const RegisterUser = () => {
     }
 
     useEffect(() => {
+        if (isMobile && serverContext.webServerUri) {
+            window.env.REACT_APP_WEB_SERVER_URI = serverContext.webServerUri;
+        }
         getAllOrgs();
-    }, [])
+    }, [serverContext.webServerUri])
 
     const validationSchema = Yup.object().shape({
         username: Yup.string().required('User username is required'),
