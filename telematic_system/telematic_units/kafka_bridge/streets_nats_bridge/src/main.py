@@ -13,7 +13,7 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 #
-from streets_nats_bridge import StreetsNatsBridge
+from kafka_nats_bridge import KafkaNatsBridge
 import asyncio
 
 
@@ -22,11 +22,11 @@ import asyncio
 #topics from the telematics UI, which will be streamed to the nats server.
 def main():
 
-    #Create StreetsNatsBridge object and asyncio loop
-    streets_nats_bridge = StreetsNatsBridge()
+    #Create KafkaNatsBridge object and asyncio loop
+    streets_nats_bridge = KafkaNatsBridge()
     loop = asyncio.get_event_loop()
 
-    #Create individual asyncio tasks to connect to the NATS server, register the StreetsNatsBridge
+    #Create individual asyncio tasks to connect to the NATS server, register the KafkaNatsBridge
     #object, listen for requests for sending available topics/publishing specific topics, and publish
     #carma streets data that has been subscribed to
     tasks = [

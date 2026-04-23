@@ -30,7 +30,7 @@ services:
 
   streets_nats_bridge:
     build:
-          context: ./telematic_units/carma_street_bridge
+          context: ./telematic_units/kafka_bridge
           dockerfile: Dockerfile
     image: usdotfhwastoldev/carma_street_nats_bridge:develop
     logging:

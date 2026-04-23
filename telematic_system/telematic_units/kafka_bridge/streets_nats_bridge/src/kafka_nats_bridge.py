@@ -34,14 +34,14 @@ class LogType(Enum):
     CONSOLE = "console"
     ALL = "all"
 
-class StreetsNatsBridge():
+class KafkaNatsBridge():
     """
-    The StreetsNatsBridge is capable of consuming Kafka topics from carma-streets and streaming
+    The KafkaNatsBridge is capable of consuming Kafka topics from carma-streets and streaming
     the data in real-time to a remote NATS server. Various asynchronous functions are defined to
     enable connecting to the NATS server, publishing available topics, and streaming data of interest.
     """
 
-    # Creates a Streets-NATS bridge object that connects to the NATS server
+    # Creates a Kafka-NATS bridge object that connects to the NATS server
     def __init__(self):
 
         # Load parameters defined as environment variables. Defined the docker-compose file.
@@ -85,7 +85,7 @@ class StreetsNatsBridge():
             UnitKeys.UNIT_TYPE.value: self.unit_type,
             UnitKeys.UNIT_NAME.value: self.unit_name}
 
-        # Create StreetsNatsBridge logger
+        # Create KafkaNatsBridge logger
         if self.log_handler_type == LogType.ALL.value:
             # If all create log handler for both file and console
             self.createLogger(LogType.FILE.value)
@@ -105,10 +105,10 @@ class StreetsNatsBridge():
                 self.exclusion_list.append(excluded.strip())
         self.logger.info("Exclusion list: " + str(self.exclusion_list))
 
-        self.logger.info(" Created Streets-NATS bridge object")
+        self.logger.info(" Created Kafka-NATS bridge object")
 
     def createLogger(self, log_type):
-        """Creates log file for the StreetsNatsBridge with configuration items based on the environment variables set in docker-compose.units.yml"""
+        """Creates log file for the KafkaNatsBridge with configuration items based on the environment variables set in docker-compose.units.yml"""
         self.logger = logging.getLogger(self.log_name)
         now = datetime.now()
         dt_string = now.strftime("_%m_%d_%Y_%H_%M_%S")
@@ -137,7 +137,7 @@ class StreetsNatsBridge():
 
 
     async def run_async_kafka_consumer(self):
-        """Create Async Kafka consumer object to read carma-streets kafka traffic"""
+        """Create Async Kafka consumer object to read kafka traffic"""
         try:
             self.logger.info(" In run_async_kafka_consumer: ")
             # auto_offset_reset handles where consumer restarts reading after breaking down or being turned off
@@ -280,11 +280,11 @@ class StreetsNatsBridge():
     async def available_topics(self):
         """
         Waits for request from telematic server to publish available topics. When a request has been received, it responds
-        with all available carma-streets kafka topics.
+        with all available kafka topics.
         """
 
         async def send_list_of_topics(msg):
-            """Send available list of carma streets topics"""
+            """Send available list of topics"""
             self.logger.info(
                 "In send_list_of_topics: Received a request for available topics")
             # convert nanoseconds to microseconds
@@ -348,7 +348,7 @@ class StreetsNatsBridge():
     async def publish_topics(self):
         """
         Waits for request from telematic server to create subscriber to selected topics and receive data. When a request
-        has been received, the topic name is then added to the StreetsNatsBridge subscribers_list variable, which will
+        has been received, the topic name is then added to the KafkaNatsBridge subscribers_list variable, which will
         trigger publishing of that data.
         """
 
