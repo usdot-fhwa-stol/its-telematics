@@ -42,7 +42,7 @@ services:
     volumes:
            - ./logs:/var/logs
     environment:
-    - KAFKA_BRIDGE_UNIT_ID=streets_id
+    - KAFKA_BRIDGE_UNIT_ID=kafka_id
     - KAFKA_BRIDGE_UNIT_TYPE=infrastructure
     - KAFKA_BRIDGE_LOG_LEVEL=debug
     - KAFKA_BRIDGE_LOG_NAME=kafka_nats_bridge

@@ -57,7 +57,7 @@ def combineFiles(log_dir):
         sys.exit("Did not find any Messaging server csv logs in directory: "+log_dir+ "")
 
     messaging_server_df = pd.concat(map(pd.read_csv, messaging_server_csv), ignore_index=True)
-    infrastructure_units = ['streets_id', 'cloud_id']
+    infrastructure_units = ['kafka_id', 'cloud_id']
 
     ############# Load messaging server logs and get a list of dataframes for all unit ids
     #### Dictionary of dataframes with unique unit ids
