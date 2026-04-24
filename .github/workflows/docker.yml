@@ -29,7 +29,7 @@ jobs:
         with:
           context: ./telematic_system/telematic_units/carma_cloud_bridge/
           file: ./telematic_system/telematic_units/carma_cloud_bridge/Dockerfile
-  telematic-carma-streets-bridge:
+  telematic-kafka-bridge:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
