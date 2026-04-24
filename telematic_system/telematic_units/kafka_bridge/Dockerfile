@@ -14,8 +14,8 @@ RUN pip install --upgrade -r requirements.txt
 
 WORKDIR /ws
 
-ADD streets_nats_bridge src/streets_nats_bridge
+ADD kafka_nats_bridge src/kafka_nats_bridge
 
-WORKDIR /ws/src/streets_nats_bridge/src
+WORKDIR /ws/src/kafka_nats_bridge/src
 
 CMD [ "python", "-u", "main.py" ]

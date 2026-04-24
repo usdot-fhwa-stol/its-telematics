@@ -83,7 +83,7 @@ jobs:
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
 
-  dockerhub-carma-streets-bridge:
+  dockerhub-kafka-bridge:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
     runs-on: ubuntu-latest
     steps:
@@ -99,7 +99,7 @@ jobs:
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
-          context: ./telematic_system/telematic_units/carma_street_bridge/
+          context: ./telematic_system/telematic_units/kafka_bridge/
           push: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_street_nats_bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           build-args: |

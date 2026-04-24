@@ -34,14 +34,14 @@ class LogType(Enum):
     CONSOLE = "console"
     ALL = "all"
 
-class StreetsNatsBridge():
+class KafkaNatsBridge():
     """
-    The StreetsNatsBridge is capable of consuming Kafka topics from carma-streets and streaming
+    The KafkaNatsBridge is capable of consuming Kafka topics from carma-streets and streaming
     the data in real-time to a remote NATS server. Various asynchronous functions are defined to
     enable connecting to the NATS server, publishing available topics, and streaming data of interest.
     """
 
-    # Creates a Streets-NATS bridge object that connects to the NATS server
+    # Creates a Kafka-NATS bridge object that connects to the NATS server
     def __init__(self):
 
         # Load parameters defined as environment variables. Defined the docker-compose file.
@@ -51,27 +51,27 @@ class StreetsNatsBridge():
         self.kafka_ip = os.getenv('KAFKA_BROKER_IP')
         # Port at which kafka broker communicates.
         self.kafka_port = os.getenv('KAFKA_BROKER_PORT')
-        # Unit ID for the streets nats bride.
-        self.unit_id = os.getenv('STREETS_BRIDGE_UNIT_ID')
-        # Unit type for the streets bridge.
-        self.unit_type = os.getenv('STREETS_BRIDGE_UNIT_TYPE')
-        # Log level for the streets bridge.
-        self.log_level = os.getenv('STREETS_BRIDGE_LOG_LEVEL')
+        # Unit ID for the kafka nats bride.
+        self.unit_id = os.getenv('KAFKA_BRIDGE_UNIT_ID')
+        # Unit type for the kafka bridge.
+        self.unit_type = os.getenv('KAFKA_BRIDGE_UNIT_TYPE')
+        # Log level for the kafka bridge.
+        self.log_level = os.getenv('KAFKA_BRIDGE_LOG_LEVEL')
         # Name of the log file where logs from the unit will be stored
-        self.log_name = os.getenv('STREETS_BRIDGE_LOG_NAME')
+        self.log_name = os.getenv('KAFKA_BRIDGE_LOG_NAME')
         # Path to the log file
-        self.log_path = os.getenv('STREETS_BRIDGE_LOG_PATH')
+        self.log_path = os.getenv('KAFKA_BRIDGE_LOG_PATH')
         # Size of data which can be stored in the log file, before it is refreshed
-        self.log_rotation = int(os.getenv('STREETS_BRIDGE_LOG_ROTATION_SIZE_BYTES'))
+        self.log_rotation = int(os.getenv('KAFKA_BRIDGE_LOG_ROTATION_SIZE_BYTES'))
         self.kafka_offset_reset = os.getenv('KAFKA_CONSUMER_RESET')
 
         self.unit_name = "West Intersection"
         self.nc = NATS()
-        self.streets_topics = []  # list of available carma-streets topic
+        self.kafka_topics = []  # list of available kafka topic
         self.subscribers_list = []  # list of topics the user has requested to publish
         self.registered = False
 
-        self.log_handler_type = os.getenv('STREETS_BRIDGE_LOG_HANDLER_TYPE')
+        self.log_handler_type = os.getenv('KAFKA_BRIDGE_LOG_HANDLER_TYPE')
 
         # Get is_sim env variable as boolean
         self.is_sim = os.getenv("IS_SIM", 'FALSE').lower() in ('true', '1')
@@ -80,12 +80,12 @@ class StreetsNatsBridge():
         self.exclusion_list = []
 
         # Placeholder info for now
-        self.streets_info = {
+        self.kafka_info = {
             UnitKeys.UNIT_ID.value: self.unit_id,
             UnitKeys.UNIT_TYPE.value: self.unit_type,
             UnitKeys.UNIT_NAME.value: self.unit_name}
 
-        # Create StreetsNatsBridge logger
+        # Create KafkaNatsBridge logger
         if self.log_handler_type == LogType.ALL.value:
             # If all create log handler for both file and console
             self.createLogger(LogType.FILE.value)
@@ -97,7 +97,7 @@ class StreetsNatsBridge():
             self.logger.warn("Incorrect Log type defined, defaulting to console")
 
         #Get the topics that should be excluded
-        self.excludedTopics = os.getenv("STREETS_BRIDGE_EXCLUSION_LIST")
+        self.excludedTopics = os.getenv("KAFKA_BRIDGE_EXCLUSION_LIST")
 
         #Add excluded topics to class member variables
         if self.excludedTopics != "":
@@ -105,10 +105,10 @@ class StreetsNatsBridge():
                 self.exclusion_list.append(excluded.strip())
         self.logger.info("Exclusion list: " + str(self.exclusion_list))
 
-        self.logger.info(" Created Streets-NATS bridge object")
+        self.logger.info(" Created Kafka-NATS bridge object")
 
     def createLogger(self, log_type):
-        """Creates log file for the StreetsNatsBridge with configuration items based on the environment variables set in docker-compose.units.yml"""
+        """Creates log file for the KafkaNatsBridge with configuration items based on the environment variables set in docker-compose.units.yml"""
         self.logger = logging.getLogger(self.log_name)
         now = datetime.now()
         dt_string = now.strftime("_%m_%d_%Y_%H_%M_%S")
@@ -137,7 +137,7 @@ class StreetsNatsBridge():
 
 
     async def run_async_kafka_consumer(self):
-        """Create Async Kafka consumer object to read carma-streets kafka traffic"""
+        """Create Async Kafka consumer object to read kafka traffic"""
         try:
             self.logger.info(" In run_async_kafka_consumer: ")
             # auto_offset_reset handles where consumer restarts reading after breaking down or being turned off
@@ -155,32 +155,32 @@ class StreetsNatsBridge():
             await self.kafka_consumer.start()
 
             # Get all kafka topics
-            self.streets_topics = []
+            self.kafka_topics = []
             for topic in await self.kafka_consumer.topics():
-                self.streets_topics.append(topic)
+                self.kafka_topics.append(topic)
 
             self.logger.info(
-                " In createAsyncKafkaConsumer: All available Kafka topics = " + str(self.streets_topics))
+                " In createAsyncKafkaConsumer: All available Kafka topics = " + str(self.kafka_topics))
 
             # Subscribe to Kafka topics in subscriber list
-            #TODO: temporarily commented out code below, to subscribe to all streets topics
+            #TODO: temporarily commented out code below, to subscribe to all kafka topics
             # if len(self.subscribers_list) > 0:
                 # self.kafka_consumer.subscribe(topics=self.subscribers_list)
                 # self.logger.info(
                 #     " In createAsyncKafkaConsumer: Successfully subscribed to the following topics: " + str(self.subscribers_list))
-            self.kafka_consumer.subscribe(topics=self.streets_topics)
+            self.kafka_consumer.subscribe(topics=self.kafka_topics)
             self.logger.info(
-                " In createAsyncKafkaConsumer: Successfully subscribed to the following topics: " + str(self.streets_topics))
+                " In createAsyncKafkaConsumer: Successfully subscribed to the following topics: " + str(self.kafka_topics))
 
             await self.kafka_read()
         except:
             self.logger.error(
-                "No CARMA Streets Kafka broker available..exiting")
+                "No Kafka broker available..exiting")
             sys.exit(SYSTEM_ERROR)
 
-    # Read the carma streets kafka data and publish to nats if the topic is in the subscribed list
+    # Read the kafka data and publish to nats if the topic is in the subscribed list
     async def kafka_read(self):
-        self.logger.info(" In kafka_read: Reading carma-streets kafka traffic")
+        self.logger.info(" In kafka_read: Reading kafka traffic")
 
         #Need to get utc epoch time of first day of year to use with moy and timestamp
         naive = datetime(int(date.today().year), 1, 1, 0, 0, 0) #datetime format (year, month, day, hour, minute, second)
@@ -204,9 +204,9 @@ class StreetsNatsBridge():
                     message[UnitKeys.UNIT_TYPE.value] = self.unit_type
                     message[UnitKeys.UNIT_NAME.value] = self.unit_name
                     message[TopicKeys.MSG_TYPE.value] = topic
-                    message[EventKeys.EVENT_NAME.value] = self.streets_info[EventKeys.EVENT_NAME.value]
-                    message[EventKeys.TESTING_TYPE.value] = self.streets_info[EventKeys.TESTING_TYPE.value]
-                    message[EventKeys.LOCATION.value] = self.streets_info[EventKeys.LOCATION.value]
+                    message[EventKeys.EVENT_NAME.value] = self.kafka_info[EventKeys.EVENT_NAME.value]
+                    message[EventKeys.TESTING_TYPE.value] = self.kafka_info[EventKeys.TESTING_TYPE.value]
+                    message[EventKeys.LOCATION.value] = self.kafka_info[EventKeys.LOCATION.value]
                     message[TopicKeys.TOPIC_NAME.value] = topic
 
                     if self.is_sim:
@@ -234,7 +234,7 @@ class StreetsNatsBridge():
                             message["timestamp"] = datetime.now(timezone.utc).timestamp()*secondToMicro  # utc timestamp in microseconds
 
                     # telematic cloud server will look for topic names with the pattern ".data."
-                    self.topic_name = "streets." + self.unit_id + ".data." + topic
+                    self.topic_name = "kafka." + self.unit_id + ".data." + topic
 
                     # publish the encoded data to the nats server
                     self.logger.info(" In kafka_read: Publishing message: " + str(message))
@@ -280,19 +280,19 @@ class StreetsNatsBridge():
     async def available_topics(self):
         """
         Waits for request from telematic server to publish available topics. When a request has been received, it responds
-        with all available carma-streets kafka topics.
+        with all available kafka topics.
         """
 
         async def send_list_of_topics(msg):
-            """Send available list of carma streets topics"""
+            """Send available list of topics"""
             self.logger.info(
                 "In send_list_of_topics: Received a request for available topics")
             # convert nanoseconds to microseconds
-            self.streets_info["timestamp"] = datetime.now(
+            self.kafka_info["timestamp"] = datetime.now(
                 timezone.utc).timestamp()*1000000  # utc timestamp in microseconds
-            self.streets_info["topics"] = [
-                {"name": topicName} for topicName in self.streets_topics if topicName not in self.exclusion_list]
-            message = json.dumps(self.streets_info).encode('utf8')
+            self.kafka_info["topics"] = [
+                {"name": topicName} for topicName in self.kafka_topics if topicName not in self.exclusion_list]
+            message = json.dumps(self.kafka_info).encode('utf8')
 
             self.logger.info(
                 "In send_list_of_topics: Sending available topics message to nats: " + str(message))
@@ -301,7 +301,7 @@ class StreetsNatsBridge():
 
         # Wait for a request for available topics and call send_list_of_topics callback function
         try:
-            await self.nc.subscribe(self.streets_info[UnitKeys.UNIT_ID.value] + ".available_topics", self.streets_info[UnitKeys.UNIT_ID.value], send_list_of_topics)
+            await self.nc.subscribe(self.kafka_info[UnitKeys.UNIT_ID.value] + ".available_topics", self.kafka_info[UnitKeys.UNIT_ID.value], send_list_of_topics)
         except:
             self.logger.error(
                 " In send_list_of_topics: ERROR sending list of available topics to nats server")
@@ -311,19 +311,19 @@ class StreetsNatsBridge():
             send request to server to register unit and waits for ack
         """
         self.logger.info("Entering register unit")
-        streets_info_message = json.dumps(
-            self.streets_info, ensure_ascii=False).encode('utf8')
+        kafka_info_message = json.dumps(
+            self.kafka_info, ensure_ascii=False).encode('utf8')
 
         if(not self.registered):
             try:
-                response = await self.nc.request(self.streets_info[UnitKeys.UNIT_ID.value] + ".register_unit", streets_info_message, timeout=5)
+                response = await self.nc.request(self.kafka_info[UnitKeys.UNIT_ID.value] + ".register_unit", kafka_info_message, timeout=5)
                 message = response.data.decode('utf-8')
                 self.logger.warn(
                     "Registering unit received response: {message}".format(message=message))
                 message_json = json.loads(message)
-                self.streets_info[EventKeys.EVENT_NAME.value] = message_json[EventKeys.EVENT_NAME.value]
-                self.streets_info[EventKeys.LOCATION.value] = message_json[EventKeys.LOCATION.value]
-                self.streets_info[EventKeys.TESTING_TYPE.value] = message_json[EventKeys.TESTING_TYPE.value]
+                self.kafka_info[EventKeys.EVENT_NAME.value] = message_json[EventKeys.EVENT_NAME.value]
+                self.kafka_info[EventKeys.LOCATION.value] = message_json[EventKeys.LOCATION.value]
+                self.kafka_info[EventKeys.TESTING_TYPE.value] = message_json[EventKeys.TESTING_TYPE.value]
                 self.registered = True
             except:
                 self.logger.warn("Registering unit failed")
@@ -338,7 +338,7 @@ class StreetsNatsBridge():
             await self.nc.publish(msg.reply, b"OK")
 
         try:
-            await self.nc.subscribe(self.streets_info[UnitKeys.UNIT_ID.value] + ".check_status", self.streets_info[UnitKeys.UNIT_ID.value], send_status)
+            await self.nc.subscribe(self.kafka_info[UnitKeys.UNIT_ID.value] + ".check_status", self.kafka_info[UnitKeys.UNIT_ID.value], send_status)
 
         except:
             self.logger.warn("Status update failed")
@@ -348,7 +348,7 @@ class StreetsNatsBridge():
     async def publish_topics(self):
         """
         Waits for request from telematic server to create subscriber to selected topics and receive data. When a request
-        has been received, the topic name is then added to the StreetsNatsBridge subscribers_list variable, which will
+        has been received, the topic name is then added to the KafkaNatsBridge subscribers_list variable, which will
         trigger publishing of that data.
         """
 
@@ -370,6 +370,6 @@ class StreetsNatsBridge():
 
         # Wait for request to publish specific topic and call topic_request callback function
         try:
-            await self.nc.subscribe(self.streets_info[UnitKeys.UNIT_ID.value] + ".publish_topics", "worker", topic_request)
+            await self.nc.subscribe(self.kafka_info[UnitKeys.UNIT_ID.value] + ".publish_topics", "worker", topic_request)
         except:
             self.logger.error(" In topic_request: Error publishing")

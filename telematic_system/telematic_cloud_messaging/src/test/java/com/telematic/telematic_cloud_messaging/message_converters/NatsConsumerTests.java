@@ -34,7 +34,7 @@ import com.telematic.telematic_cloud_messaging.nats_influx_connection.NatsConsum
     "MESSAGING_CLOUD_SUBSCRIPTION_TOPIC=cloud.*.data.",
     "MESSAGING_NUMBER_TOPICS_PER_DISPATCHER=3",
     "MESSAGING_VEHICLE_UNIT_ID_LIST=vehicle_id",
-    "MESSAGING_STREETS_UNIT_ID_LIST=streets_id,rsu_id",
+    "MESSAGING_STREETS_UNIT_ID_LIST=kafka_id,rsu_id",
     "MESSAGING_CLOUD_UNIT_ID_LIST=cloud_id",
     "MESSAGING_INFLUX_ORG=my-org",
     "MESSAGING_INFLUX_TOKEN=my-super-secret-auth-token",
@@ -57,7 +57,7 @@ public class NatsConsumerTests {
             String nats_subscribe_str = "*.data.*";
             int nats_max_reconnects = 5;
             int topics_per_dispatcher = 3;
-            String unit_id_list = "cloud_id, streets_id";
+            String unit_id_list = "cloud_id, kafka_id";
             NatsConsumer natsObject = new NatsConsumer(nats_uri, nats_subscribe_str, nats_max_reconnects,
             topics_per_dispatcher, unit_id_list, "streets");
             assertTrue(natsObject.getNatsConnected() == false);

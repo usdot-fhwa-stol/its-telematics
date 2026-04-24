@@ -49,7 +49,7 @@ def plotter(folderName):
     print("95th Latency: " + str(trimmed_data["Delay(s)"].quantile(0.95)))
 
     #plot vehicle, streets, and cloud data histograms if they were part of the test
-    units = ["DOT-45244", "DOT-45254","DOT_45254","vehicle_id","rsu_1234","streets_id","cloud_id"]
+    units = ["DOT-45244", "DOT-45254","DOT_45254","vehicle_id","rsu_1234","kafka_id","cloud_id"]
     for unit in units:
         unit_data = trimmed_data[trimmed_data['Unit Id'] == unit]
 
