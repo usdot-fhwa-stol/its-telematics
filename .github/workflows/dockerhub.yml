@@ -17,7 +17,7 @@ jobs:
       docker_image_tag: ${{ steps.docker-org-and-tag.outputs.docker_image_tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - id: docker-org-and-tag
@@ -30,7 +30,7 @@ jobs:
       vcs_ref: ${{ steps.build-metadata.outputs.vcs_ref }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Determine Build Metadata
@@ -42,16 +42,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_cloud_messaging/
           push: true
@@ -59,22 +59,30 @@ jobs:
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
+      - name: Docker Scout Record
+        if: ${{ github.ref_type == 'branch' }}
+        uses: docker/scout-action@v1
+        with:
+          command: environment
+          environment: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          image: registry://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_cloud_messaging:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   dockerhub-telematic-rsu-management-service:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_rsu_management_service/
           push: true
@@ -82,22 +90,30 @@ jobs:
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
+      - name: Docker Scout Record
+        if: ${{ github.ref_type == 'branch' }}
+        uses: docker/scout-action@v1
+        with:
+          command: environment
+          environment: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          image: registry://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_rsu_management_service:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   dockerhub-kafka-bridge:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_units/kafka_bridge/
           push: true
@@ -105,22 +121,30 @@ jobs:
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
+      - name: Docker Scout Record
+        if: ${{ github.ref_type == 'branch' }}
+        uses: docker/scout-action@v1
+        with:
+          command: environment
+          environment: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          image: registry://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_street_nats_bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   dockerhub-carma-vehicle-bridge:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_units/carma_vehicle_bridge/
           push: true
@@ -128,22 +152,30 @@ jobs:
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
+      - name: Docker Scout Record
+        if: ${{ github.ref_type == 'branch' }}
+        uses: docker/scout-action@v1
+        with:
+          command: environment
+          environment: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          image: registry://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   dockerhub-carma-cloud-bridge:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_units/carma_cloud_bridge/
           push: true
@@ -151,22 +183,30 @@ jobs:
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
+      - name: Docker Scout Record
+        if: ${{ github.ref_type == 'branch' }}
+        uses: docker/scout-action@v1
+        with:
+          command: environment
+          environment: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          image: registry://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_cloud_nats_bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   dockerhub-telematic-historical-data-processing:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_historical_data_processing/
           push: true
@@ -174,22 +214,30 @@ jobs:
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
+      - name: Docker Scout Record
+        if: ${{ github.ref_type == 'branch' }}
+        uses: docker/scout-action@v1
+        with:
+          command: environment
+          environment: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          image: registry://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_historical_data_processing:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   dockerhub-telematic-web-server:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_apps/web_app/server
           push: true
@@ -197,22 +245,30 @@ jobs:
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
+      - name: Docker Scout Record
+        if: ${{ github.ref_type == 'branch' }}
+        uses: docker/scout-action@v1
+        with:
+          command: environment
+          environment: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          image: registry://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_server:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   dockerhub-telematic-web-client:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_apps/web_app/client
           push: true
@@ -220,22 +276,30 @@ jobs:
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
+      - name: Docker Scout Record
+        if: ${{ github.ref_type == 'branch' }}
+        uses: docker/scout-action@v1
+        with:
+          command: environment
+          environment: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          image: registry://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_client:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   dockerhub-telematic-apache2:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_apps/apache2
           push: true
@@ -243,22 +307,30 @@ jobs:
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
+      - name: Docker Scout Record
+        if: ${{ github.ref_type == 'branch' }}
+        uses: docker/scout-action@v1
+        with:
+          command: environment
+          environment: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          image: registry://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_apache2:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   dockerhub-telematic-grafana:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_apps/grafana
           push: true
@@ -266,22 +338,30 @@ jobs:
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
+      - name: Docker Scout Record
+        if: ${{ github.ref_type == 'branch' }}
+        uses: docker/scout-action@v1
+        with:
+          command: environment
+          environment: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          image: registry://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_grafana:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   dockerhub-telematic-local-apache2:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_apps/apache2
           file: ./telematic_system/telematic_apps/apache2/local.Dockerfile
@@ -290,3 +370,11 @@ jobs:
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
+      - name: Docker Scout Record
+        if: ${{ github.ref_type == 'branch' }}
+        uses: docker/scout-action@v1
+        with:
+          command: environment
+          environment: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          image: registry://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_local_apache2:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
