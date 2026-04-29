@@ -12,3 +12,4 @@ COPY ports.conf /etc/apache2/ports.conf
 COPY 000-default.conf /etc/apache2/sites-available/000-default.conf
 COPY 000-default.conf /etc/apache2/sites-enabled/000-default.conf
 COPY grafana_auth.lua /etc/apache2/lua/grafana_auth.lua
+# Test added new changes job at the top that uses dorny/paths-filter@v4 to detect which image directories changed
