@@ -18,3 +18,4 @@ COPY --from=build /rsu_management_service/target/telematic_rsu_management_servic
 EXPOSE 8082
 
 ENTRYPOINT ["java", "-jar", "/rsu_management_service/app.jar"]
+#test
