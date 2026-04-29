@@ -1,4 +1,4 @@
-FROM maven:3.9-eclipse-temurin-17-alpine AS build
+FROM eclipse-temurin:17.0.10_7-jre-alpine AS build
 WORKDIR /telematic_cloud_messaging
 COPY pom.xml .
 RUN mvn dependency:go-offline -B

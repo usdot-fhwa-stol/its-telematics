@@ -1,4 +1,4 @@
-FROM ubuntu/apache2:latest
+FROM ubuntu/apache2:2.4-22.04_stable
 RUN a2enmod proxy
 RUN a2enmod rewrite
 RUN a2enmod proxy_balancer
