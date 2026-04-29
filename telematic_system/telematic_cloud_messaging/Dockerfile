@@ -13,4 +13,3 @@ COPY --from=build /telematic_cloud_messaging/target/telematic_cloud_messaging-*.
 COPY --from=build /telematic_cloud_messaging/src/main/resources/application.properties /telematic_cloud_messaging/application.properties
 EXPOSE 8082
 ENTRYPOINT ["java", "-jar", "/telematic_cloud_messaging/app.jar"]
-# Test added new changes job at the top that uses dorny/paths-filter@v4 to detect which image directories changed
