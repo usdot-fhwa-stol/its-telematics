@@ -25,7 +25,7 @@ jobs:
       - id: docker-org-and-tag
         uses: usdot-fhwa-stol/actions/docker-org-and-tag@main
 
-  # Detect which image directories changed in this PR so we only build/scan what's needed
+  # Detect changed image directories to trigger only the related build jobs
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -97,6 +97,7 @@ jobs:
           ignore-unchanged: true              # only show CVEs introduced by this PR
           only-severities: critical,high      # ignore low/medium noise
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true        # replace prior Scout comment on each push
 
   telematic-carma-cloud-nats-bridge:
     needs: [determine_docker_org_and_tag, changes]
@@ -128,6 +129,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-kafka-bridge:
     needs: [determine_docker_org_and_tag, changes]
@@ -159,6 +161,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-carma-vehicle-bridge:
     needs: [determine_docker_org_and_tag, changes]
@@ -190,6 +193,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-historical-data-processing:
     needs: [determine_docker_org_and_tag, changes]
@@ -221,6 +225,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-grafana:
     needs: [determine_docker_org_and_tag, changes]
@@ -252,6 +257,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-cloud-messaging:
     needs: [determine_docker_org_and_tag, changes]
@@ -283,6 +289,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-rsu-management-service:
     needs: [determine_docker_org_and_tag, changes]
@@ -314,6 +321,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-web-app-client:
     needs: [determine_docker_org_and_tag, changes]
@@ -345,6 +353,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-web-app-server:
     needs: [determine_docker_org_and_tag, changes]
@@ -376,3 +385,4 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
