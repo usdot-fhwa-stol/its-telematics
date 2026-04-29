@@ -15,3 +15,4 @@ echo "Copy grafana_htpasswd to directory /opt/apache2."
 
 sudo chmod 777 -R /opt/apache2
 echo "Directory /opt/apache2 permission 777."
+# Test 
