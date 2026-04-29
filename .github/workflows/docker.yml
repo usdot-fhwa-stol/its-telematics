@@ -45,7 +45,7 @@ jobs:
           file: ./telematic_system/telematic_apps/apache2/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_apache2:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare
+      - name: Docker Scout Compare telematic-apache
         uses: docker/scout-action@v1
         with:
           command: compare
@@ -54,6 +54,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-carma-cloud-nats-bridge:
     needs: determine_docker_org_and_tag
@@ -75,7 +76,7 @@ jobs:
           file: ./telematic_system/telematic_units/carma_cloud_bridge/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_cloud_nats_bridge:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare
+      - name: Docker Scout Compare telematic-carma-cloud-nats-bridge
         uses: docker/scout-action@v1
         with:
           command: compare
@@ -84,6 +85,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-kafka-bridge:
     needs: determine_docker_org_and_tag
@@ -105,7 +107,7 @@ jobs:
           file: ./telematic_system/telematic_units/kafka_bridge/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_street_nats_bridge:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare
+      - name: Docker Scout Compare telematic-kafka-bridge
         uses: docker/scout-action@v1
         with:
           command: compare
@@ -114,6 +116,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-carma-vehicle-bridge:
     needs: determine_docker_org_and_tag
@@ -135,7 +138,7 @@ jobs:
           file: ./telematic_system/telematic_units/carma_vehicle_bridge/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare
+      - name: Docker Scout Compare telematic-carma-vehicle-bridge
         uses: docker/scout-action@v1
         with:
           command: compare
@@ -144,6 +147,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-historical-data-processing:
     needs: determine_docker_org_and_tag
@@ -165,7 +169,7 @@ jobs:
           file: ./telematic_system/telematic_historical_data_processing/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_historical_data_processing:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare
+      - name: Docker Scout Compare telematic-historical-data-processing
         uses: docker/scout-action@v1
         with:
           command: compare
@@ -174,6 +178,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-grafana:
     needs: determine_docker_org_and_tag
@@ -195,7 +200,7 @@ jobs:
           file: ./telematic_system/telematic_apps/grafana/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_grafana:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare
+      - name: Docker Scout Compare telematic-grafana
         uses: docker/scout-action@v1
         with:
           command: compare
@@ -204,6 +209,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-cloud-messaging:
     needs: determine_docker_org_and_tag
@@ -225,7 +231,7 @@ jobs:
           file: ./telematic_system/telematic_cloud_messaging/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_cloud_messaging:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare
+      - name: Docker Scout Compare telematic-cloud-messaging
         uses: docker/scout-action@v1
         with:
           command: compare
@@ -234,6 +240,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-rsu-management-service:
     needs: determine_docker_org_and_tag
@@ -255,7 +262,7 @@ jobs:
           file: ./telematic_system/telematic_rsu_management_service/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_rsu_management_service:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare
+      - name: Docker Scout Compare telematic-rsu-management-service
         uses: docker/scout-action@v1
         with:
           command: compare
@@ -264,6 +271,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-web-app-client:
     needs: determine_docker_org_and_tag
@@ -285,7 +293,7 @@ jobs:
           file: ./telematic_system/telematic_apps/web_app/client/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_client:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare
+      - name: Docker Scout Compare telematic-web-app-client
         uses: docker/scout-action@v1
         with:
           command: compare
@@ -294,6 +302,7 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-web-app-server:
     needs: determine_docker_org_and_tag
@@ -315,7 +324,7 @@ jobs:
           file: ./telematic_system/telematic_apps/web_app/server/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_server:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare
+      - name: Docker Scout Compare telematic-web-app-server
         uses: docker/scout-action@v1
         with:
           command: compare
@@ -324,3 +333,4 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
