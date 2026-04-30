@@ -25,49 +25,8 @@ jobs:
       - id: docker-org-and-tag
         uses: usdot-fhwa-stol/actions/docker-org-and-tag@main
 
-  # Detect changed image directories to trigger only the related build jobs
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      apache: ${{ steps.filter.outputs.apache }}
-      carma_cloud_bridge: ${{ steps.filter.outputs.carma_cloud_bridge }}
-      kafka_bridge: ${{ steps.filter.outputs.kafka_bridge }}
-      carma_vehicle_bridge: ${{ steps.filter.outputs.carma_vehicle_bridge }}
-      historical_data: ${{ steps.filter.outputs.historical_data }}
-      grafana: ${{ steps.filter.outputs.grafana }}
-      cloud_messaging: ${{ steps.filter.outputs.cloud_messaging }}
-      rsu_management: ${{ steps.filter.outputs.rsu_management }}
-      web_client: ${{ steps.filter.outputs.web_client }}
-      web_server: ${{ steps.filter.outputs.web_server }}
-    steps:
-      - uses: dorny/paths-filter@v4
-        id: filter
-        with:
-          filters: |
-            apache:
-              - 'telematic_system/telematic_apps/apache2/**'
-            carma_cloud_bridge:
-              - 'telematic_system/telematic_units/carma_cloud_bridge/**'
-            kafka_bridge:
-              - 'telematic_system/telematic_units/kafka_bridge/**'
-            carma_vehicle_bridge:
-              - 'telematic_system/telematic_units/carma_vehicle_bridge/**'
-            historical_data:
-              - 'telematic_system/telematic_historical_data_processing/**'
-            grafana:
-              - 'telematic_system/telematic_apps/grafana/**'
-            cloud_messaging:
-              - 'telematic_system/telematic_cloud_messaging/**'
-            rsu_management:
-              - 'telematic_system/telematic_rsu_management_service/**'
-            web_client:
-              - 'telematic_system/telematic_apps/web_app/client/**'
-            web_server:
-              - 'telematic_system/telematic_apps/web_app/server/**'
-
   telematic-apache:
-    needs: [determine_docker_org_and_tag, changes]
-    if: needs.changes.outputs.apache == 'true'
+    needs: [determine_docker_org_and_tag]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -100,8 +59,7 @@ jobs:
           keep-previous-comments: true        # replace prior Scout comment on each push
 
   telematic-carma-cloud-nats-bridge:
-    needs: [determine_docker_org_and_tag, changes]
-    if: needs.changes.outputs.carma_cloud_bridge == 'true'
+    needs: [determine_docker_org_and_tag]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -124,7 +82,7 @@ jobs:
         uses: docker/scout-action@v1
         with:
           command: compare
-          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_cloud_nats_bridge:pr-${{ github.event.pull_request.number }}
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_ }}/carma_cloud_nats_bridge:pr-${{ github.event.pull_request.number }}
           to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           ignore-unchanged: true
           only-severities: critical,high
@@ -132,8 +90,7 @@ jobs:
           keep-previous-comments: true
 
   telematic-kafka-bridge:
-    needs: [determine_docker_org_and_tag, changes]
-    if: needs.changes.outputs.kafka_bridge == 'true'
+    needs: [determine_docker_org_and_tag]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -164,8 +121,7 @@ jobs:
           keep-previous-comments: true
 
   telematic-carma-vehicle-bridge:
-    needs: [determine_docker_org_and_tag, changes]
-    if: needs.changes.outputs.carma_vehicle_bridge == 'true'
+    needs: [determine_docker_org_and_tag]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -196,8 +152,7 @@ jobs:
           keep-previous-comments: true
 
   telematic-historical-data-processing:
-    needs: [determine_docker_org_and_tag, changes]
-    if: needs.changes.outputs.historical_data == 'true'
+    needs: [determine_docker_org_and_tag]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -228,8 +183,7 @@ jobs:
           keep-previous-comments: true
 
   telematic-grafana:
-    needs: [determine_docker_org_and_tag, changes]
-    if: needs.changes.outputs.grafana == 'true'
+    needs: [determine_docker_org_and_tag]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -260,8 +214,7 @@ jobs:
           keep-previous-comments: true
 
   telematic-cloud-messaging:
-    needs: [determine_docker_org_and_tag, changes]
-    if: needs.changes.outputs.cloud_messaging == 'true'
+    needs: [determine_docker_org_and_tag]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -292,8 +245,7 @@ jobs:
           keep-previous-comments: true
 
   telematic-rsu-management-service:
-    needs: [determine_docker_org_and_tag, changes]
-    if: needs.changes.outputs.rsu_management == 'true'
+    needs: [determine_docker_org_and_tag]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -324,8 +276,7 @@ jobs:
           keep-previous-comments: true
 
   telematic-web-app-client:
-    needs: [determine_docker_org_and_tag, changes]
-    if: needs.changes.outputs.web_client == 'true'
+    needs: [determine_docker_org_and_tag]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -356,8 +307,7 @@ jobs:
           keep-previous-comments: true
 
   telematic-web-app-server:
-    needs: [determine_docker_org_and_tag, changes]
-    if: needs.changes.outputs.web_server == 'true'
+    needs: [determine_docker_org_and_tag]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
