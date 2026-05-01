@@ -1,128 +1,388 @@
 name: Docker build
 on:
   pull_request:
-  push:
+    branches:
+      - develop
+      - master
+      - 'release/**'
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
+  determine_docker_org_and_tag:
+    runs-on: ubuntu-latest
+    outputs:
+      docker_organization: ${{ steps.docker-org-and-tag.outputs.docker_organization }}
+      docker_image_tag: ${{ steps.docker-org-and-tag.outputs.docker_image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - id: docker-org-and-tag
+        uses: usdot-fhwa-stol/actions/docker-org-and-tag@main
+
+  # Detect changed image directories to trigger only the related build jobs
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      apache: ${{ steps.filter.outputs.apache }}
+      carma_cloud_bridge: ${{ steps.filter.outputs.carma_cloud_bridge }}
+      kafka_bridge: ${{ steps.filter.outputs.kafka_bridge }}
+      carma_vehicle_bridge: ${{ steps.filter.outputs.carma_vehicle_bridge }}
+      historical_data: ${{ steps.filter.outputs.historical_data }}
+      grafana: ${{ steps.filter.outputs.grafana }}
+      cloud_messaging: ${{ steps.filter.outputs.cloud_messaging }}
+      rsu_management: ${{ steps.filter.outputs.rsu_management }}
+      web_client: ${{ steps.filter.outputs.web_client }}
+      web_server: ${{ steps.filter.outputs.web_server }}
+    steps:
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            apache:
+              - 'telematic_system/telematic_apps/apache2/**'
+            carma_cloud_bridge:
+              - 'telematic_system/telematic_units/carma_cloud_bridge/**'
+            kafka_bridge:
+              - 'telematic_system/telematic_units/kafka_bridge/**'
+            carma_vehicle_bridge:
+              - 'telematic_system/telematic_units/carma_vehicle_bridge/**'
+            historical_data:
+              - 'telematic_system/telematic_historical_data_processing/**'
+            grafana:
+              - 'telematic_system/telematic_apps/grafana/**'
+            cloud_messaging:
+              - 'telematic_system/telematic_cloud_messaging/**'
+            rsu_management:
+              - 'telematic_system/telematic_rsu_management_service/**'
+            web_client:
+              - 'telematic_system/telematic_apps/web_app/client/**'
+            web_server:
+              - 'telematic_system/telematic_apps/web_app/server/**'
+
   telematic-apache:
+    needs: [determine_docker_org_and_tag, changes]
+    if: ${{ github.event.pull_request.base.ref == 'master' || needs.changes.outputs.apache == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # Build PR image locally so Docker Scout can scan it
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_apps/apache2/
           file: ./telematic_system/telematic_apps/apache2/Dockerfile
+          load: true
+          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_apache2:pr-${{ github.event.pull_request.number }}
+      # Compare PR image against the base branch env on Docker Scout and post results to the PR
+      - name: Docker Scout Compare telematic-apache
+        uses: docker/scout-action@v1
+        with:
+          command: compare
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_apache2:pr-${{ github.event.pull_request.number }}
+          to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          ignore-unchanged: true              # only show CVEs introduced by this PR
+          only-severities: critical,high      # ignore low/medium noise
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true        # replace prior Scout comment on each push
+
   telematic-carma-cloud-nats-bridge:
+    needs: [determine_docker_org_and_tag, changes]
+    if: ${{ github.event.pull_request.base.ref == 'master' || needs.changes.outputs.carma_cloud_bridge == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_units/carma_cloud_bridge/
           file: ./telematic_system/telematic_units/carma_cloud_bridge/Dockerfile
+          load: true
+          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_cloud_nats_bridge:pr-${{ github.event.pull_request.number }}
+      - name: Docker Scout Compare telematic-carma-cloud-nats-bridge
+        uses: docker/scout-action@v1
+        with:
+          command: compare
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_cloud_nats_bridge:pr-${{ github.event.pull_request.number }}
+          to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          ignore-unchanged: true
+          only-severities: critical,high
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
+
   telematic-kafka-bridge:
+    needs: [determine_docker_org_and_tag, changes]
+    if: ${{ github.event.pull_request.base.ref == 'master' || needs.changes.outputs.kafka_bridge == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_units/kafka_bridge/
           file: ./telematic_system/telematic_units/kafka_bridge/Dockerfile
+          load: true
+          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_street_nats_bridge:pr-${{ github.event.pull_request.number }}
+      - name: Docker Scout Compare telematic-kafka-bridge
+        uses: docker/scout-action@v1
+        with:
+          command: compare
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_street_nats_bridge:pr-${{ github.event.pull_request.number }}
+          to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          ignore-unchanged: true
+          only-severities: critical,high
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
+
   telematic-carma-vehicle-bridge:
+    needs: [determine_docker_org_and_tag, changes]
+    if: ${{ github.event.pull_request.base.ref == 'master' || needs.changes.outputs.carma_vehicle_bridge == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_units/carma_vehicle_bridge/
           file: ./telematic_system/telematic_units/carma_vehicle_bridge/Dockerfile
+          load: true
+          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
+      - name: Docker Scout Compare telematic-carma-vehicle-bridge
+        uses: docker/scout-action@v1
+        with:
+          command: compare
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
+          to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          ignore-unchanged: true
+          only-severities: critical,high
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
+
   telematic-historical-data-processing:
+    needs: [determine_docker_org_and_tag, changes]
+    if: ${{ github.event.pull_request.base.ref == 'master' || needs.changes.outputs.historical_data == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_historical_data_processing/
           file: ./telematic_system/telematic_historical_data_processing/Dockerfile
+          load: true
+          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_historical_data_processing:pr-${{ github.event.pull_request.number }}
+      - name: Docker Scout Compare telematic-historical-data-processing
+        uses: docker/scout-action@v1
+        with:
+          command: compare
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_historical_data_processing:pr-${{ github.event.pull_request.number }}
+          to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          ignore-unchanged: true
+          only-severities: critical,high
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
+
   telematic-grafana:
+    needs: [determine_docker_org_and_tag, changes]
+    if: ${{ github.event.pull_request.base.ref == 'master' || needs.changes.outputs.grafana == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_apps/grafana/
           file: ./telematic_system/telematic_apps/grafana/Dockerfile
+          load: true
+          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_grafana:pr-${{ github.event.pull_request.number }}
+      - name: Docker Scout Compare telematic-grafana
+        uses: docker/scout-action@v1
+        with:
+          command: compare
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_grafana:pr-${{ github.event.pull_request.number }}
+          to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          ignore-unchanged: true
+          only-severities: critical,high
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
+
   telematic-cloud-messaging:
+    needs: [determine_docker_org_and_tag, changes]
+    if: ${{ github.event.pull_request.base.ref == 'master' || needs.changes.outputs.cloud_messaging == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_cloud_messaging/
           file: ./telematic_system/telematic_cloud_messaging/Dockerfile
+          load: true
+          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_cloud_messaging:pr-${{ github.event.pull_request.number }}
+      - name: Docker Scout Compare telematic-cloud-messaging
+        uses: docker/scout-action@v1
+        with:
+          command: compare
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_cloud_messaging:pr-${{ github.event.pull_request.number }}
+          to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          ignore-unchanged: true
+          only-severities: critical,high
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
+
   telematic-rsu-management-service:
+    needs: [determine_docker_org_and_tag, changes]
+    if: ${{ github.event.pull_request.base.ref == 'master' || needs.changes.outputs.rsu_management == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_rsu_management_service/
           file: ./telematic_system/telematic_rsu_management_service/Dockerfile
-          
+          load: true
+          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_rsu_management_service:pr-${{ github.event.pull_request.number }}
+      - name: Docker Scout Compare telematic-rsu-management-service
+        uses: docker/scout-action@v1
+        with:
+          command: compare
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_rsu_management_service:pr-${{ github.event.pull_request.number }}
+          to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          ignore-unchanged: true
+          only-severities: critical,high
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
+
   telematic-web-app-client:
+    needs: [determine_docker_org_and_tag, changes]
+    if: ${{ github.event.pull_request.base.ref == 'master' || needs.changes.outputs.web_client == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_apps/web_app/client/
           file: ./telematic_system/telematic_apps/web_app/client/Dockerfile
+          load: true
+          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_client:pr-${{ github.event.pull_request.number }}
+      - name: Docker Scout Compare telematic-web-app-client
+        uses: docker/scout-action@v1
+        with:
+          command: compare
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_client:pr-${{ github.event.pull_request.number }}
+          to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          ignore-unchanged: true
+          only-severities: critical,high
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
+
   telematic-web-app-server:
+    needs: [determine_docker_org_and_tag, changes]
+    if: ${{ github.event.pull_request.base.ref == 'master' || needs.changes.outputs.web_server == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./telematic_system/telematic_apps/web_app/server/
           file: ./telematic_system/telematic_apps/web_app/server/Dockerfile
+          load: true
+          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_server:pr-${{ github.event.pull_request.number }}
+      - name: Docker Scout Compare telematic-web-app-server
+        uses: docker/scout-action@v1
+        with:
+          command: compare
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_server:pr-${{ github.event.pull_request.number }}
+          to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          ignore-unchanged: true
+          only-severities: critical,high
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
