@@ -1,4 +1,3 @@
 .github/workflows/influx_admin_token.txt
-.vscode/
 **/*.pptx
 secrets/
