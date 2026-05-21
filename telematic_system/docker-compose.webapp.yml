@@ -5,7 +5,7 @@ services:
         context: "./telematic_apps/web_app/server"
       restart: always
       container_name: web_server
-      image: usdotfhwastoldevdev/telematic_web_server:develop
+      image: usdotfhwastoldev/telematic_web_server:develop
       logging:
         options:
           max-size: "10m"
