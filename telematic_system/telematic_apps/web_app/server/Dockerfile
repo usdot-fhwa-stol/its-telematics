@@ -11,7 +11,7 @@ RUN apk add --no-cache bash dos2unix python3 make g++
 RUN printf '#!/bin/sh\nif [ "$1" = "-t" ]; then shift; fi\nexec /usr/bin/timeout "$@"\n' > /usr/local/bin/timeout \
     && chmod +x /usr/local/bin/timeout
 
-RUN npm ci install --ignore-scripts && \
+RUN npm ci --ignore-scripts && \
     npm rebuild bcrypt --build-from-source && \
     npm cache clean --force
 
