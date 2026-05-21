@@ -4,7 +4,7 @@ FROM node:20.11.1-alpine
 WORKDIR /app
 
 #A wildcard is used to ensure both package.json AND package-lock.json are copied where available
-COPY package.json package-lock.json ./
+COPY package*.json ./
 
 RUN apk add --no-cache bash dos2unix python3 make g++
 
