@@ -86,14 +86,14 @@ class ForwardingLoopService:
             raise
 
     async def publish_with_retry(self, subject, payload):
-        """Publish to NATS with bounded retry and dead-letter logging."""
+        """Publish to NATS with bounded retry and failed-publish buffering."""
         for attempt in range(self.bridge.nats_publish_max_retries + 1):
             try:
                 await self.bridge.nc.publish(subject, payload)
                 return True
             except Exception as exc:
                 if attempt >= self.bridge.nats_publish_max_retries:
-                    self.bridge.dead_letter_messages.append(
+                    self.bridge.failed_publish_messages.append(
                         {
                             "subject": subject,
                             "payload": payload.decode("utf-8", errors="ignore")
@@ -103,7 +103,7 @@ class ForwardingLoopService:
                         }
                     )
                     self.bridge.logger.error(
-                        "NATS publish failed, message sent to dead-letter log for subject %s: %s",
+                        "NATS publish failed, message added to failed-publish buffer for subject %s: %s",
                         subject,
                         exc,
                     )

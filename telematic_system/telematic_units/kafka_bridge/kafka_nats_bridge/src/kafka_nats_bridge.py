@@ -83,7 +83,9 @@ class KafkaNatsBridge():
         self.subscribers_list = []  # list of topics the user has requested to publish
         self.registered = False
         self.control_endpoints_ready = False
-        self.dead_letter_messages = deque(maxlen=config.nats_dead_letter_max_messages)
+        self.failed_publish_messages = deque(
+            maxlen=config.nats_failed_publish_buffer_max_messages
+        )
         self.registration_service = RegistrationService(self)
         self.control_endpoints_service = ControlEndpointsService(self)
         self.forwarding_loop_service = ForwardingLoopService(self)

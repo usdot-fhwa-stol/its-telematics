@@ -249,7 +249,7 @@ def test_check_status_returns_error_on_publish_failure(bridge_env, monkeypatch):
     ]
 
 
-def test_publish_with_retry_dead_letter_records_failure(bridge_env, monkeypatch):
+def test_publish_with_retry_records_failed_publish(bridge_env, monkeypatch):
     bridge = KafkaNatsBridge()
     bridge.nats_publish_max_retries = 1
 
@@ -265,8 +265,8 @@ def test_publish_with_retry_dead_letter_records_failure(bridge_env, monkeypatch)
     result = asyncio.run(bridge.publish_with_retry("kafka.unit.data.topic", b"{}"))
 
     assert result is False
-    assert len(bridge.dead_letter_messages) == 1
-    assert bridge.dead_letter_messages[0]["subject"] == "kafka.unit.data.topic"
+    assert len(bridge.failed_publish_messages) == 1
+    assert bridge.failed_publish_messages[0]["subject"] == "kafka.unit.data.topic"
 
 
 # ── BridgeLogger unit tests ────────────────────────────────────────────────────
