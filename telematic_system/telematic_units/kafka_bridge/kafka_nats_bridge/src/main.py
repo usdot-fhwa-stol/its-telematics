@@ -18,30 +18,15 @@ import asyncio
 
 
 #This creates a carma streets to nats server bridge. It will initiate communication with the
-#carma-streets kafka broker and the telematic cloud nats server. Users can subscribe to carma streets 
+#carma-streets kafka broker and the telematic cloud nats server. Users can subscribe to carma streets
 #topics from the telematics UI, which will be streamed to the nats server.
-def main():
-
-    #Create KafkaNatsBridge object and asyncio loop
+async def startup_bridge():
     kafka_nats_bridge = KafkaNatsBridge()
-    loop = asyncio.get_event_loop()
+    await kafka_nats_bridge.run()
 
-    #Create individual asyncio tasks to connect to the NATS server, register the KafkaNatsBridge
-    #object, listen for requests for sending available topics/publishing specific topics, and publish
-    #carma streets data that has been subscribed to
-    tasks = [
-        loop.create_task(kafka_nats_bridge.run_async_kafka_consumer()),# Kafka consumer was created, subscribe to all available carma-streets kafka topics, and wait to read data from kafka topics
-        loop.create_task(kafka_nats_bridge.nats_connect()),
-        loop.create_task(kafka_nats_bridge.register_unit()),
-        loop.create_task(kafka_nats_bridge.check_status()),
-        loop.create_task(kafka_nats_bridge.available_topics()),
-        loop.create_task(kafka_nats_bridge.publish_topics())
-    ]
 
-    #Run asyncio until tasks are complete
-    loop.run_forever()
-    loop.run_until_complete(asyncio.wait(tasks))
-    loop.close()
+def main():
+    asyncio.run(startup_bridge())
 
 if __name__ == '__main__':
     main()
