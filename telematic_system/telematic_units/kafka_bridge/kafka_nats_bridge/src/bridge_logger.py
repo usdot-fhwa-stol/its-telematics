@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from config import BridgeConfig
@@ -60,7 +60,7 @@ class BridgeLogger(logging.Logger):
         - ``"all"``      – both handlers are attached
         """
         logging.setLoggerClass(cls)
-        logger: BridgeLogger = logging.getLogger(config.kafka_bridge_log_name)  # type: ignore[assignment]
+        logger = cast(BridgeLogger, logging.getLogger(config.kafka_bridge_log_name))
         logger.__class__ = cls
 
         # Remove any handlers from a previous call (safe for re-use in tests).

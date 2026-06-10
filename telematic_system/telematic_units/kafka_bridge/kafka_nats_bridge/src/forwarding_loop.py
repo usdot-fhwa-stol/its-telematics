@@ -21,7 +21,6 @@ from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING
 
 from aiokafka import AIOKafkaConsumer
-import pytz
 
 if TYPE_CHECKING:
     from kafka_nats_bridge import KafkaNatsBridge
@@ -172,7 +171,7 @@ class ForwardingLoopService:
         """Normalize payload timestamps to UTC epoch microseconds with fallback."""
         
         naive = datetime(int(date.today().year), 1, 1, 0, 0, 0)
-        first_day_epoch = pytz.utc.localize(naive).timestamp() * 1000
+        first_day_epoch = naive.replace(tzinfo=timezone.utc).timestamp() * 1000
         milli_to_micro = 1000
         minute_to_milli = 60000
         second_to_micro = 1000000

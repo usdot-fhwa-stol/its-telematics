@@ -96,7 +96,7 @@ class KafkaNatsBridge():
             UnitKeys.UNIT_NAME.value: self.unit_name,
         }
 
-        self.logger = BridgeLogger.create(config)
+        self.logger: BridgeLogger = BridgeLogger.create(config)
 
         self.logger.info("Resolved NATS URL: %s", self.nats_url)
         self.logger.info("Exclusion list: %s", self.exclusion_list)

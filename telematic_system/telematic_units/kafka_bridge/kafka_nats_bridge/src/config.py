@@ -21,6 +21,8 @@ from typing import List, Literal
 from pydantic import AliasChoices, Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+NATS_URL_PREFIX = "nats://"
+
 
 class BridgeConfig(BaseSettings):
     """
@@ -74,9 +76,9 @@ class BridgeConfig(BaseSettings):
     def nats_url(self) -> str:
         """NATS connection URL normalised to exactly one ``nats://`` prefix."""
         endpoint = self.nats_server_ip_port.strip()
-        if endpoint.startswith("nats://"):
-            endpoint = endpoint[len("nats://"):]
-        return "nats://" + endpoint
+        if endpoint.startswith(NATS_URL_PREFIX):
+            endpoint = endpoint[len(NATS_URL_PREFIX):]
+        return NATS_URL_PREFIX + endpoint
 
     @computed_field  # type: ignore[prop-decorator]
     @property
