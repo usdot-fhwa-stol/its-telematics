@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import logging.handlers
 import sys
@@ -334,3 +335,177 @@ def test_bridge_uses_bridge_logger(monkeypatch):
     cfg = _make_config(monkeypatch, log_name="test_bridge_uses_logger")
     bridge = KafkaNatsBridge(config=cfg)
     assert isinstance(bridge.logger, BridgeLogger)
+
+
+# ── ControlEndpointsService unit tests ─────────────────────────────────────────
+
+def test_available_topics_excludes_configured_topics(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+    bridge.kafka_topics = ["spat", "map", "bsm"]
+    bridge.exclusion_list = ["map"]
+
+    observed = {"cb": None}
+    published = []
+
+    async def _subscribe(_subject, _queue, cb):
+        observed["cb"] = cb
+
+    async def _publish_with_retry(subject, payload):
+        published.append((subject, payload))
+        return True
+
+    monkeypatch.setattr(bridge.nc, "subscribe", _subscribe)
+    monkeypatch.setattr(bridge, "publish_with_retry", _publish_with_retry)
+
+    asyncio.run(bridge.available_topics())
+
+    assert observed["cb"] is not None
+    msg = SimpleNamespace(reply="reply.topics")
+    asyncio.run(observed["cb"](msg))
+
+    assert len(published) == 1
+    assert published[0][0] == "reply.topics"
+    payload = json.loads(published[0][1].decode("utf-8"))
+    assert payload["unit_id"] == "kafka_id"
+    assert [t["name"] for t in payload["topics"]] == ["spat", "bsm"]
+
+
+def test_publish_topics_updates_subscribers_list(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+
+    observed = {"cb": None}
+    published = []
+
+    async def _subscribe(_subject, _queue, cb):
+        observed["cb"] = cb
+
+    async def _publish_with_retry(subject, payload):
+        published.append((subject, payload))
+        return True
+
+    monkeypatch.setattr(bridge.nc, "subscribe", _subscribe)
+    monkeypatch.setattr(bridge, "publish_with_retry", _publish_with_retry)
+
+    asyncio.run(bridge.publish_topics())
+
+    assert observed["cb"] is not None
+    msg = SimpleNamespace(
+        reply="reply.publish",
+        data=json.dumps({"topics": ["spat", "bsm"]}).encode("utf-8"),
+    )
+    asyncio.run(observed["cb"](msg))
+
+    assert published == [("reply.publish", b"topic publish request received!")]
+    assert bridge.subscribers_list == ["spat", "bsm"]
+
+
+# ── ForwardingLoopService unit tests ───────────────────────────────────────────
+
+def test_build_forward_message_populates_expected_fields(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+    bridge.kafka_info["event_name"] = "evt"
+    bridge.kafka_info["testing_type"] = "tt"
+    bridge.kafka_info["location"] = "loc"
+
+    payload = {"timestamp": 1773408367485}
+    msg = bridge.forwarding_loop_service._build_forward_message("spat", payload)
+
+    assert msg["unit_id"] == bridge.unit_id
+    assert msg["unit_type"] == bridge.unit_type
+    assert msg["unit_name"] == bridge.unit_name
+    assert msg["event_name"] == "evt"
+    assert msg["testing_type"] == "tt"
+    assert msg["location"] == "loc"
+    assert msg["topic_name"] == "spat"
+    assert isinstance(msg["timestamp"], (int, float))
+
+
+def test_kafka_read_publishes_only_when_registered_and_subscribed(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+    bridge.registered = True
+    bridge.subscribers_list = ["spat"]
+    bridge.kafka_info["event_name"] = "evt"
+    bridge.kafka_info["testing_type"] = "tt"
+    bridge.kafka_info["location"] = "loc"
+
+    class _Consumer:
+        def __init__(self, messages):
+            self._messages = messages
+
+        def __aiter__(self):
+            self._it = iter(self._messages)
+            return self
+
+        async def __anext__(self):
+            try:
+                return next(self._it)
+            except StopIteration:
+                raise StopAsyncIteration
+
+    bridge.kafka_consumer = _Consumer(
+        [
+            SimpleNamespace(topic="spat", value={"timestamp": 1773408367485}),
+            SimpleNamespace(topic="map", value={"timestamp": 1773408367485}),
+        ]
+    )
+
+    published = []
+
+    async def _publish_with_retry(subject, payload):
+        published.append((subject, payload))
+        return True
+
+    monkeypatch.setattr(bridge.forwarding_loop_service, "publish_with_retry", _publish_with_retry)
+
+    asyncio.run(bridge.kafka_read())
+
+    assert len(published) == 1
+    assert published[0][0] == f"kafka.{bridge.unit_id}.data.spat"
+
+
+# ── RegistrationService unit tests ─────────────────────────────────────────────
+
+def test_register_unit_with_retry_succeeds_after_retries(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+    bridge.nats_registration_max_retries = 3
+
+    attempts = {"count": 0}
+
+    async def _register_unit():
+        attempts["count"] += 1
+        return attempts["count"] == 3
+
+    async def _sleep(_):
+        return None
+
+    monkeypatch.setattr(bridge.registration_service, "register_unit", _register_unit)
+    monkeypatch.setattr(asyncio, "sleep", _sleep)
+
+    result = asyncio.run(bridge.register_unit_with_retry())
+
+    assert result is True
+    assert attempts["count"] == 3
+
+
+def test_register_unit_success_sets_registration_and_metadata(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+
+    response_payload = {
+        "event_name": "IntegrationTest2",
+        "location": "West Intersection",
+        "testing_type": "integration",
+    }
+
+    async def _request(_subject, _payload, **kwargs):
+        assert kwargs["timeout"] == 5
+        return SimpleNamespace(data=json.dumps(response_payload).encode("utf-8"))
+
+    monkeypatch.setattr(bridge.nc, "request", _request)
+
+    result = asyncio.run(bridge.register_unit())
+
+    assert result is True
+    assert bridge.registered is True
+    assert bridge.kafka_info["event_name"] == "IntegrationTest2"
+    assert bridge.kafka_info["location"] == "West Intersection"
+    assert bridge.kafka_info["testing_type"] == "integration"

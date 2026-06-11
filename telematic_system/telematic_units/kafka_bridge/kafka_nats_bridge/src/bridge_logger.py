@@ -32,11 +32,6 @@ class BridgeLogger(logging.Logger):
     """
     Custom ``logging.Logger`` subclass for the Kafka-NATS bridge.
 
-    Supports file, console, or both handler modes driven entirely by
-    ``BridgeConfig``.  Use the ``create`` classmethod rather than the
-    standard ``logging.getLogger`` factory so that the correct subclass and
-    handlers are always returned.
-
     Example::
 
         from bridge_logger import BridgeLogger
@@ -45,7 +40,7 @@ class BridgeLogger(logging.Logger):
     """
 
     @classmethod
-    def create(cls, config: "BridgeConfig") -> "BridgeLogger":
+    def create(cls, config: BridgeConfig) -> BridgeLogger:
         """
         Build and return a fully configured ``BridgeLogger`` instance.
 
@@ -94,7 +89,7 @@ class BridgeLogger(logging.Logger):
 
     @staticmethod
     def _make_file_handler(
-        config: "BridgeConfig", level: int
+        config: BridgeConfig, level: int
     ) -> RotatingFileHandler:
         timestamp = datetime.now().strftime("_%m_%d_%Y_%H_%M_%S")
         filename = config.kafka_bridge_log_path + config.kafka_bridge_log_name + timestamp + ".log"

@@ -32,7 +32,7 @@ services:
     build:
           context: ./telematic_units/kafka_bridge
           dockerfile: Dockerfile
-    image: usdotfhwastoldev/carma_street_nats_bridge:develop
+    image: usdotfhwastoldev/kafka_nats_bridge:develop
     logging:
       options:
         max-size: "2g"

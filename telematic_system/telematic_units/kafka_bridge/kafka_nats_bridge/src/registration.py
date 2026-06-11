@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 class RegistrationService:
     """Handle unit registration lifecycle after NATS connectivity is established."""
 
-    def __init__(self, bridge: "KafkaNatsBridge"):
+    def __init__(self, bridge: KafkaNatsBridge):
         self.bridge = bridge
 
     async def register_unit_with_retry(self):
@@ -71,7 +71,7 @@ class RegistrationService:
                 self.bridge.kafka_info["testing_type"] = message_json["testing_type"]
                 self.bridge.registered = True
                 return True
-            except Exception as exc:
+            except (asyncio.TimeoutError, KeyError, ValueError) as exc:
                 self.bridge.logger.warning("Registering unit failed: %s", exc)
                 self.bridge.registered = False
                 return False

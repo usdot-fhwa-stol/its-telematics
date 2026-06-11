@@ -33,7 +33,7 @@ class BridgeConfig(BaseSettings):
     would otherwise surface as runtime crashes deep in the bridge logic.
 
     Derived values (``nats_url``, ``exclusion_list``) are computed once from the
-    raw inputs via ``@computed_field`` properties and cached by Pydantic.
+    raw inputs via ``@computed_field`` properties
     """
 
     model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
@@ -71,7 +71,7 @@ class BridgeConfig(BaseSettings):
 
     # ── Derived fields ──────────────────────────────────────────────────────────
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  
     @property
     def nats_url(self) -> str:
         """NATS connection URL normalised to exactly one ``nats://`` prefix."""
@@ -80,7 +80,7 @@ class BridgeConfig(BaseSettings):
             endpoint = endpoint[len(NATS_URL_PREFIX):]
         return NATS_URL_PREFIX + endpoint
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  
     @property
     def exclusion_list(self) -> List[str]:
         """Parsed list of Kafka topic names excluded from available-topics responses."""
