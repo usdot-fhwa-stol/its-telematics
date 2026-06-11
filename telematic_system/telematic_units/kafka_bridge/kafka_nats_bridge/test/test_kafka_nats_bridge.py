@@ -516,3 +516,19 @@ def test_register_unit_success_sets_registration_and_metadata(bridge_env, monkey
     assert bridge.kafka_info["event_name"] == "IntegrationTest2"
     assert bridge.kafka_info["location"] == "West Intersection"
     assert bridge.kafka_info["testing_type"] == "integration"
+
+
+def test_register_unit_returns_false_on_no_responders(bridge_env, monkeypatch):
+    from nats.errors import NoRespondersError
+
+    bridge = KafkaNatsBridge()
+
+    async def _request(_subject, _payload, **_kwargs):
+        raise NoRespondersError
+
+    monkeypatch.setattr(bridge.nc, "request", _request)
+
+    result = asyncio.run(bridge.register_unit())
+
+    assert result is False
+    assert bridge.registered is False

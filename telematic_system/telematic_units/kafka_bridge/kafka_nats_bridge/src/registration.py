@@ -18,6 +18,12 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import TYPE_CHECKING
+from nats.errors import (
+    ConnectionClosedError,
+    NoRespondersError,
+    NoServersError,
+    TimeoutError,
+)
 
 if TYPE_CHECKING:
     from kafka_nats_bridge import KafkaNatsBridge
@@ -71,7 +77,15 @@ class RegistrationService:
                 self.bridge.kafka_info["testing_type"] = message_json["testing_type"]
                 self.bridge.registered = True
                 return True
-            except (asyncio.TimeoutError, KeyError, ValueError) as exc:
+            except (
+                asyncio.TimeoutError,
+                KeyError,
+                ValueError,
+                ConnectionClosedError,
+                NoRespondersError,
+                TimeoutError,
+                NoServersError,
+            ) as exc:
                 self.bridge.logger.warning("Registering unit failed: %s", exc)
                 self.bridge.registered = False
                 return False
