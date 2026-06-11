@@ -41,6 +41,7 @@ class BridgeConfig(BaseSettings):
     # ── NATS connection ─────────────────────────────────────────────────────────
     nats_server_ip_port: str  # NATS host:port (or nats://host:port) for bridge connection.
     nats_reconnect_time_wait_seconds: float = 1.0  # Delay between NATS reconnect attempts.
+    nats_max_reconnect_attempts: int = -1  # Max NATS reconnect attempts (-1 = infinite retries).
     nats_registration_max_retries: int = 5  # Max register_unit retries after connect (-1 = infinite).
     nats_publish_max_retries: int = 3  # Max retries for each NATS publish operation.
     nats_publish_retry_base_delay_seconds: float = 0.2  # Base delay for exponential publish backoff.

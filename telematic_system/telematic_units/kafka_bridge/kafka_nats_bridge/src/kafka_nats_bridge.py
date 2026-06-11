@@ -56,6 +56,7 @@ class KafkaNatsBridge():
         # NATS settings
         self.nats_url = config.nats_url
         self.nats_reconnect_wait = config.nats_reconnect_time_wait_seconds
+        self.nats_max_reconnect_attempts = config.nats_max_reconnect_attempts
         self.nats_registration_max_retries = config.nats_registration_max_retries
         self.nats_publish_max_retries = config.nats_publish_max_retries
         self.nats_publish_retry_base_delay = config.nats_publish_retry_base_delay_seconds
@@ -159,7 +160,7 @@ class KafkaNatsBridge():
                                   error_cb=error_cb,
                                   reconnected_cb=reconnected_cb,
                                   disconnected_cb=disconnected_cb,
-                                  max_reconnect_attempts=-1,
+                                  max_reconnect_attempts=self.nats_max_reconnect_attempts,
                                   reconnect_time_wait=self.nats_reconnect_wait)
             self.logger.info(" In nats_connect: Connected to nats server!")
         except Exception as exc:

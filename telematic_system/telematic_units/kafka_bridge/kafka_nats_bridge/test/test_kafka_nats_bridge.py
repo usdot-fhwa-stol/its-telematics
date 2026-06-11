@@ -118,6 +118,12 @@ def test_config_exclusion_list_empty_when_unset(min_env, monkeypatch):
     assert cfg.exclusion_list == []
 
 
+def test_config_nats_max_reconnect_attempts_can_be_overridden(min_env, monkeypatch):
+    monkeypatch.setenv("NATS_MAX_RECONNECT_ATTEMPTS", "7")
+    cfg = BridgeConfig()
+    assert cfg.nats_max_reconnect_attempts == 7
+
+
 def test_config_log_path_trailing_slash_added(min_env, monkeypatch):
     monkeypatch.setenv("KAFKA_BRIDGE_LOG_PATH", "/var/logs")
     cfg = BridgeConfig()
@@ -135,6 +141,7 @@ def test_config_defaults_are_applied(min_env):
     cfg = BridgeConfig()
     assert cfg.kafka_consumer_reset == "earliest"
     assert cfg.nats_reconnect_time_wait_seconds == 1.0
+    assert cfg.nats_max_reconnect_attempts == -1
     assert cfg.kafka_max_retries == 5
     assert cfg.nats_publish_max_retries == 3
     assert cfg.is_sim is False
