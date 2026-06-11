@@ -1,13 +1,10 @@
 FROM python:3.12.13-alpine
 
-RUN set -xe \
-    && apt-get update \
-    && apt-get install -y \
-    python3-pip
+RUN apk add --no-cache build-base zlib-dev
     
 COPY requirements.txt /tmp
 WORKDIR /tmp
-RUN pip install --upgrade -r requirements.txt
+RUN python -m pip install --upgrade -r requirements.txt
 
 WORKDIR /ws
 
