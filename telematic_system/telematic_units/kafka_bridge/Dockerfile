@@ -1,11 +1,8 @@
-FROM python:3.9
+FROM python:3.12.13-alpine
 
 RUN set -xe \
     && apt-get update \
     && apt-get install -y \
-    iputils-ping \
-    git \
-    vim \
     python3-pip
     
 COPY requirements.txt /tmp
