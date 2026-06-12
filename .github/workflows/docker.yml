@@ -153,7 +153,6 @@ jobs:
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematics-kafka-nats-bridge:pr-${{ github.event.pull_request.number }}
       - name: Docker Scout Compare telematic-kafka-nats-bridge
-        continue-on-error: true 
         uses: docker/scout-action@v1
         with:
           command: compare
