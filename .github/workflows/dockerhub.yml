@@ -99,7 +99,7 @@ jobs:
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_rsu_management_service:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
-  dockerhub-kafka-bridge:
+  dockerhub-kafka-nats-bridge:
     needs: [determine_docker_org_and_tag, determine_docker_image_metadata]
     runs-on: ubuntu-latest
     steps:
@@ -117,7 +117,7 @@ jobs:
         with:
           context: ./telematic_system/telematic_units/kafka_bridge/
           push: true
-          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_street_nats_bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematics-kafka-nats-bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
             VCS_REF=${{ needs.determine_docker_image_metadata.outputs.vcs_ref }}
@@ -127,7 +127,7 @@ jobs:
         with:
           command: environment
           environment: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
-          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_street_nats_bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematics-kafka-nats-bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   dockerhub-carma-vehicle-bridge:

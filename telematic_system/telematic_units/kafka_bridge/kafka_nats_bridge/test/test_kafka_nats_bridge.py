@@ -1,0 +1,534 @@
+import asyncio
+import json
+import logging
+import logging.handlers
+import sys
+import types
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+aiokafka_stub = types.ModuleType("aiokafka")
+aiokafka_stub.AIOKafkaConsumer = object
+sys.modules.setdefault("aiokafka", aiokafka_stub)
+
+sys.path.insert(1, str(Path(__file__).resolve().parents[1] / "src"))
+
+from config import BridgeConfig
+from bridge_logger import BridgeLogger
+from kafka_nats_bridge import KafkaNatsBridge
+
+
+@pytest.fixture
+def bridge_env(monkeypatch):
+    monkeypatch.setenv("NATS_SERVER_IP_PORT", "127.0.0.1:4222")
+    monkeypatch.setenv("KAFKA_BROKER_IP", "127.0.0.1")
+    monkeypatch.setenv("KAFKA_BROKER_PORT", "9092")
+    monkeypatch.setenv("KAFKA_BRIDGE_UNIT_ID", "kafka_id")
+    monkeypatch.setenv("KAFKA_BRIDGE_UNIT_TYPE", "infrastructure")
+    monkeypatch.setenv("KAFKA_BRIDGE_LOG_LEVEL", "info")
+    monkeypatch.setenv("KAFKA_BRIDGE_LOG_NAME", "kafka_nats_bridge_test")
+    monkeypatch.setenv("KAFKA_BRIDGE_LOG_PATH", "/tmp/")
+    monkeypatch.setenv("KAFKA_BRIDGE_LOG_ROTATION_SIZE_BYTES", "1024")
+    monkeypatch.setenv("KAFKA_BRIDGE_LOG_HANDLER_TYPE", "console")
+    monkeypatch.setenv("KAFKA_CONSUMER_RESET", "earliest")
+
+
+def test_startup_sequence_is_ordered(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+    order = []
+
+    async def _nats_connect():
+        order.append("nats_connect")
+
+    async def _register_unit_with_retry():
+        order.append("register_unit")
+
+    async def _start_kafka_consumer_with_retry():
+        order.append("kafka_consumer")
+
+    async def _subscribe_control_endpoints():
+        order.append("control_endpoints")
+
+    async def _kafka_read():
+        order.append("kafka_read")
+
+    monkeypatch.setattr(bridge, "nats_connect", _nats_connect)
+    monkeypatch.setattr(bridge, "register_unit_with_retry", _register_unit_with_retry)
+    monkeypatch.setattr(bridge, "start_kafka_consumer_with_retry", _start_kafka_consumer_with_retry)
+    monkeypatch.setattr(bridge, "subscribe_control_endpoints", _subscribe_control_endpoints)
+    monkeypatch.setattr(bridge, "kafka_read", _kafka_read)
+
+    asyncio.run(bridge.run())
+
+    assert order == [
+        "nats_connect",
+        "register_unit",
+        "kafka_consumer",
+        "control_endpoints",
+        "kafka_read",
+
+    ]
+
+
+def test_nats_url_normalization_and_exclusion_default(bridge_env, monkeypatch):
+    monkeypatch.setenv("NATS_SERVER_IP_PORT", "nats://10.0.0.2:4222")
+    monkeypatch.delenv("KAFKA_BRIDGE_EXCLUSION_LIST", raising=False)
+
+    bridge = KafkaNatsBridge()
+
+    assert bridge.nats_url == "nats://10.0.0.2:4222"
+    assert bridge.exclusion_list == []
+
+
+# ── BridgeConfig unit tests ────────────────────────────────────────────────────
+
+@pytest.fixture
+def min_env(monkeypatch):
+    """Minimal environment satisfying all required BridgeConfig fields."""
+    monkeypatch.setenv("NATS_SERVER_IP_PORT", "127.0.0.1:4222")
+    monkeypatch.setenv("KAFKA_BROKER_IP", "127.0.0.1")
+    monkeypatch.setenv("KAFKA_BROKER_PORT", "9092")
+    monkeypatch.setenv("KAFKA_BRIDGE_UNIT_ID", "unit_01")
+    monkeypatch.setenv("KAFKA_BRIDGE_UNIT_TYPE", "infrastructure")
+
+
+def test_config_nats_url_strips_duplicate_scheme(min_env, monkeypatch):
+    monkeypatch.setenv("NATS_SERVER_IP_PORT", "nats://10.0.0.1:4222")
+    cfg = BridgeConfig()
+    assert cfg.nats_url == "nats://10.0.0.1:4222"
+
+
+def test_config_nats_url_prepends_scheme_when_missing(min_env, monkeypatch):
+    monkeypatch.setenv("NATS_SERVER_IP_PORT", "10.0.0.1:4222")
+    cfg = BridgeConfig()
+    assert cfg.nats_url == "nats://10.0.0.1:4222"
+
+
+def test_config_exclusion_list_parses_csv(min_env, monkeypatch):
+    monkeypatch.setenv("KAFKA_BRIDGE_EXCLUSION_LIST", " spat, bsm , map ")
+    cfg = BridgeConfig()
+    assert cfg.exclusion_list == ["spat", "bsm", "map"]
+
+
+def test_config_exclusion_list_empty_when_unset(min_env, monkeypatch):
+    monkeypatch.delenv("KAFKA_BRIDGE_EXCLUSION_LIST", raising=False)
+    cfg = BridgeConfig()
+    assert cfg.exclusion_list == []
+
+
+def test_config_nats_max_reconnect_attempts_can_be_overridden(min_env, monkeypatch):
+    monkeypatch.setenv("NATS_MAX_RECONNECT_ATTEMPTS", "7")
+    cfg = BridgeConfig()
+    assert cfg.nats_max_reconnect_attempts == 7
+
+
+def test_config_log_path_trailing_slash_added(min_env, monkeypatch):
+    monkeypatch.setenv("KAFKA_BRIDGE_LOG_PATH", "/var/logs")
+    cfg = BridgeConfig()
+    assert cfg.kafka_bridge_log_path == "/var/logs/"
+
+
+def test_config_missing_required_field_raises(min_env, monkeypatch):
+    from pydantic import ValidationError
+    monkeypatch.delenv("KAFKA_BRIDGE_UNIT_ID")
+    with pytest.raises(ValidationError):
+        BridgeConfig()
+
+
+def test_config_defaults_are_applied(min_env):
+    cfg = BridgeConfig()
+    assert cfg.kafka_consumer_reset == "earliest"
+    assert cfg.nats_reconnect_time_wait_seconds == 1.0
+    assert cfg.nats_max_reconnect_attempts == -1
+    assert cfg.kafka_max_retries == 5
+    assert cfg.nats_publish_max_retries == 3
+    assert cfg.is_sim is False
+    assert cfg.kafka_bridge_unit_name == "West Intersection"
+
+
+def test_config_is_sim_parses_true_string(min_env, monkeypatch):
+    monkeypatch.setenv("IS_SIM", "true")
+    assert BridgeConfig().is_sim is True
+
+
+def test_config_injected_into_bridge(min_env):
+    cfg = BridgeConfig()
+    bridge = KafkaNatsBridge(config=cfg)
+    assert bridge.nats_url == cfg.nats_url
+    assert bridge.unit_id == cfg.kafka_bridge_unit_id
+    assert bridge.exclusion_list == cfg.exclusion_list
+
+
+def test_nats_connect_uses_reconnect_settings_and_recovers(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+    bridge.nats_reconnect_wait = 3.5
+    bridge.registered = True
+
+    observed = {}
+    recovered = {"called": False}
+
+    async def _recover():
+        recovered["called"] = True
+
+    async def _connect(url, **kwargs):
+        observed["url"] = url
+        observed["kwargs"] = kwargs
+        await kwargs["disconnected_cb"]()
+        await kwargs["reconnected_cb"]()
+
+    monkeypatch.setattr(bridge, "recover_after_nats_reconnect", _recover)
+    monkeypatch.setattr(bridge.nc, "connect", _connect)
+
+    asyncio.run(bridge.nats_connect())
+
+    assert observed["url"] == "nats://127.0.0.1:4222"
+    assert observed["kwargs"]["max_reconnect_attempts"] == -1
+    assert observed["kwargs"]["reconnect_time_wait"] == 3.5
+    assert recovered["called"] is True
+    assert bridge.registered is False
+
+
+def test_kafka_consumer_retries_before_success(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+    bridge.kafka_max_retries = 3
+
+    attempts = {"count": 0}
+
+    async def _start_kafka_consumer():
+        attempts["count"] += 1
+        if attempts["count"] < 3:
+            raise RuntimeError("broker down")
+
+    async def _sleep(_):
+        return None
+
+    monkeypatch.setattr(bridge, "start_kafka_consumer", _start_kafka_consumer)
+    monkeypatch.setattr(asyncio, "sleep", _sleep)
+
+    asyncio.run(bridge.start_kafka_consumer_with_retry())
+
+    assert attempts["count"] == 3
+
+
+def test_kafka_consumer_retry_exhaustion_raises(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+    bridge.kafka_max_retries = 2
+
+    async def _start_kafka_consumer():
+        raise RuntimeError("broker down")
+
+    async def _sleep(_):
+        return None
+
+    monkeypatch.setattr(bridge, "start_kafka_consumer", _start_kafka_consumer)
+    monkeypatch.setattr(asyncio, "sleep", _sleep)
+
+    with pytest.raises(RuntimeError, match="max retries"):
+        asyncio.run(bridge.start_kafka_consumer_with_retry())
+
+
+def test_check_status_returns_error_on_publish_failure(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+
+    observed = {"cb": None}
+    publishes = []
+
+    async def _subscribe(_subject, _queue, cb):
+        observed["cb"] = cb
+
+    async def _publish_with_retry(subject, payload):
+        publishes.append((subject, payload))
+        return payload == b"ERROR"
+
+    monkeypatch.setattr(bridge.nc, "subscribe", _subscribe)
+    monkeypatch.setattr(bridge, "publish_with_retry", _publish_with_retry)
+
+    asyncio.run(bridge.check_status())
+
+    assert observed["cb"] is not None
+    msg = SimpleNamespace(reply="reply.subject")
+    asyncio.run(observed["cb"](msg))
+
+    assert publishes == [
+        ("reply.subject", b"OK"),
+        ("reply.subject", b"ERROR"),
+    ]
+
+
+def test_publish_with_retry_records_failed_publish(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+    bridge.nats_publish_max_retries = 1
+
+    async def _publish(_subject, _payload):
+        raise RuntimeError("nats unavailable")
+
+    async def _sleep(_):
+        return None
+
+    monkeypatch.setattr(bridge.nc, "publish", _publish)
+    monkeypatch.setattr(asyncio, "sleep", _sleep)
+
+    result = asyncio.run(bridge.publish_with_retry("kafka.unit.data.topic", b"{}"))
+
+    assert result is False
+    assert len(bridge.failed_publish_messages) == 1
+    assert bridge.failed_publish_messages[0]["subject"] == "kafka.unit.data.topic"
+
+
+# ── BridgeLogger unit tests ────────────────────────────────────────────────────
+
+import logging
+
+
+def _make_config(monkeypatch, *, handler_type="console", level="info", log_name="test_bridge"):
+    monkeypatch.setenv("NATS_SERVER_IP_PORT", "127.0.0.1:4222")
+    monkeypatch.setenv("KAFKA_BROKER_IP", "127.0.0.1")
+    monkeypatch.setenv("KAFKA_BROKER_PORT", "9092")
+    monkeypatch.setenv("KAFKA_BRIDGE_UNIT_ID", "unit_01")
+    monkeypatch.setenv("KAFKA_BRIDGE_UNIT_TYPE", "infra")
+    monkeypatch.setenv("KAFKA_BRIDGE_LOG_HANDLER_TYPE", handler_type)
+    monkeypatch.setenv("KAFKA_BRIDGE_LOG_LEVEL", level)
+    monkeypatch.setenv("KAFKA_BRIDGE_LOG_NAME", log_name)
+    monkeypatch.setenv("KAFKA_BRIDGE_LOG_PATH", "/tmp/")
+    monkeypatch.setenv("KAFKA_BRIDGE_LOG_ROTATION_SIZE_BYTES", "1024")
+    monkeypatch.setenv("KAFKA_CONSUMER_RESET", "earliest")
+    return BridgeConfig()
+
+
+def test_bridge_logger_is_bridge_logger_subclass(monkeypatch):
+    cfg = _make_config(monkeypatch, log_name="test_subclass")
+    logger = BridgeLogger.create(cfg)
+    assert isinstance(logger, BridgeLogger)
+    assert isinstance(logger, logging.Logger)
+
+
+def test_bridge_logger_console_mode_has_one_stream_handler(monkeypatch):
+    cfg = _make_config(monkeypatch, handler_type="console", log_name="test_console")
+    logger = BridgeLogger.create(cfg)
+    stream_handlers = [h for h in logger.handlers if isinstance(h, logging.StreamHandler)
+                       and not isinstance(h, logging.FileHandler)]
+    assert len(stream_handlers) == 1
+    assert len(logger.handlers) == 1
+
+
+def test_bridge_logger_all_mode_has_both_handlers(monkeypatch):
+    cfg = _make_config(monkeypatch, handler_type="all", log_name="test_all")
+    logger = BridgeLogger.create(cfg)
+    has_stream = any(type(h) is logging.StreamHandler for h in logger.handlers)
+    has_file = any(isinstance(h, logging.handlers.RotatingFileHandler) for h in logger.handlers)
+    assert has_stream
+    assert has_file
+    assert len(logger.handlers) == 2
+
+
+def test_bridge_logger_level_is_applied(monkeypatch):
+    cfg = _make_config(monkeypatch, level="debug", log_name="test_debug_level")
+    logger = BridgeLogger.create(cfg)
+    assert logger.level == logging.DEBUG
+    for h in logger.handlers:
+        assert h.level == logging.DEBUG
+
+
+def test_bridge_logger_handlers_cleared_on_recreate(monkeypatch):
+    cfg = _make_config(monkeypatch, log_name="test_recreate")
+    BridgeLogger.create(cfg)
+    logger = BridgeLogger.create(cfg)  # second call
+    assert len(logger.handlers) == 1  # not doubled
+
+
+def test_bridge_uses_bridge_logger(monkeypatch):
+    cfg = _make_config(monkeypatch, log_name="test_bridge_uses_logger")
+    bridge = KafkaNatsBridge(config=cfg)
+    assert isinstance(bridge.logger, BridgeLogger)
+
+
+# ── ControlEndpointsService unit tests ─────────────────────────────────────────
+
+def test_available_topics_excludes_configured_topics(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+    bridge.kafka_topics = ["spat", "map", "bsm"]
+    bridge.exclusion_list = ["map"]
+
+    observed = {"cb": None}
+    published = []
+
+    async def _subscribe(_subject, _queue, cb):
+        observed["cb"] = cb
+
+    async def _publish_with_retry(subject, payload):
+        published.append((subject, payload))
+        return True
+
+    monkeypatch.setattr(bridge.nc, "subscribe", _subscribe)
+    monkeypatch.setattr(bridge, "publish_with_retry", _publish_with_retry)
+
+    asyncio.run(bridge.available_topics())
+
+    assert observed["cb"] is not None
+    msg = SimpleNamespace(reply="reply.topics")
+    asyncio.run(observed["cb"](msg))
+
+    assert len(published) == 1
+    assert published[0][0] == "reply.topics"
+    payload = json.loads(published[0][1].decode("utf-8"))
+    assert payload["unit_id"] == "kafka_id"
+    assert [t["name"] for t in payload["topics"]] == ["spat", "bsm"]
+
+
+def test_publish_topics_updates_subscribers_list(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+
+    observed = {"cb": None}
+    published = []
+
+    async def _subscribe(_subject, _queue, cb):
+        observed["cb"] = cb
+
+    async def _publish_with_retry(subject, payload):
+        published.append((subject, payload))
+        return True
+
+    monkeypatch.setattr(bridge.nc, "subscribe", _subscribe)
+    monkeypatch.setattr(bridge, "publish_with_retry", _publish_with_retry)
+
+    asyncio.run(bridge.publish_topics())
+
+    assert observed["cb"] is not None
+    msg = SimpleNamespace(
+        reply="reply.publish",
+        data=json.dumps({"topics": ["spat", "bsm"]}).encode("utf-8"),
+    )
+    asyncio.run(observed["cb"](msg))
+
+    assert published == [("reply.publish", b"topic publish request received!")]
+    assert bridge.subscribers_list == ["spat", "bsm"]
+
+
+# ── ForwardingLoopService unit tests ───────────────────────────────────────────
+
+def test_build_forward_message_populates_expected_fields(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+    bridge.kafka_info["event_name"] = "evt"
+    bridge.kafka_info["testing_type"] = "tt"
+    bridge.kafka_info["location"] = "loc"
+
+    payload = {"timestamp": 1773408367485}
+    msg = bridge.forwarding_loop_service._build_forward_message("spat", payload)
+
+    assert msg["unit_id"] == bridge.unit_id
+    assert msg["unit_type"] == bridge.unit_type
+    assert msg["unit_name"] == bridge.unit_name
+    assert msg["event_name"] == "evt"
+    assert msg["testing_type"] == "tt"
+    assert msg["location"] == "loc"
+    assert msg["topic_name"] == "spat"
+    assert isinstance(msg["timestamp"], (int, float))
+
+
+def test_kafka_read_publishes_only_when_registered_and_subscribed(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+    bridge.registered = True
+    bridge.subscribers_list = ["spat"]
+    bridge.kafka_info["event_name"] = "evt"
+    bridge.kafka_info["testing_type"] = "tt"
+    bridge.kafka_info["location"] = "loc"
+
+    class _Consumer:
+        def __init__(self, messages):
+            self._messages = messages
+
+        def __aiter__(self):
+            self._it = iter(self._messages)
+            return self
+
+        async def __anext__(self):
+            try:
+                return next(self._it)
+            except StopIteration:
+                raise StopAsyncIteration
+
+    bridge.kafka_consumer = _Consumer(
+        [
+            SimpleNamespace(topic="spat", value={"timestamp": 1773408367485}),
+            SimpleNamespace(topic="map", value={"timestamp": 1773408367485}),
+        ]
+    )
+
+    published = []
+
+    async def _publish_with_retry(subject, payload):
+        published.append((subject, payload))
+        return True
+
+    monkeypatch.setattr(bridge.forwarding_loop_service, "publish_with_retry", _publish_with_retry)
+
+    asyncio.run(bridge.kafka_read())
+
+    assert len(published) == 1
+    assert published[0][0] == f"kafka.{bridge.unit_id}.data.spat"
+
+
+# ── RegistrationService unit tests ─────────────────────────────────────────────
+
+def test_register_unit_with_retry_succeeds_after_retries(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+    bridge.nats_registration_max_retries = 3
+
+    attempts = {"count": 0}
+
+    async def _register_unit():
+        attempts["count"] += 1
+        return attempts["count"] == 3
+
+    async def _sleep(_):
+        return None
+
+    monkeypatch.setattr(bridge.registration_service, "register_unit", _register_unit)
+    monkeypatch.setattr(asyncio, "sleep", _sleep)
+
+    result = asyncio.run(bridge.register_unit_with_retry())
+
+    assert result is True
+    assert attempts["count"] == 3
+
+
+def test_register_unit_success_sets_registration_and_metadata(bridge_env, monkeypatch):
+    bridge = KafkaNatsBridge()
+
+    response_payload = {
+        "event_name": "IntegrationTest2",
+        "location": "West Intersection",
+        "testing_type": "integration",
+    }
+
+    async def _request(_subject, _payload, **kwargs):
+        assert kwargs["timeout"] == 5
+        return SimpleNamespace(data=json.dumps(response_payload).encode("utf-8"))
+
+    monkeypatch.setattr(bridge.nc, "request", _request)
+
+    result = asyncio.run(bridge.register_unit())
+
+    assert result is True
+    assert bridge.registered is True
+    assert bridge.kafka_info["event_name"] == "IntegrationTest2"
+    assert bridge.kafka_info["location"] == "West Intersection"
+    assert bridge.kafka_info["testing_type"] == "integration"
+
+
+def test_register_unit_returns_false_on_no_responders(bridge_env, monkeypatch):
+    from nats.errors import NoRespondersError
+
+    bridge = KafkaNatsBridge()
+
+    async def _request(_subject, _payload, **_kwargs):
+        raise NoRespondersError
+
+    monkeypatch.setattr(bridge.nc, "request", _request)
+
+    result = asyncio.run(bridge.register_unit())
+
+    assert result is False
+    assert bridge.registered is False

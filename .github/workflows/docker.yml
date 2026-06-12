@@ -131,7 +131,7 @@ jobs:
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
           keep-previous-comments: true
 
-  telematic-kafka-bridge:
+  telematic-kafka-nats-bridge:
     needs: [determine_docker_org_and_tag, changes]
     if: ${{ github.event.pull_request.base.ref == 'master' || needs.changes.outputs.kafka_bridge == 'true' }}
     runs-on: ubuntu-latest
@@ -151,12 +151,12 @@ jobs:
           context: ./telematic_system/telematic_units/kafka_bridge/
           file: ./telematic_system/telematic_units/kafka_bridge/Dockerfile
           load: true
-          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_street_nats_bridge:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare telematic-kafka-bridge
+          tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematics-kafka-nats-bridge:pr-${{ github.event.pull_request.number }}
+      - name: Docker Scout Compare telematic-kafka-nats-bridge
         uses: docker/scout-action@v1
         with:
           command: compare
-          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_street_nats_bridge:pr-${{ github.event.pull_request.number }}
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematics-kafka-nats-bridge:pr-${{ github.event.pull_request.number }}
           to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           ignore-unchanged: true
           only-severities: critical,high

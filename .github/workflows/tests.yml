@@ -32,6 +32,39 @@ jobs:
           name: carma-cloud-bridge-coverage
           path: telematic_system/telematic_units/carma_cloud_bridge/cloud_nats_bridge/test/coverage.xml
           if-no-files-found: error
+
+  kafka_nats_bridge_coverage:
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.11
+      options: --user root
+    steps:
+      - name: Checkout ${{ github.event.repository.name }}
+        uses: actions/checkout@v3
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get -y install python3-coverage python3-pip python3-pytest
+      - name: Install requirements
+        run: |
+          python3 -m pip install \
+            nats-py \
+            aiokafka \
+            pydantic \
+            pydantic-settings
+      - name: Run tests
+        run: |
+          export PYTHONPATH=$PYTHONPATH:/usr/lib/python3/dist-packages
+          cd $GITHUB_WORKSPACE/telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test/
+          python3 -m coverage run -m pytest
+          python3 -m coverage xml --omit="/opt/*,/root/*,/tmp/*,/usr/*,/var/*,**/__init__.py"
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v4
+        with:
+          name: kafka-nats-bridge-coverage
+          path: telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test/coverage.xml
+          if-no-files-found: error
+
   carma_vehicle_bridge_coverage:
     runs-on: ubuntu-latest
     container:
@@ -191,7 +224,7 @@ jobs:
           if-no-files-found: error
   sonar:
     # Remove cloud bridge, vehicle bridge, and telematic_cloud_messaging coverage temporarily as test build failed
-    needs: [telematic_rsu_management_service_coverage, web_app_client_coverage, web_app_server_coverage, rosbag2_processing_service_coverage, telematic_cloud_messaging_coverage, carma_vehicle_bridge_coverage, carma_cloud_bridge_coverage]
+    needs: [telematic_rsu_management_service_coverage, web_app_client_coverage, web_app_server_coverage, rosbag2_processing_service_coverage, telematic_cloud_messaging_coverage, carma_vehicle_bridge_coverage, carma_cloud_bridge_coverage, kafka_nats_bridge_coverage]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ${{ github.event.repository.name }}
@@ -208,6 +241,11 @@ jobs:
         with:
           name: carma-vehicle-bridge-coverage
           path: carma_vehicle_bridge
+      - name: Download kafka-nats-bridge code coverage results
+        uses: actions/download-artifact@v4
+        with:
+          name: kafka-nats-bridge-coverage
+          path: telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test
       - name: Download telematic cloud messaging server code coverage results
         uses: actions/download-artifact@v4
         with:
@@ -240,7 +278,11 @@ jobs:
       - name: Rewrite workspace path in coverage.xml
         shell: python
         run: |
-          for coverage_file in ["/home/runner/work/cda-telematics/cda-telematics/carma_cloud_bridge/coverage.xml", "/home/runner/work/cda-telematics/cda-telematics/carma_vehicle_bridge/coverage.xml"] :
+          for coverage_file in [
+            "/home/runner/work/cda-telematics/cda-telematics/carma_cloud_bridge/coverage.xml",
+            "/home/runner/work/cda-telematics/cda-telematics/carma_vehicle_bridge/coverage.xml",
+            "/home/runner/work/cda-telematics/cda-telematics/telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test/coverage.xml",
+          ]:
             with open(coverage_file, 'r') as coverage :
               coverage_content = coverage.read()
 

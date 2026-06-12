@@ -3,4 +3,4 @@ nats-py
 kafka-python
 pyyaml
 aiokafka
-pytz
+pydantic-settings>=2.0
