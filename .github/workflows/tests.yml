@@ -13,7 +13,7 @@ jobs:
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Install dependencies
         run: |
           apt-get update
@@ -27,7 +27,7 @@ jobs:
           python3 -m coverage run -m pytest
           python3 -m coverage xml --omit="/opt/*,/root/*,/tmp/*,/usr/*,/var/*,**/__init__.py,setup.py"
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: carma-cloud-bridge-coverage
           path: telematic_system/telematic_units/carma_cloud_bridge/cloud_nats_bridge/test/coverage.xml
@@ -40,7 +40,7 @@ jobs:
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Install dependencies
         run: |
           apt-get update
@@ -59,7 +59,7 @@ jobs:
           python3 -m coverage run -m pytest
           python3 -m coverage xml --omit="/opt/*,/root/*,/tmp/*,/usr/*,/var/*,**/__init__.py"
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: kafka-nats-bridge-coverage
           path: telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test/coverage.xml
@@ -72,7 +72,7 @@ jobs:
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Install dependencies
         shell: bash
         run: |
@@ -95,7 +95,7 @@ jobs:
           python3 -m coverage run -m pytest
           python3 -m coverage xml --omit="/opt/*,/root/*,/tmp/*,/usr/*,/var/*,**/__init__.py"
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: carma-vehicle-bridge-coverage
           path: telematic_system/telematic_units/carma_vehicle_bridge/ros2_nats_bridge/test/coverage.xml
@@ -107,14 +107,14 @@ jobs:
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Build
         run: |
           cd $GITHUB_WORKSPACE/telematic_system/telematic_cloud_messaging
           mvn org.jacoco:jacoco-maven-plugin:prepare-agent package
           mvn org.jacoco:jacoco-maven-plugin:report package
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: telematic-cloud-messaging
           path: telematic_system/telematic_cloud_messaging/target
@@ -127,14 +127,14 @@ jobs:
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Build
         run: |
           cd $GITHUB_WORKSPACE/telematic_system/telematic_rsu_management_service
           mvn org.jacoco:jacoco-maven-plugin:prepare-agent package
           mvn org.jacoco:jacoco-maven-plugin:report package
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: telematic-rsu-management-service
           path: telematic_system/telematic_rsu_management_service/target
@@ -149,14 +149,14 @@ jobs:
         CI: true
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Build
         run: |
           cd $GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/client
           npm install --force
           npm test
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: web-app-client
           path: telematic_system/telematic_apps/web_app/client/coverage/*
@@ -170,14 +170,14 @@ jobs:
         CI: true
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Build
         run: |
           cd $GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/server
           npm install --force
           npm run test --coverage || true
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: web-app-server
           path: telematic_system/telematic_apps/web_app/server/coverage/*
@@ -189,7 +189,7 @@ jobs:
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           path: src/${{ github.event.repository.name }}
@@ -217,7 +217,7 @@ jobs:
         run: |
           find "$GITHUB_WORKSPACE" -name "coverage.xml"
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: rosbag2-processing-service
           path: src/cda-telematics/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/coverage.xml
@@ -228,46 +228,46 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Download code coverage results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: carma-cloud-bridge-coverage
           path: carma_cloud_bridge
       - name: Download code coverage results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: carma-vehicle-bridge-coverage
           path: carma_vehicle_bridge
       - name: Download kafka-nats-bridge code coverage results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: kafka-nats-bridge-coverage
           path: telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test
       - name: Download telematic cloud messaging server code coverage results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: telematic-cloud-messaging
           path: telematic_system/telematic_cloud_messaging/target
       - name: Download telematic RSU management service code coverage results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: telematic-rsu-management-service
           path: telematic_system/telematic_rsu_management_service/target
       - name: Download web app client code coverage results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: web-app-client
           path: telematic_system/telematic_apps/web_app/client/coverage
       - name: Download rosbag2-processing-service code coverage results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: rosbag2-processing-service
           path: telematic_system/telematic_historical_data_processing/rosbag2_processing_service/
       - name: Download web app server code coverage results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: web-app-server
           path: telematic_system/telematic_apps/web_app/server/coverage
