@@ -1,153 +1,262 @@
-# parser.py
 import json
 import re
-from datetime import datetime, timezone
-from typing import Optional, Generator, Tuple
-from models import ParsedEntry
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Generator, Optional
 
-ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-
-# Flexible formats searching inside raw lines
-JAVA_LOG_RE = re.compile(
-    r"(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+)"  # timestamp
-    r"\s+(\w+)\s+"                                   # level
-    r"\[([^\]]+)\]"                                  # thread
-    r"\s+([\w.$:#-]+)\s+-\s+"                         # logger
-    r"(.*)"                                          # msg
+from models import (
+    BasicSafetyMessage,
+    BSMCoreData,
+    BSMTelematicPayload,
+    InfluxBatchWrite,
+    InfluxLineTags,
+    LogMessage,
+    MessageMetadata,
+    MgmtBSMTraceMetrics,
+    ParsedEntry,
+    RSUConnection,
+    RSUStatusPayload,
+    TRUHealthStatusMessage,
+    UnitHealthConfig,
 )
+from regex import ANSI_CLEANER, INFLUX_SUFFIX_RE, MGMT_REGEX, TRU_REGEX
 
-CPP_LOG_RE = re.compile(
-    r"\[(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2}\.\d+)\]"  # dynamic space handling
-    r"\s+(\S+)\s+"                                        # file
-    r"\((\d+)\)\s+-\s+"                                   # line
-    r"(\w+)\s*:\s*"                                       # level
-    r"(.*)"                                               # msg
-)
 
-def strip_ansi(s: str) -> str:
-    return ANSI_RE.sub("", s)
+def safe_search_str(pattern: str, text: str, default: str = "unknown") -> str:
+    """Safely extracts a string group from a regex search."""
+    match = re.search(pattern, text)
+    return match.group(1) if match else default
 
-def parse_docker_time(time_str: str) -> datetime:
-    clean = re.sub(r"(\.\d{6})\d*Z$", r"\1+00:00", time_str)
-    return datetime.fromisoformat(clean)
 
-class StatefulStreamAssembler:
-    def __init__(self):
-        self._buffer: list[Tuple[datetime, str]] = []
+def safe_search_int(pattern: str, text: str, default: int = 0) -> int:
+    """Safely extracts an integer group from a regex search."""
+    match = re.search(pattern, text)
+    if match and match.group(1).replace("-", "").isdigit():
+        return int(match.group(1))
+    return default
 
-    def _is_complete(self) -> bool:
-        combined = "".join(t for _, t in self._buffer)
-        b_opens, b_closes = combined.count("{"), combined.count("}")
-        s_opens, s_closes = combined.count("["), combined.count("]")
-        return b_opens == b_closes and s_opens == s_closes
 
-    def feed(self, ts: datetime, inner: str) -> Optional[Tuple[datetime, list[str]]]:
-        is_new_entry = bool(CPP_LOG_RE.search(inner))
-        
-        if is_new_entry and self._buffer:
-            result = (self._buffer[0][0], [t for _, t in self._buffer])
-            self._buffer = [(ts, inner)]
-            return result
-            
-        self._buffer.append((ts, inner))
-        
-        if len(self._buffer) > 1 and self._is_complete():
-            result = (self._buffer[0][0], [t for _, t in self._buffer])
-            self._buffer = []
-            return result
-            
+def parse_datetime(ts_str: str) -> datetime:
+    return datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S.%f")
+
+
+def extract_tru_payload(msg_text: str) -> tuple[str, Any]:
+    if "Published:" in msg_text:
+        try:
+            json_str = msg_text.split("Published:", 1)[1].strip()
+            data = json.loads(json_str)
+
+            meta = data.get("metadata", {})
+            rsu = meta.get("rsu", {})
+            metadata_obj = MessageMetadata(
+                event=meta.get("event", ""),
+                rsu=RSUConnection(ip=rsu.get("ip", ""), port=int(rsu.get("port", 0))),
+                timestamp=meta.get("timestamp", ""),
+                topicName=meta.get("topicName", ""),
+                unitId=meta.get("unitId", ""),
+            )
+
+            payload_wrapper = data.get("payload", {})
+            inner_payload = payload_wrapper.get("payload", {})
+            bsm_val = inner_payload.get("value", {}).get("BasicSafetyMessage", {})
+            core = bsm_val.get("coreData", {})
+
+            bsm_core = BSMCoreData(
+                msgCnt=core.get("msgCnt", "0"),
+                id=core.get("id", ""),
+                secMark=core.get("secMark", "0"),
+                lat=core.get("lat", "0"),
+                long=core.get("long", "0"),
+                elev=core.get("elev", "0"),
+                speed=core.get("speed", "0"),
+                heading=core.get("heading", "0"),
+                angle=core.get("angle", "0"),
+                accelSet=core.get("accelSet", {}),
+                brakes=core.get("brakes", {}),
+                size=core.get("size", {}),
+                accuracy=core.get("accuracy", {}),
+            )
+
+            payload_obj = BSMTelematicPayload(
+                channel=int(payload_wrapper.get("channel", -1)),
+                encoding=payload_wrapper.get("encoding", ""),
+                flags=int(payload_wrapper.get("flags", 0)),
+                psid=int(payload_wrapper.get("psid", -1)),
+                source=payload_wrapper.get("source", ""),
+                sourceId=int(payload_wrapper.get("sourceId", 0)),
+                subType=payload_wrapper.get("subType", ""),
+                timestamp=int(payload_wrapper.get("timestamp", 0)),
+                type=payload_wrapper.get("type", ""),
+                message=BasicSafetyMessage(
+                    messageId=inner_payload.get("messageId", ""),
+                    coreData=bsm_core,
+                    partII=bsm_val.get("partII", []),
+                ),
+            )
+            return "bsm_published", (metadata_obj, payload_obj)
+        except Exception:
+            return "tru_json_parse_failure", None
+
+    if "ProcessRSUStatusMessage:" in msg_text:
+        try:
+            json_str = msg_text.split("ProcessRSUStatusMessage:", 1)[1].strip()
+            data = json.loads(json_str)
+            rsu = data.get("rsu", {})
+            payload_obj = RSUStatusPayload(
+                event=data.get("event", ""),
+                rsu=RSUConnection(ip=rsu.get("ip", ""), port=int(rsu.get("port", 0))),
+                status=data.get("status", ""),
+            )
+            return "rsu_status_update", (None, payload_obj)
+        except Exception:
+            return "tru_status_parse_failure", None
+
+    return "generic_cpp_debug", None
+
+
+def extract_mgmt_payload(msg_text: str) -> tuple[str, Any]:
+    if "Handling Unit Health Status Message:" in msg_text:
+        try:
+            unit_id = safe_search_str(r"unitId=([^,\s)]+)", msg_text)
+            status = safe_search_str(r"bridgePluginStatus=([^,\s)]+)", msg_text)
+            lut = safe_search_int(r"lastUpdatedTimestamp=(\d+)", msg_text, default=-1)
+
+            # Find the trailing message timestamp
+            ts_match = re.findall(r"timestamp=(\d+)", msg_text)
+            top_ts = int(ts_match[-1]) if ts_match else 0
+
+            payload = TRUHealthStatusMessage(
+                unit_config=UnitHealthConfig(
+                    unit_id=unit_id,
+                    bridge_plugin_status=status,
+                    last_updated_timestamp=lut if lut != -1 else None,
+                    timestamp=None,
+                ),
+                timestamp=top_ts,
+            )
+            return "tru_health_status", payload
+        except Exception:
+            return "mgmt_health_parse_failure", None
+
+    if "Built Influx line:" in msg_text:
+        try:
+            influx_part = msg_text.split("Built Influx line:", 1)[1].strip()
+            suffix_match = INFLUX_SUFFIX_RE.search(influx_part)
+            if not suffix_match:
+                return "influx_line_built", None
+
+            influx_ts = int(suffix_match.group(1))
+            byte_size = int(suffix_match.group(2))
+
+            meas = influx_part.split(",", 1)[0]
+            uid = safe_search_str(r"unitId=([^,\s]+)", influx_part)
+            ip = safe_search_str(r"rsuIp=([^,\s]+)", influx_part)
+            topic = safe_search_str(r"topicName=([^,\s]+)", influx_part)
+            port = safe_search_int(r"port=(\d+)", influx_part)
+
+            msg_cnt = safe_search_int(r"coreData\.msgCnt=(\d+)", influx_part)
+            bsm_id = safe_search_str(r'coreData\.id="([^"]+)"', influx_part)
+            sec_mark = safe_search_int(r"coreData\.secMark=(\d+)", influx_part)
+            src_ts = safe_search_int(r"payload\.timestamp=(\d+)", influx_part)
+
+            payload = MgmtBSMTraceMetrics(
+                tags=InfluxLineTags(
+                    measurement=meas,
+                    unit_id=uid,
+                    rsu_ip=ip,
+                    topic_name=topic,
+                    port=port,
+                ),
+                msg_cnt=msg_cnt,
+                bsm_id=bsm_id,
+                sec_mark=sec_mark,
+                source_timestamp=src_ts,
+                influx_timestamp=influx_ts,
+                bytes_size=byte_size,
+            )
+            return "influx_line_built", payload
+        except Exception:
+            return "mgmt_influx_parse_failure", None
+
+    if "Wrote number of" in msg_text:
+        count = safe_search_int(r"Wrote number of (\d+) records", msg_text)
+        return "influx_batch_written", InfluxBatchWrite(records_written=count)
+
+    return "generic_java_info", None
+
+
+def iter_parsed_entries(file_path: str) -> Generator[ParsedEntry, None, None]:
+    path = Path(file_path)
+    if not path.exists():
+        return
+
+    with path.open("r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            cleaned_line = ANSI_CLEANER.sub("", line).strip()
+            if not cleaned_line:
+                continue
+
+            tru_match = TRU_REGEX.match(cleaned_line)
+            if tru_match:
+                gd = tru_match.groupdict()
+                yield ParsedEntry(
+                    docker_time=parse_datetime(gd["ts"]),
+                    inner_format="cpp",
+                    level=gd["level"],
+                    logger_or_file=gd["file"],
+                    message=gd["msg"],
+                    source_lines=[line],
+                )
+                continue
+
+            mgmt_match = MGMT_REGEX.match(cleaned_line)
+            if mgmt_match:
+                gd = mgmt_match.groupdict()
+                yield ParsedEntry(
+                    docker_time=parse_datetime(gd["ts"]),
+                    inner_format="java",
+                    level=gd["level"],
+                    logger_or_file=gd["class"],
+                    message=gd["msg"],
+                    source_lines=[line],
+                )
+                continue
+
+            yield ParsedEntry(
+                docker_time=datetime.utcnow(),
+                inner_format="unknown",
+                level="UNKNOWN",
+                logger_or_file=None,
+                message=cleaned_line,
+                source_lines=[line],
+            )
+
+
+def parse_and_categorize(entry: ParsedEntry, file_path: str) -> Optional[LogMessage]:
+    if entry.inner_format == "unknown":
         return None
 
-    def flush(self) -> Optional[Tuple[datetime, list[str]]]:
-        if self._buffer:
-            result = (self._buffer[0][0], [t for _, t in self._buffer])
-            self._buffer = []
-            return result
-        return None
+    msg_type = "generic_fallback"
+    metadata_obj = None
+    payload_obj = None
 
+    if entry.inner_format == "cpp":
+        msg_type, extracted = extract_tru_payload(entry.message)
+        if isinstance(extracted, tuple):
+            metadata_obj, payload_obj = extracted
+        else:
+            payload_obj = extracted
 
-def iter_parsed_entries(path: str) -> Generator[ParsedEntry, None, None]:
-    assembler = StatefulStreamAssembler()
-    
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
-        for raw_line in fh:
-            line_str = raw_line.strip()
-            if not line_str:
-                continue
-                
-            try:
-                obj = json.loads(line_str)
-            except json.JSONDecodeError:
-                continue
+    elif entry.inner_format == "java":
+        msg_type, payload_obj = extract_mgmt_payload(entry.message)
 
-            time_str = obj.get("time", "")
-            inner_log = strip_ansi(obj.get("log", "").rstrip("\r\n").strip())
-            if not inner_log:
-                continue
-
-            try:
-                ts = parse_docker_time(time_str)
-            except ValueError:
-                ts = datetime.min.replace(tzinfo=timezone.utc)
-
-            # Re-architect search logic to look inside line strings
-            if "[" in inner_log and "]" in inner_log:
-                completed = assembler.feed(ts, inner_log)
-                if completed:
-                    yield build_cpp_entry(completed[0], completed[1])
-            else:
-                leftover = assembler.flush()
-                if leftover:
-                    yield build_cpp_entry(leftover[0], leftover[1])
-                yield build_java_or_unknown_entry(ts, inner_log)
-
-        leftover = assembler.flush()
-        if leftover:
-            yield build_cpp_entry(leftover[0], leftover[1])
-
-
-def build_java_or_unknown_entry(ts: datetime, inner: str) -> ParsedEntry:
-    m = JAVA_LOG_RE.search(inner)
-    if m:
-        return ParsedEntry(
-            docker_time=ts,
-            inner_format="java",
-            level=m.group(2).strip(),
-            logger_or_file=m.group(4),
-            message=m.group(5).strip(),
-            source_lines=[inner]
-        )
-    return ParsedEntry(
-        docker_time=ts,
-        inner_format="unknown",
-        level=None,
-        logger_or_file=None,
-        message=inner,
-        source_lines=[inner]
-    )
-
-
-def build_cpp_entry(ts: datetime, lines: list[str]) -> ParsedEntry:
-    first = lines[0]
-    m = CPP_LOG_RE.search(first)
-    
-    if m:
-        body_parts = [m.group(6).strip()] + [l.strip() for l in lines[1:]]
-        full_msg = " ".join(part for part in body_parts if part)
-        return ParsedEntry(
-            docker_time=ts,
-            inner_format="cpp",
-            level=m.group(5).strip(),
-            logger_or_file=m.group(3),
-            message=full_msg,
-            source_lines=lines
-        )
-    
-    return ParsedEntry(
-        docker_time=ts,
-        inner_format="cpp",
-        level=None,
-        logger_or_file=None,
-        message=" ".join(lines),
-        source_lines=lines
+    return LogMessage(
+        timestamp=entry.docker_time,
+        source_format=entry.inner_format,
+        source_file=entry.logger_or_file or "unknown",
+        message_type=msg_type,
+        level=entry.level or "INFO",
+        raw_message_text=entry.message,
+        metadata=metadata_obj,
+        payload=payload_obj,
     )

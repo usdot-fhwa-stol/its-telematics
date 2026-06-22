@@ -1,7 +1,11 @@
-# analyzer.py
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
-from models import LogMessage, RunMetrics
+from models import (
+    InfluxBatchWrite,
+    LogMessage,
+    MgmtBSMTraceMetrics,
+    RSUStatusPayload,
+)
 
 
 def analyze_system_performance(messages: List[LogMessage]) -> Dict[str, Any]:
@@ -12,43 +16,56 @@ def analyze_system_performance(messages: List[LogMessage]) -> Dict[str, Any]:
     status_updates = []
 
     for msg in messages:
-        f = msg.fields
-        # Latency calculations
-        if "payload_timestamp" in msg.fields and "influx_timestamp_ms" in msg.fields:
-            try:
-                # Convert strings out of regex format mappings back to int structures
-                p_ts = int(msg.fields["payload_timestamp"])
-                i_ts = int(msg.fields["influx_timestamp_ms"])
+        if not msg.payload:
+            continue
 
-                # Check for unit variations (seconds vs milliseconds)
-                if p_ts > 9_999_999_999:  # Must be millisecond epochs
-                    delta_ms = i_ts - p_ts
-                else:  # Convert seconds to milliseconds
-                    delta_ms = (i_ts) - (p_ts * 1000)
+        # 1. Pipeline Latency Calculations & RSU Ingestion Metrics
+        if msg.message_type == "influx_line_built":
+            # Explicitly cast the broad Union payload to the expected dataclass structure
+            payload = cast(MgmtBSMTraceMetrics, msg.payload)
+            p_ts = payload.source_timestamp
+            i_ts = payload.influx_timestamp
 
-                latencies.append(delta_ms)
-            except (ValueError, TypeError):
-                pass
+            # Guard check for unit variations (seconds vs milliseconds)
+            if p_ts > 9_999_999_999:  # Already a millisecond epoch
+                delta_ms = i_ts - p_ts
+            else:  # Convert source seconds to milliseconds
+                delta_ms = i_ts - (p_ts * 1000)
 
-        # Aggregate trace message counts by RSU Ip
-        rsu_ip = f.get("rsu_ip")
-        if rsu_ip:
-            rsu_msg_counts[rsu_ip] = rsu_msg_counts.get(rsu_ip, 0) + 1
+            latencies.append(delta_ms)
 
-        if msg.message_type == "influx_batch_write":
-            total_influx_written += f.get("records_count", 0)
+            rsu_ip = payload.tags.rsu_ip
+            if rsu_ip:
+                rsu_msg_counts[rsu_ip] = rsu_msg_counts.get(rsu_ip, 0) + 1
 
-        if msg.message_type == "rsu_status_event":
+        # 2. Inbound Edge Message Distribution Tracking (C++ Apps)
+        elif msg.message_type == "bsm_published":
+            if msg.metadata and msg.metadata.rsu and msg.metadata.rsu.ip:
+                rsu_ip = msg.metadata.rsu.ip
+                rsu_msg_counts[rsu_ip] = rsu_msg_counts.get(rsu_ip, 0) + 1
+
+        # 3. Aggregate Throughput Saved to Database via Influx Batch Confirmations
+        elif msg.message_type == "influx_batch_written":
+            payload = cast(InfluxBatchWrite, msg.payload)
+            total_influx_written += payload.records_written
+
+        # 4. Log RSU Operating State Transitions
+        elif msg.message_type == "rsu_status_update":
+            payload = cast(RSUStatusPayload, msg.payload)
+            rsu_ip = payload.rsu.ip if payload.rsu else "unknown"
+
             status_updates.append(
                 {
                     "time": msg.timestamp.isoformat(),
-                    "ip": f.get("rsu_ip"),
-                    "status": f.get("status"),
-                    "event": f.get("event"),
+                    "ip": rsu_ip,
+                    "status": payload.status,
+                    "event": payload.event,
                 }
             )
+            if rsu_ip and rsu_ip != "unknown":
+                rsu_msg_counts[rsu_ip] = rsu_msg_counts.get(rsu_ip, 0) + 1
 
-    # Summarize latency
+    # Summarize Latency Distributions for CDF / Distribution Plots
     lat_stats = {}
     if latencies:
         lat_arr = sorted(latencies)

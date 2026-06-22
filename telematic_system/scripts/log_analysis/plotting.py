@@ -1,13 +1,13 @@
-# plotting.py
-import os
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
-import numpy as np
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 
 sns.set_theme(style="whitegrid")
+
 
 def clean_latency_outliers_iqr(delays: List[float]) -> List[float]:
     """Applies IQR filtering to remove anomalous network execution noise."""
@@ -21,11 +21,14 @@ def clean_latency_outliers_iqr(delays: List[float]) -> List[float]:
     lower = q1 - 1.5 * iqr
     return arr[(arr >= lower) & (arr <= upper)].tolist()
 
-def generate_plots_and_sheets(test_case: str, run_id: str, messages: List[Any], results: Dict[str, Any]):
+
+def generate_plots_and_sheets(
+    test_case: str, run_id: str, messages: List[Any], results: Dict[str, Any]
+):
     """Draws metrics distribution, throughput curves, and saves a summary csv."""
     output_dir = Path("output") / f"{test_case}_run_{run_id}"
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # 1. LATENCY DISTRIBUTION
     latencies = []
     for msg in messages:
@@ -34,12 +37,12 @@ def generate_plots_and_sheets(test_case: str, run_id: str, messages: List[Any], 
                 p_ts = int(msg.fields["payload_timestamp"])
                 i_ts = int(msg.fields["influx_timestamp_ms"])
                 delta = (i_ts - p_ts) if p_ts > 9_999_999_999 else (i_ts - p_ts * 1000)
-                latencies.append(delta / 1000.0) # Convert to seconds
+                latencies.append(delta / 1000.0)  # Convert to seconds
             except (ValueError, TypeError):
                 pass
-                
+
     cleaned_seconds = clean_latency_outliers_iqr(latencies)
-    
+
     if cleaned_seconds:
         plt.figure(figsize=(10, 6))
         sns.histplot(cleaned_seconds, kde=True, color="teal", bins=30)
@@ -50,19 +53,33 @@ def generate_plots_and_sheets(test_case: str, run_id: str, messages: List[Any], 
         plt.tight_layout()
         plt.savefig(output_dir / "latency_density.png")
         plt.close()
-        
+
     # 2. THROUGHPUT TIMELINE (Data points over active epoch windows)
     time_series = [msg.timestamp for msg in messages]
     if time_series:
-        df_time = pd.DataFrame({"time": time_series})
+        # 1. Force a clean, uniform datetime series to avoid object-type fallback
+        df_time = pd.DataFrame({"time": pd.to_datetime(time_series, utc=True)})
         df_time["second"] = df_time["time"].dt.floor("s")
-        throughput = df_time.groupby("second").size().reset_index(name="msgs_per_sec")
-        
+
+        # 2. Explicitly convert to a DataFrame first to satisfy Pyright's strict typing
+        throughput = (
+            df_time.groupby("second").size().to_frame(name="msgs_per_sec").reset_index()
+        )
+
         plt.figure(figsize=(12, 5))
-        sns.lineplot(data=throughput, x="second", y="msgs_per_sec", marker="o", color="royalblue", linewidth=1.5)
+        sns.lineplot(
+            data=throughput,
+            x="second",
+            y="msgs_per_sec",
+            marker="o",
+            color="royalblue",
+            linewidth=1.5,
+        )
         plt.xlabel("Transmission Wall Time (UTC)", fontsize=13)
         plt.ylabel("Inbound Messages / Sec", fontsize=13)
-        plt.title(f"{test_case} (Run {run_id}) Real-Time System Throughput", fontsize=15)
+        plt.title(
+            f"{test_case} (Run {run_id}) Real-Time System Throughput", fontsize=15
+        )
         plt.xticks(rotation=45)
         plt.tight_layout()
         plt.savefig(output_dir / "throughput_timeline.png")
@@ -73,7 +90,9 @@ def generate_plots_and_sheets(test_case: str, run_id: str, messages: List[Any], 
     if rsu_counts:
         df_rsu = pd.DataFrame(list(rsu_counts.items()), columns=["RSU IP", "Count"])
         plt.figure(figsize=(8, 5))
-        sns.barplot(data=df_rsu, x="RSU IP", y="Count", palette="viridis")
+        sns.barplot(
+            data=df_rsu, x="RSU IP", y="Count", palette="viridis", hue="x", legend=False
+        )
         plt.xlabel("Network Target IP", fontsize=13)
         plt.ylabel("Captured Transmissions", fontsize=13)
         plt.title(f"{test_case} Traffic Completeness Profile", fontsize=15)
@@ -91,7 +110,9 @@ def generate_plots_and_sheets(test_case: str, run_id: str, messages: List[Any], 
         "mean_latency_ms": [lat_stats.get("mean_ms", np.nan)],
         "p95_latency_ms": [lat_stats.get("p95_ms", np.nan)],
         "db_records_written": [results.get("total_records_saved_to_db", 0)],
-        "unique_rsus_seen": [len(rsu_counts)]
+        "unique_rsus_seen": [len(rsu_counts)],
     }
     pd.DataFrame(summary_data).to_csv(sheet_path, index=False)
-    print(f"      [✓] Visual reports & structural raw analysis exported to: '{output_dir}'")
+    print(
+        f"      [✓] Visual reports & structural raw analysis exported to: '{output_dir}'"
+    )
