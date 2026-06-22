@@ -76,6 +76,7 @@ def extract_tru_payload(msg_text: str) -> tuple[str, Any]:
                 size=core.get("size", {}),
                 accuracy=core.get("accuracy", {}),
             )
+            payload_json = json.dumps(payload_wrapper, separators=(",", ":"))
 
             payload_obj = BSMTelematicPayload(
                 channel=int(payload_wrapper.get("channel", -1)),
@@ -87,6 +88,7 @@ def extract_tru_payload(msg_text: str) -> tuple[str, Any]:
                 subType=payload_wrapper.get("subType", ""),
                 timestamp=int(payload_wrapper.get("timestamp", 0)),
                 type=payload_wrapper.get("type", ""),
+                bytes_size=len(payload_json.encode("utf-8")),
                 message=BasicSafetyMessage(
                     messageId=inner_payload.get("messageId", ""),
                     coreData=bsm_core,

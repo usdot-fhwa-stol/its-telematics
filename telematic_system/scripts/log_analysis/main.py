@@ -131,15 +131,14 @@ def main():
                 print(f"  Network Entities Checked:     {', '.join(rsus)}")
 
                 if not args.no_plots or not args.no_csv:
-                    # generate_plots_and_sheets(
-                    #     test_id,
-                    #     run_id,
-                    #     all_messages,
-                    #     results,
-                    #     export_plots=not args.no_plots,
-                    #     export_csv=not args.no_csv
-                    # )
-                    print("on hold")
+                    generate_plots_and_sheets(
+                        test_id,
+                        run_id,
+                        all_messages,
+                        results,
+                        export_plots=not args.no_plots,
+                        export_csv=not args.no_csv,
+                    )
             else:
                 print("  Network Entities Checked:     None")
 

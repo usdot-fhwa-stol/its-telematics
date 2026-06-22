@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from pickletools import bytes_types
 from typing import Any, Dict, List, Optional, Union
 
 
@@ -133,6 +134,7 @@ class BSMTelematicPayload:
     subType: str
     timestamp: int
     type: str
+    bytes_size: int
     message: BasicSafetyMessage
 
 
