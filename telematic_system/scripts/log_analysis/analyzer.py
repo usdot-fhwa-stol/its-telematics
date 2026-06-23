@@ -7,34 +7,28 @@ from models import (
     MgmtBSMTraceMetrics,
     RSUStatusPayload,
 )
+from parser import compute_latency_ms
 
 
 def analyze_system_performance(messages: List[LogMessage]) -> Dict[str, Any]:
-    latencies = []
-    rsu_msg_counts = {}
+    latencies: List[int] = []
+    rsu_msg_counts: Dict[str, int] = {}
     total_influx_written = 0
-    status_updates = []
+    status_updates: List[Dict[str, Any]] = []
 
     for msg in messages:
-        if msg.message_type == "bsm_published":
-            print(msg.payload)
-            break
         if not msg.payload:
             continue
 
         if msg.message_type == "influx_line_built":
             payload = cast(MgmtBSMTraceMetrics, msg.payload)
-
-            p_ts = payload.source_timestamp
-            i_ts = payload.influx_timestamp
-
-            delta_ms = i_ts - p_ts if p_ts > 9_999_999_999 else i_ts - (p_ts * 1000)
-
-            latencies.append(delta_ms)
-
-            rsu_ip = payload.tags.rsu_ip
-            if rsu_ip:
-                rsu_msg_counts[rsu_ip] = rsu_msg_counts.get(rsu_ip, 0) + 1
+            latencies.append(
+                compute_latency_ms(payload.source_timestamp, payload.influx_timestamp)
+            )
+            if payload.tags.rsu_ip:
+                rsu_msg_counts[payload.tags.rsu_ip] = (
+                    rsu_msg_counts.get(payload.tags.rsu_ip, 0) + 1
+                )
 
         elif msg.message_type == "bsm_published":
             if msg.metadata and msg.metadata.rsu and msg.metadata.rsu.ip:
@@ -42,14 +36,11 @@ def analyze_system_performance(messages: List[LogMessage]) -> Dict[str, Any]:
                 rsu_msg_counts[rsu_ip] = rsu_msg_counts.get(rsu_ip, 0) + 1
 
         elif msg.message_type == "influx_batch_written":
-            payload = cast(InfluxBatchWrite, msg.payload)
-            total_influx_written += payload.records_written
+            total_influx_written += cast(InfluxBatchWrite, msg.payload).records_written
 
         elif msg.message_type == "rsu_status_update":
             payload = cast(RSUStatusPayload, msg.payload)
-
             rsu_ip = payload.rsu.ip if payload.rsu else "unknown"
-
             status_updates.append(
                 {
                     "time": msg.timestamp.isoformat(),
@@ -58,21 +49,17 @@ def analyze_system_performance(messages: List[LogMessage]) -> Dict[str, Any]:
                     "event": payload.event,
                 }
             )
-
             if rsu_ip != "unknown":
                 rsu_msg_counts[rsu_ip] = rsu_msg_counts.get(rsu_ip, 0) + 1
 
-    lat_stats = {}
-
+    lat_stats: Dict[str, float] = {}
     if latencies:
         lat_arr = np.array(latencies)
-
         lat_stats = {
             "mean_ms": float(np.mean(lat_arr)),
             "max_ms": float(np.max(lat_arr)),
             "min_ms": float(np.min(lat_arr)),
             "p50_ms": float(np.percentile(lat_arr, 50)),
-            "p95_ms": float(np.percentile(lat_arr, 95)),
         }
 
     return {

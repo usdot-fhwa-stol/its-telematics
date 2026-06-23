@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from pickletools import bytes_types
 from typing import Any, Dict, List, Optional, Union
 
 
@@ -9,16 +8,12 @@ from typing import Any, Dict, List, Optional, Union
 # ---------------------------------------------------------
 @dataclass
 class RSUConnection:
-    """Represents the target Roadside Unit."""
-
     ip: str
     port: int
 
 
 @dataclass
 class MessageMetadata:
-    """Standard metadata wrapper found in telematic streams."""
-
     event: str
     rsu: RSUConnection
     timestamp: str
@@ -47,14 +42,11 @@ class BSMCoreData:
 
 @dataclass
 class BasicSafetyMessage:
-    """J2735 BSM Wrapper including optional Part II extensions."""
+    """J2735 BSM wrapper including optional Part II extensions."""
 
     messageId: str
     coreData: BSMCoreData
     partII: List[Dict[str, Any]] = field(default_factory=list)
-
-
-# append to models.py
 
 
 # ---------------------------------------------------------
@@ -62,8 +54,6 @@ class BasicSafetyMessage:
 # ---------------------------------------------------------
 @dataclass
 class UnitHealthConfig:
-    """Parsed from UnitHealthStatusMessage(...) string."""
-
     unit_id: str
     bridge_plugin_status: str
     last_updated_timestamp: Optional[int]
@@ -72,8 +62,6 @@ class UnitHealthConfig:
 
 @dataclass
 class TRUHealthStatusMessage:
-    """Top-level container for handling Unit Health Status logs."""
-
     unit_config: UnitHealthConfig
     timestamp: int
     rsu_configs: List[Dict[str, Any]] = field(default_factory=list)
@@ -84,37 +72,28 @@ class TRUHealthStatusMessage:
 # ---------------------------------------------------------
 @dataclass
 class InfluxLineTags:
-    """The routing and identity tags embedded at the start of the Influx line."""
-
-    measurement: str  # e.g., "IntegrationTest2"
-    unit_id: str  # e.g., "Unit001"
-    rsu_ip: str  # e.g., "192.168.55.72"
-    topic_name: str  # e.g., "J2735_BSM_MessageReceiver"
+    measurement: str
+    unit_id: str
+    rsu_ip: str
+    topic_name: str
     port: int
 
 
 @dataclass
 class MgmtBSMTraceMetrics:
-    """
-    Captures critical telemetry identifiers and performance tracing properties.
-    Designed specifically to calculate processing latency pipeline deltas.
-    """
+    """BSM trace identifiers and timing fields used for E2E latency."""
 
     tags: InfluxLineTags
     msg_cnt: int
     bsm_id: str
     sec_mark: int
-
-    # Timing fields for Latency Data (E2E Analysis)
-    source_timestamp: int  # payload.timestamp (extracted from the fields)
-    influx_timestamp: int  # The terminal epoch timestamp at the end of the line
-    bytes_size: int  # Extracted from the log suffix (bytes: X)
+    source_timestamp: int  # payload.timestamp from the line fields
+    influx_timestamp: int  # terminal epoch timestamp at end of line
+    bytes_size: int
 
 
 @dataclass
 class InfluxBatchWrite:
-    """Model tracking database pipeline confirmations."""
-
     records_written: int
 
 
@@ -123,8 +102,6 @@ class InfluxBatchWrite:
 # ---------------------------------------------------------
 @dataclass
 class BSMTelematicPayload:
-    """The full payload wrapper for a BSM broadcast event."""
-
     channel: int
     encoding: str
     flags: int
@@ -140,8 +117,6 @@ class BSMTelematicPayload:
 
 @dataclass
 class RSUStatusPayload:
-    """Payload for RSU Health/Management Status events."""
-
     event: str
     rsu: RSUConnection
     status: str
@@ -152,28 +127,22 @@ class RSUStatusPayload:
 # ---------------------------------------------------------
 @dataclass
 class ParsedEntry:
-    """A raw unpacked container holding lines tied to one logical event."""
-
     docker_time: datetime
     inner_format: str  # 'java' | 'cpp' | 'unknown'
     level: Optional[str]
     logger_or_file: Optional[str]
-    message: str  # Aggregated inner text
+    message: str
     source_lines: List[str] = field(default_factory=list)
 
 
 @dataclass
 class LogMessage:
     timestamp: datetime
-    source_format: str  # 'java' (for Mgmt service) | 'cpp' (for TRU)
-    source_file: str  # e.g., 'DataIngestionDepositor'
-    message_type: (
-        str  # 'tru_health_status' | 'influx_line_built' | 'influx_batch_written'
-    )
+    source_format: str  # 'java' (Mgmt) | 'cpp' (TRU)
+    source_file: str
+    message_type: str
     level: str
     raw_message_text: str
-
-    # Updated to hold the new structured data targets
     metadata: Optional[MessageMetadata] = None
     payload: Optional[
         Union[

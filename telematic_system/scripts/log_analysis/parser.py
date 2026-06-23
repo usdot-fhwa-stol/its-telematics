@@ -2,7 +2,7 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Generator, Optional
+from typing import Any, Generator, Optional, Tuple
 
 from models import (
     BasicSafetyMessage,
@@ -21,15 +21,22 @@ from models import (
 )
 from regex import ANSI_CLEANER, INFLUX_SUFFIX_RE, MGMT_REGEX, TRU_REGEX
 
+_MS_THRESHOLD = 9_999_999_999
+
+
+def compute_latency_ms(source_timestamp: int, influx_timestamp: int) -> int:
+    """End-to-end latency in ms, normalizing the source timestamp to ms."""
+    if source_timestamp > _MS_THRESHOLD:
+        return influx_timestamp - source_timestamp
+    return influx_timestamp - (source_timestamp * 1000)
+
 
 def safe_search_str(pattern: str, text: str, default: str = "unknown") -> str:
-    """Safely extracts a string group from a regex search."""
     match = re.search(pattern, text)
     return match.group(1) if match else default
 
 
 def safe_search_int(pattern: str, text: str, default: int = 0) -> int:
-    """Safely extracts an integer group from a regex search."""
     match = re.search(pattern, text)
     if match and match.group(1).replace("-", "").isdigit():
         return int(match.group(1))
@@ -40,10 +47,11 @@ def parse_datetime(ts_str: str) -> datetime:
     return datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S.%f")
 
 
-def extract_tru_payload(msg_text: str) -> tuple[str, Any]:
+def extract_tru_payload(msg_text: str) -> Tuple[str, Any]:
     if "Published:" in msg_text:
         try:
             json_str = msg_text.split("Published:", 1)[1].strip()
+            raw_payload_bytes = len(json_str.encode("utf-8"))
             data = json.loads(json_str)
 
             meta = data.get("metadata", {})
@@ -76,7 +84,6 @@ def extract_tru_payload(msg_text: str) -> tuple[str, Any]:
                 size=core.get("size", {}),
                 accuracy=core.get("accuracy", {}),
             )
-            payload_json = json.dumps(payload_wrapper, separators=(",", ":"))
 
             payload_obj = BSMTelematicPayload(
                 channel=int(payload_wrapper.get("channel", -1)),
@@ -88,16 +95,16 @@ def extract_tru_payload(msg_text: str) -> tuple[str, Any]:
                 subType=payload_wrapper.get("subType", ""),
                 timestamp=int(payload_wrapper.get("timestamp", 0)),
                 type=payload_wrapper.get("type", ""),
-                bytes_size=len(payload_json.encode("utf-8")),
+                bytes_size=raw_payload_bytes,
                 message=BasicSafetyMessage(
                     messageId=inner_payload.get("messageId", ""),
                     coreData=bsm_core,
                     partII=bsm_val.get("partII", []),
                 ),
             )
-            return "bsm_published", (metadata_obj, payload_obj)
+            return ("bsm_published", (metadata_obj, payload_obj))
         except Exception:
-            return "tru_json_parse_failure", None
+            return ("tru_json_parse_failure", None)
 
     if "ProcessRSUStatusMessage:" in msg_text:
         try:
@@ -109,21 +116,20 @@ def extract_tru_payload(msg_text: str) -> tuple[str, Any]:
                 rsu=RSUConnection(ip=rsu.get("ip", ""), port=int(rsu.get("port", 0))),
                 status=data.get("status", ""),
             )
-            return "rsu_status_update", (None, payload_obj)
+            return ("rsu_status_update", (None, payload_obj))
         except Exception:
-            return "tru_status_parse_failure", None
+            return ("tru_status_parse_failure", None)
 
-    return "generic_cpp_debug", None
+    return ("generic_cpp_debug", None)
 
 
-def extract_mgmt_payload(msg_text: str) -> tuple[str, Any]:
+def extract_mgmt_payload(msg_text: str) -> Tuple[str, Any]:
     if "Handling Unit Health Status Message:" in msg_text:
         try:
             unit_id = safe_search_str(r"unitId=([^,\s)]+)", msg_text)
             status = safe_search_str(r"bridgePluginStatus=([^,\s)]+)", msg_text)
             lut = safe_search_int(r"lastUpdatedTimestamp=(\d+)", msg_text, default=-1)
 
-            # Find the trailing message timestamp
             ts_match = re.findall(r"timestamp=(\d+)", msg_text)
             top_ts = int(ts_match[-1]) if ts_match else 0
 
@@ -150,29 +156,20 @@ def extract_mgmt_payload(msg_text: str) -> tuple[str, Any]:
             influx_ts = int(suffix_match.group(1))
             byte_size = int(suffix_match.group(2))
 
-            meas = influx_part.split(",", 1)[0]
-            uid = safe_search_str(r"unitId=([^,\s]+)", influx_part)
-            ip = safe_search_str(r"rsuIp=([^,\s]+)", influx_part)
-            topic = safe_search_str(r"topicName=([^,\s]+)", influx_part)
-            port = safe_search_int(r"port=(\d+)", influx_part)
-
-            msg_cnt = safe_search_int(r"coreData\.msgCnt=(\d+)", influx_part)
-            bsm_id = safe_search_str(r'coreData\.id="([^"]+)"', influx_part)
-            sec_mark = safe_search_int(r"coreData\.secMark=(\d+)", influx_part)
-            src_ts = safe_search_int(r"payload\.timestamp=(\d+)", influx_part)
-
             payload = MgmtBSMTraceMetrics(
                 tags=InfluxLineTags(
-                    measurement=meas,
-                    unit_id=uid,
-                    rsu_ip=ip,
-                    topic_name=topic,
-                    port=port,
+                    measurement=influx_part.split(",", 1)[0],
+                    unit_id=safe_search_str(r"unitId=([^,\s]+)", influx_part),
+                    rsu_ip=safe_search_str(r"rsuIp=([^,\s]+)", influx_part),
+                    topic_name=safe_search_str(r"topicName=([^,\s]+)", influx_part),
+                    port=safe_search_int(r"port=(\d+)", influx_part),
                 ),
-                msg_cnt=msg_cnt,
-                bsm_id=bsm_id,
-                sec_mark=sec_mark,
-                source_timestamp=src_ts,
+                msg_cnt=safe_search_int(r"coreData\.msgCnt=(\d+)", influx_part),
+                bsm_id=safe_search_str(r'coreData\.id="([^"]+)"', influx_part),
+                sec_mark=safe_search_int(r"coreData\.secMark=(\d+)", influx_part),
+                source_timestamp=safe_search_int(
+                    r"payload\.timestamp=(\d+)", influx_part
+                ),
                 influx_timestamp=influx_ts,
                 bytes_size=byte_size,
             )
@@ -248,7 +245,6 @@ def parse_and_categorize(entry: ParsedEntry, file_path: str) -> Optional[LogMess
             metadata_obj, payload_obj = extracted
         else:
             payload_obj = extracted
-
     elif entry.inner_format == "java":
         msg_type, payload_obj = extract_mgmt_payload(entry.message)
 

@@ -11,7 +11,7 @@ FILE_PATTERN = re.compile(r"^(c\d+)[_-](.*)run[_-](\d+)\.log$", re.I)
 
 
 def process_log_file(log_path: Path, metrics: dict, all_messages: list):
-    """Helper to parse a single log file and update execution metrics."""
+    """Parse a single log file and update execution metrics."""
     if not log_path or not log_path.exists():
         return
 
@@ -26,7 +26,7 @@ def process_log_file(log_path: Path, metrics: dict, all_messages: list):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="RSU Telematic System Cohort Report")
+    parser = argparse.ArgumentParser(description="Verification Test Log Analysis Script")
     parser.add_argument(
         "-t",
         "--test",
@@ -40,8 +40,6 @@ def main():
         default="telematic_system/scripts/log_analysis/logs",
         help="Root logs directory (default: ./telematic_system/scripts/log_analysis/logs)",
     )
-
-    # Arguments for Export Control (Enabled by default)
     parser.add_argument(
         "--no-plots", action="store_true", help="Disable exporting graphs"
     )
@@ -57,7 +55,7 @@ def main():
         return
 
     print("=" * 80)
-    print(" RSU TELEMATIC SYSTEM COHORT REPORT SCRIPT")
+    print("VERIFICATION TEST LOG ANALYSIS SCRIPT")
     print(f" Logs Directory: {logs_dir.resolve()}")
     if args.test:
         print(f" Target Test:    {args.test}")
@@ -99,7 +97,6 @@ def main():
             print(f"     Field Unit Log:     {tru_log.name}")
             print("-" * 50)
 
-            # Replaced missing RunMetrics dataclass with a clean local tracking dictionary
             metrics = {"total_entries_read": 0, "parse_failures": 0}
             all_messages = []
 
@@ -108,27 +105,30 @@ def main():
 
             results = analyze_system_performance(all_messages)
 
-            print(f"  Scanned Container Lines:      {metrics['total_entries_read']:,}")
-            print(f"  Uncategorized Fallbacks:      {metrics['parse_failures']:,}")
-            print(f"  Parsed Operational Messages: {len(all_messages):,}")
+            print(f"  Number of Log Entries Scanned:      {metrics['total_entries_read']:,}")
+            print(f"  Parsed Logs:  {len(all_messages):,}")
+            print(f"  Unparsed Logs:      {metrics['parse_failures']:,}")
 
             lat = results.get("latency_stats")
             if lat:
                 print(
-                    f"  Latency Average (Mean / P95): {lat['mean_ms']:.1f}ms / {lat['p95_ms']:.1f}ms"
+                    f"  Latency (Mean / Max):         "
+                    f"{lat['mean_ms']:.1f}ms / {lat['max_ms']:.1f}ms"
                 )
             else:
                 print(
-                    "  Latency Evaluation:          Insufficient matching trace events evaluated."
+                    "  Latency Evaluation:           "
+                    "Insufficient matching trace events evaluated."
                 )
 
             print(
-                f"  Database records written:    {results.get('total_records_saved_to_db', 0):,}"
+                f"  Database records written:     "
+                f"{results.get('total_records_saved_to_db', 0):,}"
             )
 
             rsus = list(results.get("rsu_data_distributions", {}).keys())
             if rsus:
-                print(f"  Network Entities Checked:     {', '.join(rsus)}")
+                print(f"  Unique RSU IPs:     {', '.join(rsus)}")
 
                 if not args.no_plots or not args.no_csv:
                     generate_plots_and_sheets(
@@ -140,11 +140,11 @@ def main():
                         export_csv=not args.no_csv,
                     )
             else:
-                print("  Network Entities Checked:     None")
+                print("  Unique RSU IPs:     None")
 
     if total_runs_processed == 0:
         print(
-            "\n[!] Could not locate complete test logs paired under common execution runs."
+            "\n[!] Could not locate any paired tru instance logs and rsu management service logs."
         )
     else:
         print(f"\n[✓] Finished parsing and exporting {total_runs_processed} runs.")
