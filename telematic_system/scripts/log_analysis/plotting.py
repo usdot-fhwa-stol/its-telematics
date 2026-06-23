@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from models import LogMessage, MgmtBSMTraceMetrics, TRUHealthStatusMessage
+from models import InfluxBSMTraceRecord, LogMessage, TRUHealthPayload
 
 sns.set_theme(style="darkgrid")
 
@@ -111,7 +111,7 @@ def generate_plots_and_sheets(
             # --- 1. MANAGEMENT (JAVA) DATA STREAM ---
             if msg.source_format.lower() == "java":
                 if msg.message_type == "influx_line_built":
-                    payload = cast(MgmtBSMTraceMetrics, msg.payload)
+                    payload = cast(InfluxBSMTraceRecord, msg.payload)
                     event_ts = pd.to_datetime(
                         payload.source_timestamp, unit="ms", utc=True
                     )
@@ -123,7 +123,7 @@ def generate_plots_and_sheets(
                         }
                     )
                 elif msg.message_type == "tru_health_status":
-                    payload = cast(TRUHealthStatusMessage, msg.payload)
+                    payload = cast(TRUHealthPayload, msg.payload)
                     if payload.timestamp:
                         event_ts = pd.to_datetime(
                             payload.timestamp, unit="ms", utc=True
@@ -152,7 +152,7 @@ def generate_plots_and_sheets(
                         }
                     )
                 elif msg.message_type == "tru_health_status":
-                    payload = cast(TRUHealthStatusMessage, msg.payload)
+                    payload = cast(TRUHealthPayload, msg.payload)
                     if payload.timestamp:
                         event_ts = pd.to_datetime(
                             payload.timestamp, unit="ms", utc=True

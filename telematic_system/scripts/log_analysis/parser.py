@@ -5,18 +5,18 @@ from pathlib import Path
 from typing import Any, Generator, Optional, Tuple
 
 from models import (
-    BasicSafetyMessage,
+    BSM,
     BSMCoreData,
-    BSMTelematicPayload,
-    InfluxBatchWrite,
-    InfluxLineTags,
+    BSMEventMetadata,
+    BSMPayload,
+    BSMTraceTags,
+    InfluxBSMTraceRecord,
+    InfluxWriteResult,
     LogMessage,
-    MessageMetadata,
-    MgmtBSMTraceMetrics,
-    RSUConnection,
+    RSUEndpoint,
     RSUStatusPayload,
-    TRUHealthStatusMessage,
-    UnitHealthConfig,
+    TRUHealthPayload,
+    TRUUnitStatus,
 )
 from regex import ANSI_CLEANER, INFLUX_SUFFIX_RE, MGMT_REGEX, TRU_REGEX
 
@@ -54,7 +54,7 @@ def extract_tru_payload(msg_text: str) -> Tuple[str, Any]:
 
             if "unitConfig" in data or "rsuConfigs" in data:
                 uc_raw = data.get("unitConfig", {})
-                unit_config_obj = UnitHealthConfig(
+                unit_config_obj = TRUUnitStatus(
                     unit_id=uc_raw.get("unitId", ""),
                     bridge_plugin_status=uc_raw.get("bridgePluginStatus", ""),
                     last_updated_timestamp=uc_raw.get("lastUpdatedTimestamp"),
@@ -64,7 +64,7 @@ def extract_tru_payload(msg_text: str) -> Tuple[str, Any]:
                 raw_ts = data.get("timestamp", "0")
                 ts = int(raw_ts) if str(raw_ts).isdigit() else 0
 
-                payload_obj = TRUHealthStatusMessage(
+                payload_obj = TRUHealthPayload(
                     unit_config=unit_config_obj,
                     timestamp=ts,
                     bytes_size=raw_payload_bytes,
@@ -74,9 +74,9 @@ def extract_tru_payload(msg_text: str) -> Tuple[str, Any]:
 
             meta = data.get("metadata", {})
             rsu = meta.get("rsu", {})
-            metadata_obj = MessageMetadata(
+            metadata_obj = BSMEventMetadata(
                 event=meta.get("event", ""),
-                rsu=RSUConnection(ip=rsu.get("ip", ""), port=int(rsu.get("port", 0))),
+                rsu=RSUEndpoint(ip=rsu.get("ip", ""), port=int(rsu.get("port", 0))),
                 timestamp=meta.get("timestamp", ""),
                 topicName=meta.get("topicName", ""),
                 unitId=meta.get("unitId", ""),
@@ -103,7 +103,7 @@ def extract_tru_payload(msg_text: str) -> Tuple[str, Any]:
                 accuracy=core.get("accuracy", {}),
             )
 
-            payload_obj = BSMTelematicPayload(
+            payload_obj = BSMPayload(
                 channel=int(payload_wrapper.get("channel", -1)),
                 encoding=payload_wrapper.get("encoding", ""),
                 flags=int(payload_wrapper.get("flags", 0)),
@@ -114,7 +114,7 @@ def extract_tru_payload(msg_text: str) -> Tuple[str, Any]:
                 timestamp=int(payload_wrapper.get("timestamp", 0)),
                 type=payload_wrapper.get("type", ""),
                 bytes_size=raw_payload_bytes,
-                message=BasicSafetyMessage(
+                message=BSM(
                     messageId=inner_payload.get("messageId", ""),
                     coreData=bsm_core,
                     partII=bsm_val.get("partII", []),
@@ -131,7 +131,7 @@ def extract_tru_payload(msg_text: str) -> Tuple[str, Any]:
             rsu = data.get("rsu", {})
             payload_obj = RSUStatusPayload(
                 event=data.get("event", ""),
-                rsu=RSUConnection(ip=rsu.get("ip", ""), port=int(rsu.get("port", 0))),
+                rsu=RSUEndpoint(ip=rsu.get("ip", ""), port=int(rsu.get("port", 0))),
                 status=data.get("status", ""),
             )
             return ("rsu_status_update", (None, payload_obj))
@@ -157,8 +157,8 @@ def extract_mgmt_payload(msg_text: str) -> Tuple[str, Any]:
             else:
                 mgmt_bytes = len(msg_text.encode("utf-8"))
 
-            payload = TRUHealthStatusMessage(
-                unit_config=UnitHealthConfig(
+            payload = TRUHealthPayload(
+                unit_config=TRUUnitStatus(
                     unit_id=unit_id,
                     bridge_plugin_status=status,
                     last_updated_timestamp=lut if lut != -1 else None,
@@ -181,8 +181,8 @@ def extract_mgmt_payload(msg_text: str) -> Tuple[str, Any]:
             influx_ts = int(suffix_match.group(1))
             byte_size = int(suffix_match.group(2))
 
-            payload = MgmtBSMTraceMetrics(
-                tags=InfluxLineTags(
+            payload = InfluxBSMTraceRecord(
+                tags=BSMTraceTags(
                     measurement=influx_part.split(",", 1)[0],
                     unit_id=safe_search_str(r"unitId=([^,\s]+)", influx_part),
                     rsu_ip=safe_search_str(r"rsuIp=([^,\s]+)", influx_part),
@@ -204,7 +204,7 @@ def extract_mgmt_payload(msg_text: str) -> Tuple[str, Any]:
 
     if "Wrote number of" in msg_text:
         count = safe_search_int(r"Wrote number of (\d+) records", msg_text)
-        return "influx_batch_written", InfluxBatchWrite(records_written=count)
+        return "influx_batch_written", InfluxWriteResult(records_written=count)
 
     return "generic_java_info", None
 

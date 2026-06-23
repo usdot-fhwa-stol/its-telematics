@@ -4,18 +4,28 @@ from typing import Any, Dict, List, Optional, Union
 
 
 # ---------------------------------------------------------
-# Telemetry & V2X Sub-Models
+# RSU
 # ---------------------------------------------------------
 @dataclass
-class RSUConnection:
+class RSUEndpoint:
     ip: str
     port: int
 
 
 @dataclass
-class MessageMetadata:
+class RSUStatusPayload:
     event: str
-    rsu: RSUConnection
+    rsu: RSUEndpoint
+    status: str
+
+
+# ---------------------------------------------------------
+# BSM
+# ---------------------------------------------------------
+@dataclass
+class BSMEventMetadata:
+    event: str
+    rsu: RSUEndpoint
     timestamp: str
     topicName: str
     unitId: str
@@ -39,64 +49,14 @@ class BSMCoreData:
 
 
 @dataclass
-class BasicSafetyMessage:
+class BSM:
     messageId: str
     coreData: BSMCoreData
     partII: List[Dict[str, Any]] = field(default_factory=list)
 
 
-# ---------------------------------------------------------
-# Management Service Health Sub-Models
-# ---------------------------------------------------------
 @dataclass
-class UnitHealthConfig:
-    unit_id: str
-    bridge_plugin_status: str
-    last_updated_timestamp: Optional[int]
-    timestamp: Optional[int]
-
-
-@dataclass
-class TRUHealthStatusMessage:
-    unit_config: UnitHealthConfig
-    timestamp: int
-    bytes_size: int
-    rsu_configs: List[Dict[str, Any]] = field(default_factory=list)
-
-
-# ---------------------------------------------------------
-# InfluxDB Ingestion & Latency Tracing Models
-# ---------------------------------------------------------
-@dataclass
-class InfluxLineTags:
-    measurement: str
-    unit_id: str
-    rsu_ip: str
-    topic_name: str
-    port: int
-
-
-@dataclass
-class MgmtBSMTraceMetrics:
-    tags: InfluxLineTags
-    msg_cnt: int
-    bsm_id: str
-    sec_mark: int
-    source_timestamp: int  # payload.timestamp from the line fields
-    influx_timestamp: int  # terminal epoch timestamp at end of line
-    bytes_size: int
-
-
-@dataclass
-class InfluxBatchWrite:
-    records_written: int
-
-
-# ---------------------------------------------------------
-# Top-Level Log Payloads
-# ---------------------------------------------------------
-@dataclass
-class BSMTelematicPayload:
+class BSMPayload:
     channel: int
     encoding: str
     flags: int
@@ -107,14 +67,54 @@ class BSMTelematicPayload:
     timestamp: int
     type: str
     bytes_size: int
-    message: BasicSafetyMessage
+    message: BSM
+
+
+# ---------------------------------------------------------
+# TRU
+# ---------------------------------------------------------
+@dataclass
+class TRUUnitStatus:
+    unit_id: str
+    bridge_plugin_status: str
+    last_updated_timestamp: Optional[int]
+    timestamp: Optional[int]
 
 
 @dataclass
-class RSUStatusPayload:
-    event: str
-    rsu: RSUConnection
-    status: str
+class TRUHealthPayload:
+    unit_config: TRUUnitStatus
+    timestamp: int
+    bytes_size: int
+    rsu_configs: List[Dict[str, Any]] = field(default_factory=list)
+
+
+# ---------------------------------------------------------
+# Mgmt InfluxDB BSM Trace
+# ---------------------------------------------------------
+@dataclass
+class BSMTraceTags:
+    measurement: str
+    unit_id: str
+    rsu_ip: str
+    topic_name: str
+    port: int
+
+
+@dataclass
+class InfluxBSMTraceRecord:
+    tags: BSMTraceTags
+    msg_cnt: int
+    bsm_id: str
+    sec_mark: int
+    source_timestamp: int
+    influx_timestamp: int
+    bytes_size: int
+
+
+@dataclass
+class InfluxWriteResult:
+    records_written: int
 
 
 # ---------------------------------------------------------
@@ -128,14 +128,14 @@ class LogMessage:
     message_type: str
     level: str
     raw_message_text: str
-    metadata: Optional[MessageMetadata] = None
+    metadata: Optional[BSMEventMetadata] = None
     payload: Optional[
         Union[
-            BSMTelematicPayload,
+            BSMPayload,
             RSUStatusPayload,
-            TRUHealthStatusMessage,
-            MgmtBSMTraceMetrics,
-            InfluxBatchWrite,
+            TRUHealthPayload,
+            InfluxBSMTraceRecord,
+            InfluxWriteResult,
             Dict[str, Any],
         ]
     ] = None

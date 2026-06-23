@@ -2,11 +2,11 @@ from typing import Any, Dict, List, cast
 
 import numpy as np
 from models import (
-    InfluxBatchWrite,
+    InfluxBSMTraceRecord,
+    InfluxWriteResult,
     LogMessage,
-    MgmtBSMTraceMetrics,
     RSUStatusPayload,
-    TRUHealthStatusMessage,
+    TRUHealthPayload,
 )
 from parser import compute_latency_ms
 
@@ -22,7 +22,7 @@ def analyze_system_performance(messages: List[LogMessage]) -> Dict[str, Any]:
             continue
 
         if msg.message_type == "influx_line_built":
-            payload = cast(MgmtBSMTraceMetrics, msg.payload)
+            payload = cast(InfluxBSMTraceRecord, msg.payload)
             latencies.append(
                 compute_latency_ms(payload.source_timestamp, payload.influx_timestamp)
             )
@@ -37,7 +37,7 @@ def analyze_system_performance(messages: List[LogMessage]) -> Dict[str, Any]:
                 rsu_msg_counts[rsu_ip] = rsu_msg_counts.get(rsu_ip, 0) + 1
 
         elif msg.message_type == "influx_batch_written":
-            total_influx_written += cast(InfluxBatchWrite, msg.payload).records_written
+            total_influx_written += cast(InfluxWriteResult, msg.payload).records_written
 
         elif msg.message_type == "rsu_status_update":
             payload = cast(RSUStatusPayload, msg.payload)
@@ -54,7 +54,7 @@ def analyze_system_performance(messages: List[LogMessage]) -> Dict[str, Any]:
                 rsu_msg_counts[rsu_ip] = rsu_msg_counts.get(rsu_ip, 0) + 1
 
         elif msg.message_type == "tru_health_status":
-            payload = cast(TRUHealthStatusMessage, msg.payload)
+            payload = cast(TRUHealthPayload, msg.payload)
 
             if msg.source_format == "java" and payload.timestamp:
                 arrival_ms = int(msg.timestamp.timestamp() * 1000)
