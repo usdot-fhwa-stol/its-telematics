@@ -39,40 +39,40 @@ def analyze_system_performance(messages: List[LogMessage]) -> Dict[str, Any]:
         elif msg.message_type == "influx_batch_written":
             total_influx_written += cast(InfluxWriteResult, msg.payload).records_written
 
-        elif msg.message_type == "rsu_status_update":
-            payload = cast(RSUStatusPayload, msg.payload)
-            rsu_ip = payload.rsu.ip if payload.rsu else "unknown"
-            status_updates.append(
-                {
-                    "time": msg.timestamp.isoformat(),
-                    "ip": rsu_ip,
-                    "status": payload.status,
-                    "event": payload.event,
-                }
-            )
-            if rsu_ip != "unknown":
-                rsu_msg_counts[rsu_ip] = rsu_msg_counts.get(rsu_ip, 0) + 1
-
-        elif msg.message_type == "tru_health_status":
-            payload = cast(TRUHealthPayload, msg.payload)
-
-            if msg.source_format == "java" and payload.timestamp:
-                arrival_ms = int(msg.timestamp.timestamp() * 1000)
-                latencies.append(compute_latency_ms(payload.timestamp, arrival_ms))
-
     lat_stats: Dict[str, float] = {}
+    trimmed_lat_stats: Dict[str, float] = {}
+
     if latencies:
-        lat_arr = np.array(latencies)
+        arr = np.array(latencies, dtype=float)
+
+        q1, q3 = np.percentile(arr, 25), np.percentile(arr, 75)
+        iqr = q3 - q1
+        trimmed = arr[(arr >= q1 - 1.5 * iqr) & (arr <= q3 + 1.5 * iqr)]
+
         lat_stats = {
-            "mean_ms": float(np.mean(lat_arr)),
-            "max_ms": float(np.max(lat_arr)),
-            "min_ms": float(np.min(lat_arr)),
-            "p50_ms": float(np.percentile(lat_arr, 50)),
+            "mean_ms": float(np.mean(arr)),
+            "max_ms": float(np.max(arr)),
+            "min_ms": float(np.min(arr)),
+            "p50_ms": float(np.percentile(arr, 50)),
         }
+
+        if len(trimmed) > 0:
+            trimmed_lat_stats = {
+                "mean_ms": float(np.mean(trimmed)),
+                "max_ms": float(np.max(trimmed)),
+                "min_ms": float(np.min(trimmed)),
+                "std_ms": float(np.std(trimmed)),
+                "p50_ms": float(np.percentile(trimmed, 50)),
+                "p75_ms": float(np.percentile(trimmed, 75)),
+                "p95_ms": float(np.percentile(trimmed, 95)),
+                "count": int(len(trimmed)),
+                "outliers_removed": int(len(arr) - len(trimmed)),
+            }
 
     return {
         "latencies_found": len(latencies),
         "latency_stats": lat_stats,
+        "trimmed_latency_stats": trimmed_lat_stats,
         "rsu_data_distributions": rsu_msg_counts,
         "total_records_saved_to_db": total_influx_written,
         "operating_state_timeline": status_updates,

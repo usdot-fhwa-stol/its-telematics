@@ -109,17 +109,16 @@ def main():
             print(f"  Parsed Logs:  {total_parsed:,}")
             print(f"  Unparsed Logs:      {metrics['parse_failures']:,}")
 
-            lat = results.get("latency_stats")
-            if lat:
+            trimmed = results.get("trimmed_latency_stats", {})
+            if trimmed:
                 print(
-                    f"  Latency (Mean / Max):         "
-                    f"{lat['mean_ms']:.1f}ms / {lat['max_ms']:.1f}ms"
+                    f"  Latency (trimmed) — Mean: {trimmed['mean_ms']:.1f}ms | "
+                    f"p95: {trimmed['p95_ms']:.1f}ms | "
+                    f"Std: {trimmed['std_ms']:.1f}ms "
+                    f"(removed {trimmed['outliers_removed']} outliers)"
                 )
             else:
-                print(
-                    "  Latency Evaluation:           "
-                    "Insufficient matching trace events evaluated."
-                )
+                print("  Latency Evaluation: Insufficient data.")
 
             print(
                 f"  Database records written:     "

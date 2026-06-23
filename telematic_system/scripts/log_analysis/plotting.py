@@ -10,17 +10,6 @@ from models import InfluxBSMTraceRecord, LogMessage, TRUHealthPayload
 sns.set_theme(style="darkgrid")
 
 
-def clean_latency_outliers_iqr(delays: List[float]) -> List[float]:
-    if not delays:
-        return []
-
-    arr = np.array(delays)
-    q1, q3 = np.percentile(arr, 25), np.percentile(arr, 75)
-    iqr = q3 - q1
-    lower, upper = q1 - 1.5 * iqr, q3 + 1.5 * iqr
-    return arr[(arr >= lower) & (arr <= upper)].tolist()
-
-
 def generate_plots_and_sheets(
     test_case: str,
     run_id: str,
@@ -35,89 +24,54 @@ def generate_plots_and_sheets(
     )
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    mgmt_msgs = [m for m in messages if m.source_format.lower() == "java"]
-    tru_msgs = [m for m in messages if m.source_format.lower() == "cpp"]
+    mgmt_msgs = [m for m in messages if m.message_type == "influx_line_built"]
+    tru_msgs = [m for m in messages if m.message_type == "bsm_published"]
 
-    # -----------------------------------------------------
+    # ------------------------------------------------------------------
     # Latency histogram
-    # -----------------------------------------------------
+    # ------------------------------------------------------------------
     if export_plots:
+        trimmed_stats = results.get("trimmed_latency_stats", {})
         raw_latencies = results.get("raw_latencies", [])
-        latencies_seconds = [lat / 1000.0 for lat in raw_latencies]
 
-        cleaned_seconds = clean_latency_outliers_iqr(latencies_seconds)
+        if raw_latencies and trimmed_stats:
+            arr = np.array(raw_latencies, dtype=float)
+            q1, q3 = np.percentile(arr, 25), np.percentile(arr, 75)
+            iqr = q3 - q1
+            trimmed_ms = arr[(arr >= q1 - 1.5 * iqr) & (arr <= q3 + 1.5 * iqr)]
+            trimmed_s = trimmed_ms / 1000.0
 
-        if cleaned_seconds:
             plt.figure(figsize=(10, 6))
-            sns.histplot(cleaned_seconds, bins=30)
-            plt.xlim(0, max(cleaned_seconds) * 1.1)
+            sns.histplot(trimmed_s, bins=30)
+            plt.xlim(0, max(trimmed_s) * 1.1)
             plt.xlabel("End-to-End Latency (Seconds)", fontsize=13)
             plt.ylabel("Number of Samples", fontsize=13)
-            plt.title(f"Test {test_case} Run {run_id} Latency Histogram", fontsize=15)
+            plt.title(
+                f"Test {test_case} Run {run_id} Latency Histogram "
+                f"(IQR trimmed, n={trimmed_stats['count']})",
+                fontsize=15,
+            )
             plt.tight_layout()
             plt.savefig(output_dir / "latency_hist.png")
             plt.close()
 
-    # -----------------------------------------------------
-    # Byte-size comparison (TRU vs. Management)
-    # -----------------------------------------------------
-    # mgmt_by_timestamp: Dict[int, list] = defaultdict(list)
-    # for msg in mgmt_msgs:
-    #     if msg.message_type == "influx_line_built" and msg.payload:
-    #         mgmt_by_timestamp[msg.payload.source_timestamp].append(msg.payload)
-
-    # comparison_rows = []
-    # for msg in tru_msgs:
-    #     if msg.message_type != "bsm_published" or not msg.payload:
-    #         continue
-
-    #     matches = mgmt_by_timestamp.get(msg.payload.timestamp, [])
-    #     if not matches:
-    #         continue
-
-    #     mgmt_payload = matches[0]
-    #     comparison_rows.append(
-    #         {
-    #             "source_timestamp": msg.payload.timestamp,
-    #             "vehicle_id": msg.payload.message.coreData.id,
-    #             "msgCnt": msg.payload.message.coreData.msgCnt,
-    #             "secMark": msg.payload.message.coreData.secMark,
-    #             "mgmt_reported_bytes": mgmt_payload.bytes_size,
-    #             "tru_calculated_bytes": msg.payload.bytes_size,
-    #             "reported_minus_tru": mgmt_payload.bytes_size - msg.payload.bytes_size,
-    #         }
-    #     )
-
-    # comparison_df = pd.DataFrame(comparison_rows)
-    # comparison_df.to_csv(output_dir / "byte_size_comparison.csv", index=False)
-
-    # if not comparison_df.empty:
-    #     print(
-    #         f"[i] Byte-size comparison: {len(comparison_df)} matched records, "
-    #         f"mean delta (mgmt - tru) = "
-    #         f"{comparison_df['reported_minus_tru'].mean():.2f} bytes"
-    #     )
-    # else:
-    #     print("[!] No records matched for byte-size comparison.")
-
-    # -----------------------------------------------------
-    # Throughput: Management, TRU, and loss in one plot
-    # -----------------------------------------------------
+    # ------------------------------------------------------------------
+    # Throughput
+    # ------------------------------------------------------------------
     if export_plots:
         time_series = []
         for msg in messages:
             if not msg.payload:
                 continue
-            # --- 1. MANAGEMENT (JAVA) DATA STREAM ---
+
             if msg.source_format.lower() == "java":
                 if msg.message_type == "influx_line_built":
                     payload = cast(InfluxBSMTraceRecord, msg.payload)
-                    event_ts = pd.to_datetime(
-                        payload.source_timestamp, unit="ms", utc=True
-                    )
                     time_series.append(
                         {
-                            "time": event_ts,
+                            "time": pd.to_datetime(
+                                payload.source_timestamp, unit="ms", utc=True
+                            ),
                             "bytes": payload.bytes_size,
                             "source": "Management",
                         }
@@ -125,28 +79,25 @@ def generate_plots_and_sheets(
                 elif msg.message_type == "tru_health_status":
                     payload = cast(TRUHealthPayload, msg.payload)
                     if payload.timestamp:
-                        event_ts = pd.to_datetime(
-                            payload.timestamp, unit="ms", utc=True
-                        )
                         time_series.append(
                             {
-                                "time": event_ts,
+                                "time": pd.to_datetime(
+                                    payload.timestamp, unit="ms", utc=True
+                                ),
                                 "bytes": payload.bytes_size,
                                 "source": "Management",
                             }
                         )
 
-            # --- 2. TRU (C++) DATA STREAM ---
             elif msg.source_format.lower() == "cpp":
                 if msg.message_type == "bsm_published" and hasattr(
                     msg.payload, "bytes_size"
                 ):
-                    event_ts = pd.to_datetime(
-                        msg.payload.timestamp, unit="ms", utc=True
-                    )
                     time_series.append(
                         {
-                            "time": event_ts,
+                            "time": pd.to_datetime(
+                                msg.payload.timestamp, unit="ms", utc=True
+                            ),
                             "bytes": msg.payload.bytes_size,
                             "source": "TRU",
                         }
@@ -154,12 +105,11 @@ def generate_plots_and_sheets(
                 elif msg.message_type == "tru_health_status":
                     payload = cast(TRUHealthPayload, msg.payload)
                     if payload.timestamp:
-                        event_ts = pd.to_datetime(
-                            payload.timestamp, unit="ms", utc=True
-                        )
                         time_series.append(
                             {
-                                "time": event_ts,
+                                "time": pd.to_datetime(
+                                    payload.timestamp, unit="ms", utc=True
+                                ),
                                 "bytes": payload.bytes_size,
                                 "source": "TRU",
                             }
@@ -168,18 +118,15 @@ def generate_plots_and_sheets(
         if time_series:
             df = pd.DataFrame(time_series)
             df["second"] = df["time"].dt.floor("s")
-
             grouped = df.groupby(["second", "source"], as_index=False)["bytes"].sum()
             pivot = (
                 grouped.pivot(index="second", columns="source", values="bytes")
                 .fillna(0)
                 .reset_index()
             )
-
             for col in ("Management", "TRU"):
                 if col not in pivot.columns:
                     pivot[col] = 0
-
             pivot["throughput_loss_bytes"] = pivot["Management"] - pivot["TRU"]
 
             plt.figure(figsize=(12, 6))
@@ -214,11 +161,12 @@ def generate_plots_and_sheets(
             plt.savefig(output_dir / "throughput_comparison.png")
             plt.close()
 
-    # -----------------------------------------------------
+    # ------------------------------------------------------------------
     # Execution summary CSV
-    # -----------------------------------------------------
+    # ------------------------------------------------------------------
     if export_csv:
         lat_stats = results.get("latency_stats", {})
+        trimmed_stats = results.get("trimmed_latency_stats", {})
         rsu_counts = results.get("rsu_data_distributions", {})
 
         count_mgmt = len(mgmt_msgs)
@@ -238,8 +186,14 @@ def generate_plots_and_sheets(
             ],
             "mean_latency_ms": [lat_stats.get("mean_ms", np.nan)],
             "max_latency_ms": [lat_stats.get("max_ms", np.nan)],
+            "trimmed_mean_latency_ms": [trimmed_stats.get("mean_ms", np.nan)],
+            "trimmed_max_latency_ms": [trimmed_stats.get("max_ms", np.nan)],
+            "trimmed_std_latency_ms": [trimmed_stats.get("std_ms", np.nan)],
+            "trimmed_p75_latency_ms": [trimmed_stats.get("p75_ms", np.nan)],
+            "trimmed_p95_latency_ms": [trimmed_stats.get("p95_ms", np.nan)],
+            "latency_outliers_removed": [trimmed_stats.get("outliers_removed", 0)],
             "metric_2_latency_status": [
-                "PASS" if lat_stats.get("mean_ms", 999999) < 1000 else "FAIL"
+                "PASS" if trimmed_stats.get("mean_ms", 999999) < 1000 else "FAIL"
             ],
             "db_records_written": [results.get("total_records_saved_to_db", 0)],
             "unique_rsus_seen": [len(rsu_counts)],
