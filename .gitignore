@@ -5,7 +5,10 @@ secrets/
 *.log
 *.csv
 *.png
+
 __pycache__/
+
 logs/
+output/
 
 .gitconfig

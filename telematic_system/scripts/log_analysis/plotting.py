@@ -207,7 +207,7 @@ def generate_plots_and_sheets(
             plt.axhline(y=0, color="black", linestyle="--", linewidth=0.8)
             plt.xlabel("Event Time")
             plt.ylabel("Bytes Per Second")
-            plt.title(f"{test_case} (Run {run_id}) Throughput & Loss")
+            plt.title(f"Test {test_case} (Run {run_id}) Throughput Loss")
             plt.legend()
             plt.xticks(rotation=45)
             plt.tight_layout()
