@@ -5,8 +5,6 @@ from models import (
     InfluxBSMTraceRecord,
     InfluxWriteResult,
     LogMessage,
-    RSUStatusPayload,
-    TRUHealthPayload,
 )
 from parser import compute_latency_ms
 

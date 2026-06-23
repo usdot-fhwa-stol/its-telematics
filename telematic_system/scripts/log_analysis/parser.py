@@ -41,10 +41,6 @@ def safe_search_int(pattern: str, text: str, default: int = 0) -> int:
     return default
 
 
-def parse_datetime(ts_str: str) -> datetime:
-    return datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S.%f")
-
-
 def extract_tru_payload(msg_text: str) -> Tuple[str, Any]:
     if "Published:" in msg_text:
         try:
@@ -280,14 +276,14 @@ def iter_log_messages(file_path: str) -> Generator[LogMessage, None, None]:
                     inner_format = "cpp"
                     level = gd["level"]
                     logger_or_file = gd["file"]
-                    docker_time = parse_datetime(gd["ts"])
+                    docker_time = datetime.strptime(gd["ts"], "%Y-%m-%d %H:%M:%S.%f")
                     message_parts = [gd["msg"]]
                 else:
                     gd = mgmt_match.groupdict()
                     inner_format = "java"
                     level = gd["level"]
                     logger_or_file = gd["class"]
-                    docker_time = parse_datetime(gd["ts"])
+                    docker_time = datetime.strptime(gd["ts"], "%Y-%m-%d %H:%M:%S.%f")
                     message_parts = [gd["msg"]]
             else:
                 if inner_format is not None:
