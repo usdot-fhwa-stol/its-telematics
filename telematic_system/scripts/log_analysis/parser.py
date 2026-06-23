@@ -25,7 +25,6 @@ _MS_THRESHOLD = 9_999_999_999
 
 
 def compute_latency_ms(source_timestamp: int, influx_timestamp: int) -> int:
-    """End-to-end latency in ms, normalizing the source timestamp to ms."""
     if source_timestamp > _MS_THRESHOLD:
         return influx_timestamp - source_timestamp
     return influx_timestamp - (source_timestamp * 1000)
@@ -53,6 +52,26 @@ def extract_tru_payload(msg_text: str) -> Tuple[str, Any]:
             json_str = msg_text.split("Published:", 1)[1].strip()
             raw_payload_bytes = len(json_str.encode("utf-8"))
             data = json.loads(json_str)
+
+            if "unitConfig" in data or "rsuConfigs" in data:
+                uc_raw = data.get("unitConfig", {})
+                unit_config_obj = UnitHealthConfig(
+                    unit_id=uc_raw.get("unitId", ""),
+                    bridge_plugin_status=uc_raw.get("bridgePluginStatus", ""),
+                    last_updated_timestamp=uc_raw.get("lastUpdatedTimestamp"),
+                    timestamp=uc_raw.get("timestamp"),
+                )
+
+                raw_ts = data.get("timestamp", "0")
+                ts = int(raw_ts) if str(raw_ts).isdigit() else 0
+
+                payload_obj = TRUHealthStatusMessage(
+                    unit_config=unit_config_obj,
+                    timestamp=ts,
+                    bytes_size=raw_payload_bytes,
+                    rsu_configs=data.get("rsuConfigs", []),
+                )
+                return ("tru_health_status", payload_obj)
 
             meta = data.get("metadata", {})
             rsu = meta.get("rsu", {})
@@ -124,7 +143,7 @@ def extract_tru_payload(msg_text: str) -> Tuple[str, Any]:
 
 
 def extract_mgmt_payload(msg_text: str) -> Tuple[str, Any]:
-    if "Handling Unit Health Status Message:" in msg_text:
+    if "Health Status Message:" in msg_text:
         try:
             unit_id = safe_search_str(r"unitId=([^,\s)]+)", msg_text)
             status = safe_search_str(r"bridgePluginStatus=([^,\s)]+)", msg_text)
@@ -132,6 +151,12 @@ def extract_mgmt_payload(msg_text: str) -> Tuple[str, Any]:
 
             ts_match = re.findall(r"timestamp=(\d+)", msg_text)
             top_ts = int(ts_match[-1]) if ts_match else 0
+
+            if "Message:" in msg_text:
+                body = msg_text.split("Message:", 1)[1].strip()
+                mgmt_bytes = len(body.encode("utf-8"))
+            else:
+                mgmt_bytes = len(msg_text.encode("utf-8"))
 
             payload = TRUHealthStatusMessage(
                 unit_config=UnitHealthConfig(
@@ -141,6 +166,7 @@ def extract_mgmt_payload(msg_text: str) -> Tuple[str, Any]:
                     timestamp=None,
                 ),
                 timestamp=top_ts,
+                bytes_size=mgmt_bytes,
             )
             return "tru_health_status", payload
         except Exception:
@@ -189,6 +215,8 @@ def iter_parsed_entries(file_path: str) -> Generator[ParsedEntry, None, None]:
     if not path.exists():
         return
 
+    current_entry: Optional[ParsedEntry] = None
+
     with path.open("r", encoding="utf-8", errors="ignore") as f:
         for line in f:
             cleaned_line = ANSI_CLEANER.sub("", line).strip()
@@ -196,43 +224,53 @@ def iter_parsed_entries(file_path: str) -> Generator[ParsedEntry, None, None]:
                 continue
 
             tru_match = TRU_REGEX.match(cleaned_line)
-            if tru_match:
-                gd = tru_match.groupdict()
-                yield ParsedEntry(
-                    docker_time=parse_datetime(gd["ts"]),
-                    inner_format="cpp",
-                    level=gd["level"],
-                    logger_or_file=gd["file"],
-                    message=gd["msg"],
-                    source_lines=[line],
-                )
-                continue
-
             mgmt_match = MGMT_REGEX.match(cleaned_line)
-            if mgmt_match:
-                gd = mgmt_match.groupdict()
-                yield ParsedEntry(
-                    docker_time=parse_datetime(gd["ts"]),
-                    inner_format="java",
-                    level=gd["level"],
-                    logger_or_file=gd["class"],
-                    message=gd["msg"],
-                    source_lines=[line],
-                )
-                continue
 
-            yield ParsedEntry(
-                docker_time=datetime.utcnow(),
-                inner_format="unknown",
-                level="UNKNOWN",
-                logger_or_file=None,
-                message=cleaned_line,
-                source_lines=[line],
-            )
+            if tru_match or mgmt_match:
+                if current_entry:
+                    yield current_entry
+
+                if tru_match:
+                    gd = tru_match.groupdict()
+                    current_entry = ParsedEntry(
+                        docker_time=parse_datetime(gd["ts"]),
+                        inner_format="cpp",
+                        level=gd["level"],
+                        logger_or_file=gd["file"],
+                        message=gd["msg"],
+                        source_lines=[line],
+                    )
+                else:
+                    gd = mgmt_match.groupdict()
+                    current_entry = ParsedEntry(
+                        docker_time=parse_datetime(gd["ts"]),
+                        inner_format="java",
+                        level=gd["level"],
+                        logger_or_file=gd["class"],
+                        message=gd["msg"],
+                        source_lines=[line],
+                    )
+            else:
+                if current_entry:
+                    current_entry.message += "\n" + cleaned_line
+                    current_entry.source_lines.append(line)
+                else:
+                    yield ParsedEntry(
+                        docker_time=datetime.utcnow(),
+                        inner_format="unknown",
+                        level="UNKNOWN",
+                        logger_or_file=None,
+                        message=cleaned_line,
+                        source_lines=[line],
+                    )
+
+        if current_entry:
+            yield current_entry
 
 
 def parse_and_categorize(entry: ParsedEntry, file_path: str) -> Optional[LogMessage]:
     if entry.inner_format == "unknown":
+        print(f"[DROPPED - UNKNOWN FORMAT] Regex missed this line: {entry.message}")
         return None
 
     msg_type = "generic_fallback"
@@ -247,6 +285,18 @@ def parse_and_categorize(entry: ParsedEntry, file_path: str) -> Optional[LogMess
             payload_obj = extracted
     elif entry.inner_format == "java":
         msg_type, payload_obj = extract_mgmt_payload(entry.message)
+
+    failure_types = {
+        "tru_json_parse_failure",
+        "tru_status_parse_failure",
+        "mgmt_health_parse_failure",
+        "mgmt_influx_parse_failure",
+    }
+
+    if msg_type in failure_types:
+        print(
+            f"[DROPPED - {msg_type.upper()}] Failed to extract payload: {entry.message}"
+        )
 
     return LogMessage(
         timestamp=entry.docker_time,

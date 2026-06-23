@@ -6,6 +6,7 @@ from models import (
     LogMessage,
     MgmtBSMTraceMetrics,
     RSUStatusPayload,
+    TRUHealthStatusMessage,
 )
 from parser import compute_latency_ms
 
@@ -52,6 +53,13 @@ def analyze_system_performance(messages: List[LogMessage]) -> Dict[str, Any]:
             if rsu_ip != "unknown":
                 rsu_msg_counts[rsu_ip] = rsu_msg_counts.get(rsu_ip, 0) + 1
 
+        elif msg.message_type == "tru_health_status":
+            payload = cast(TRUHealthStatusMessage, msg.payload)
+
+            if msg.source_format == "java" and payload.timestamp:
+                arrival_ms = int(msg.timestamp.timestamp() * 1000)
+                latencies.append(compute_latency_ms(payload.timestamp, arrival_ms))
+
     lat_stats: Dict[str, float] = {}
     if latencies:
         lat_arr = np.array(latencies)
@@ -68,4 +76,5 @@ def analyze_system_performance(messages: List[LogMessage]) -> Dict[str, Any]:
         "rsu_data_distributions": rsu_msg_counts,
         "total_records_saved_to_db": total_influx_written,
         "operating_state_timeline": status_updates,
+        "raw_latencies": latencies,
     }

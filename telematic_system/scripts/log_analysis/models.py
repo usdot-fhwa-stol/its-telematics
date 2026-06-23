@@ -23,8 +23,6 @@ class MessageMetadata:
 
 @dataclass
 class BSMCoreData:
-    """J2735 Basic Safety Message Core Data."""
-
     msgCnt: str
     id: str
     secMark: str
@@ -42,8 +40,6 @@ class BSMCoreData:
 
 @dataclass
 class BasicSafetyMessage:
-    """J2735 BSM wrapper including optional Part II extensions."""
-
     messageId: str
     coreData: BSMCoreData
     partII: List[Dict[str, Any]] = field(default_factory=list)
@@ -64,6 +60,7 @@ class UnitHealthConfig:
 class TRUHealthStatusMessage:
     unit_config: UnitHealthConfig
     timestamp: int
+    bytes_size: int
     rsu_configs: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -81,8 +78,6 @@ class InfluxLineTags:
 
 @dataclass
 class MgmtBSMTraceMetrics:
-    """BSM trace identifiers and timing fields used for E2E latency."""
-
     tags: InfluxLineTags
     msg_cnt: int
     bsm_id: str

@@ -1,4 +1,3 @@
-from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, cast
 
@@ -6,12 +5,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from models import LogMessage, MgmtBSMTraceMetrics
-from parser import compute_latency_ms
+from models import LogMessage, MgmtBSMTraceMetrics, TRUHealthStatusMessage
 
-sns.set_theme(style="whitegrid")
-
-_MS_THRSHOLD = 1000
+sns.set_theme(style="darkgrid")
 
 
 def clean_latency_outliers_iqr(delays: List[float]) -> List[float]:
@@ -46,21 +42,14 @@ def generate_plots_and_sheets(
     # Latency histogram
     # -----------------------------------------------------
     if export_plots:
-        latencies_seconds = [
-            compute_latency_ms(
-                cast(MgmtBSMTraceMetrics, m.payload).source_timestamp,
-                cast(MgmtBSMTraceMetrics, m.payload).influx_timestamp,
-            )
-            / 1000.0
-            for m in mgmt_msgs
-            if m.message_type == "influx_line_built" and m.payload
-        ]
+        raw_latencies = results.get("raw_latencies", [])
+        latencies_seconds = [lat / 1000.0 for lat in raw_latencies]
 
         cleaned_seconds = clean_latency_outliers_iqr(latencies_seconds)
 
         if cleaned_seconds:
             plt.figure(figsize=(10, 6))
-            sns.histplot(cleaned_seconds, bins=30, color="teal")
+            sns.histplot(cleaned_seconds, bins=30)
             plt.xlim(0, max(cleaned_seconds) * 1.1)
             plt.xlabel("End-to-End Latency (Seconds)", fontsize=13)
             plt.ylabel("Number of Samples", fontsize=13)
@@ -117,34 +106,64 @@ def generate_plots_and_sheets(
     if export_plots:
         time_series = []
         for msg in messages:
-            if (
-                msg.source_format.lower() == "java"
-                and msg.message_type == "influx_line_built"
-                and msg.payload
-            ):
-                payload = cast(MgmtBSMTraceMetrics, msg.payload)
-                event_ts = pd.to_datetime(payload.source_timestamp, unit="ms", utc=True)
-                time_series.append(
-                    {
-                        "time": event_ts,
-                        "bytes": payload.bytes_size,
-                        "source": "Management",
-                    }
-                )
-            elif (
-                msg.source_format.lower() == "cpp"
-                and msg.message_type == "bsm_published"
-                and msg.payload
-                and hasattr(msg.payload, "bytes_size")
-            ):
-                event_ts = pd.to_datetime(msg.payload.timestamp, unit="ms", utc=True)
-                time_series.append(
-                    {
-                        "time": event_ts,
-                        "bytes": msg.payload.bytes_size,
-                        "source": "TRU",
-                    }
-                )
+            if not msg.payload:
+                continue
+            # --- 1. MANAGEMENT (JAVA) DATA STREAM ---
+            if msg.source_format.lower() == "java":
+                if msg.message_type == "influx_line_built":
+                    payload = cast(MgmtBSMTraceMetrics, msg.payload)
+                    event_ts = pd.to_datetime(
+                        payload.source_timestamp, unit="ms", utc=True
+                    )
+                    time_series.append(
+                        {
+                            "time": event_ts,
+                            "bytes": payload.bytes_size,
+                            "source": "Management",
+                        }
+                    )
+                elif msg.message_type == "tru_health_status":
+                    payload = cast(TRUHealthStatusMessage, msg.payload)
+                    if payload.timestamp:
+                        event_ts = pd.to_datetime(
+                            payload.timestamp, unit="ms", utc=True
+                        )
+                        time_series.append(
+                            {
+                                "time": event_ts,
+                                "bytes": payload.bytes_size,
+                                "source": "Management",
+                            }
+                        )
+
+            # --- 2. TRU (C++) DATA STREAM ---
+            elif msg.source_format.lower() == "cpp":
+                if msg.message_type == "bsm_published" and hasattr(
+                    msg.payload, "bytes_size"
+                ):
+                    event_ts = pd.to_datetime(
+                        msg.payload.timestamp, unit="ms", utc=True
+                    )
+                    time_series.append(
+                        {
+                            "time": event_ts,
+                            "bytes": msg.payload.bytes_size,
+                            "source": "TRU",
+                        }
+                    )
+                elif msg.message_type == "tru_health_status":
+                    payload = cast(TRUHealthStatusMessage, msg.payload)
+                    if payload.timestamp:
+                        event_ts = pd.to_datetime(
+                            payload.timestamp, unit="ms", utc=True
+                        )
+                        time_series.append(
+                            {
+                                "time": event_ts,
+                                "bytes": payload.bytes_size,
+                                "source": "TRU",
+                            }
+                        )
 
         if time_series:
             df = pd.DataFrame(time_series)
