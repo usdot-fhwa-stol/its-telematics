@@ -297,7 +297,6 @@ def iter_log_messages(file_path: str) -> Generator[LogMessage, None, None]:
                         f"[DROPPED - UNKNOWN FORMAT] Regex missed this line: {cleaned_line}"
                     )
 
-    # Flush the final entry
     if inner_format is not None:
         result = flush()
         if result:
