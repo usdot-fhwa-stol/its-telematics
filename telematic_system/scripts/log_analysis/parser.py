@@ -13,7 +13,6 @@ from models import (
     LogMessage,
     MessageMetadata,
     MgmtBSMTraceMetrics,
-    ParsedEntry,
     RSUConnection,
     RSUStatusPayload,
     TRUHealthStatusMessage,
@@ -210,12 +209,56 @@ def extract_mgmt_payload(msg_text: str) -> Tuple[str, Any]:
     return "generic_java_info", None
 
 
-def iter_parsed_entries(file_path: str) -> Generator[ParsedEntry, None, None]:
+def iter_log_messages(file_path: str) -> Generator[LogMessage, None, None]:
     path = Path(file_path)
     if not path.exists():
         return
 
-    current_entry: Optional[ParsedEntry] = None
+    inner_format: Optional[str] = None
+    level: Optional[str] = None
+    logger_or_file: Optional[str] = None
+    docker_time: Optional[datetime] = None
+    message_parts: list[str] = []
+
+    def flush() -> Optional[LogMessage]:
+        if inner_format is None:
+            return None
+
+        message = "\n".join(message_parts)
+        msg_type = "generic_fallback"
+        metadata_obj = None
+        payload_obj = None
+
+        if inner_format == "cpp":
+            msg_type, extracted = extract_tru_payload(message)
+            if isinstance(extracted, tuple):
+                metadata_obj, payload_obj = extracted
+            else:
+                payload_obj = extracted
+        elif inner_format == "java":
+            msg_type, payload_obj = extract_mgmt_payload(message)
+
+        failure_types = {
+            "tru_json_parse_failure",
+            "tru_status_parse_failure",
+            "mgmt_health_parse_failure",
+            "mgmt_influx_parse_failure",
+        }
+        if msg_type in failure_types:
+            print(
+                f"[DROPPED - {msg_type.upper()}] Failed to extract payload: {message}"
+            )
+
+        return LogMessage(
+            timestamp=docker_time,
+            source_format=inner_format,
+            source_file=logger_or_file or "unknown",
+            message_type=msg_type,
+            level=level or "INFO",
+            raw_message_text=message,
+            metadata=metadata_obj,
+            payload=payload_obj,
+        )
 
     with path.open("r", encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -227,84 +270,35 @@ def iter_parsed_entries(file_path: str) -> Generator[ParsedEntry, None, None]:
             mgmt_match = MGMT_REGEX.match(cleaned_line)
 
             if tru_match or mgmt_match:
-                if current_entry:
-                    yield current_entry
+                if inner_format is not None:
+                    result = flush()
+                    if result:
+                        yield result
 
                 if tru_match:
                     gd = tru_match.groupdict()
-                    current_entry = ParsedEntry(
-                        docker_time=parse_datetime(gd["ts"]),
-                        inner_format="cpp",
-                        level=gd["level"],
-                        logger_or_file=gd["file"],
-                        message=gd["msg"],
-                        source_lines=[line],
-                    )
+                    inner_format = "cpp"
+                    level = gd["level"]
+                    logger_or_file = gd["file"]
+                    docker_time = parse_datetime(gd["ts"])
+                    message_parts = [gd["msg"]]
                 else:
                     gd = mgmt_match.groupdict()
-                    current_entry = ParsedEntry(
-                        docker_time=parse_datetime(gd["ts"]),
-                        inner_format="java",
-                        level=gd["level"],
-                        logger_or_file=gd["class"],
-                        message=gd["msg"],
-                        source_lines=[line],
-                    )
+                    inner_format = "java"
+                    level = gd["level"]
+                    logger_or_file = gd["class"]
+                    docker_time = parse_datetime(gd["ts"])
+                    message_parts = [gd["msg"]]
             else:
-                if current_entry:
-                    current_entry.message += "\n" + cleaned_line
-                    current_entry.source_lines.append(line)
+                if inner_format is not None:
+                    message_parts.append(cleaned_line)
                 else:
-                    yield ParsedEntry(
-                        docker_time=datetime.utcnow(),
-                        inner_format="unknown",
-                        level="UNKNOWN",
-                        logger_or_file=None,
-                        message=cleaned_line,
-                        source_lines=[line],
+                    print(
+                        f"[DROPPED - UNKNOWN FORMAT] Regex missed this line: {cleaned_line}"
                     )
 
-        if current_entry:
-            yield current_entry
-
-
-def parse_and_categorize(entry: ParsedEntry, file_path: str) -> Optional[LogMessage]:
-    if entry.inner_format == "unknown":
-        print(f"[DROPPED - UNKNOWN FORMAT] Regex missed this line: {entry.message}")
-        return None
-
-    msg_type = "generic_fallback"
-    metadata_obj = None
-    payload_obj = None
-
-    if entry.inner_format == "cpp":
-        msg_type, extracted = extract_tru_payload(entry.message)
-        if isinstance(extracted, tuple):
-            metadata_obj, payload_obj = extracted
-        else:
-            payload_obj = extracted
-    elif entry.inner_format == "java":
-        msg_type, payload_obj = extract_mgmt_payload(entry.message)
-
-    failure_types = {
-        "tru_json_parse_failure",
-        "tru_status_parse_failure",
-        "mgmt_health_parse_failure",
-        "mgmt_influx_parse_failure",
-    }
-
-    if msg_type in failure_types:
-        print(
-            f"[DROPPED - {msg_type.upper()}] Failed to extract payload: {entry.message}"
-        )
-
-    return LogMessage(
-        timestamp=entry.docker_time,
-        source_format=entry.inner_format,
-        source_file=entry.logger_or_file or "unknown",
-        message_type=msg_type,
-        level=entry.level or "INFO",
-        raw_message_text=entry.message,
-        metadata=metadata_obj,
-        payload=payload_obj,
-    )
+    # Flush the final entry
+    if inner_format is not None:
+        result = flush()
+        if result:
+            yield result

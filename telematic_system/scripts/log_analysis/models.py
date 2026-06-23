@@ -118,18 +118,8 @@ class RSUStatusPayload:
 
 
 # ---------------------------------------------------------
-# Base Container Models
+# Base Message Model
 # ---------------------------------------------------------
-@dataclass
-class ParsedEntry:
-    docker_time: datetime
-    inner_format: str  # 'java' | 'cpp' | 'unknown'
-    level: Optional[str]
-    logger_or_file: Optional[str]
-    message: str
-    source_lines: List[str] = field(default_factory=list)
-
-
 @dataclass
 class LogMessage:
     timestamp: datetime

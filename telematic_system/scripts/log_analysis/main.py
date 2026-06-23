@@ -4,29 +4,29 @@ from collections import defaultdict
 from pathlib import Path
 
 from analyzer import analyze_system_performance
-from parser import iter_parsed_entries, parse_and_categorize
+from parser import iter_log_messages
 from plotting import generate_plots_and_sheets
 
 FILE_PATTERN = re.compile(r"^(c\d+)[_-](.*)run[_-](\d+)\.log$", re.I)
 
 
-def process_log_file(log_path: Path, metrics: dict, all_messages: list):
-    """Parse a single log file and update execution metrics."""
+def process_log_file(log_path: Path, all_messages: list) -> int:
+    """Parse a single log file and return total messages collected."""
     if not log_path or not log_path.exists():
-        return
+        return 0
 
-    for entry in iter_parsed_entries(str(log_path)):
-        metrics["total_entries_read"] += 1
-        if entry.inner_format == "unknown":
-            metrics["parse_failures"] += 1
+    count = 0
+    for msg in iter_log_messages(str(log_path)):
+        all_messages.append(msg)
+        count += 1
 
-        msg = parse_and_categorize(entry, str(log_path))
-        if msg:
-            all_messages.append(msg)
+    return count
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Verification Test Log Analysis Script")
+    parser = argparse.ArgumentParser(
+        description="Verification Test Log Analysis Script"
+    )
     parser.add_argument(
         "-t",
         "--test",
@@ -92,21 +92,21 @@ def main():
                 continue
 
             total_runs_processed += 1
-            print(f"\n[▶] Processing Cohort Case: {test_id} | Run: {run_id}")
-            print(f"     Backend System Log: {mgmt_log.name}")
-            print(f"     Field Unit Log:     {tru_log.name}")
+            print(f"\n[▶] Processing Test: {test_id} | Run: {run_id}")
+            print(f"     RSU Management Service Log: {mgmt_log.name}")
+            print(f"     TRU Instance Log:     {tru_log.name}")
             print("-" * 50)
 
             metrics = {"total_entries_read": 0, "parse_failures": 0}
             all_messages = []
 
-            process_log_file(mgmt_log, metrics, all_messages)
-            process_log_file(tru_log, metrics, all_messages)
+            mgmt_count = process_log_file(mgmt_log, all_messages)
+            tru_count = process_log_file(tru_log, all_messages)
+            total_parsed = mgmt_count + tru_count
 
             results = analyze_system_performance(all_messages)
 
-            print(f"  Number of Log Entries Scanned:      {metrics['total_entries_read']:,}")
-            print(f"  Parsed Logs:  {len(all_messages):,}")
+            print(f"  Parsed Logs:  {total_parsed:,}")
             print(f"  Unparsed Logs:      {metrics['parse_failures']:,}")
 
             lat = results.get("latency_stats")
