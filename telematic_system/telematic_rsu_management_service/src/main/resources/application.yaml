@@ -88,8 +88,4 @@ perf:
     # Enable performance checkpoint timestamp logging for latency analysis.
     # Set PERF_METRICS_ENABLED=true to activate all checkpoint logs:
     #   [PERF][TRANSIT_DELAY_NATS]  - ingress to NATS receive delay
-    #   [PERF][EXTRACT_LATENCY]     - JSON extraction/parsing time at ingestor
-    #   [PERF][PROCESSING_TIME]     - NATS receive to ingestor-queue time
-    #   [PERF][INGRESS_TO_SINK]     - end-to-end ingress to ingestor-queue time
-    #   [PERF][DB_WRITE_SUCCESS]    - InfluxDB batch write completion
     enabled: ${PERF_METRICS_ENABLED:false}
