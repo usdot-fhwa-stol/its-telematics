@@ -24,21 +24,19 @@ def process_log_file(log_path: Path, all_messages: list) -> int:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Log Analysis Script"
-    )
+    parser = argparse.ArgumentParser(description="Log Analysis Script")
     parser.add_argument(
         "-t",
         "--test",
         type=str,
-        help="Specify test case (e.g., --test c11). Defaults to all.",
+        help="Specify test case (Ex: --test c11). Log files within this folder should match this format: c<test#>_<name>_run-<run#> (Ex: c11_tru-instance-1-run-01.log and c11_rsu_management-service-run-01.log). Defaults to all.",
     )
     parser.add_argument(
         "-d",
         "--dir",
         type=str,
-        default="telematic_system/scripts/log_analysis/logs",
-        help="Logs directory (default: ./telematic_system/scripts/log_analysis/logs)",
+        default="telematic_system/scripts/rsu_management_service_analysis/logs",
+        help="Logs directory (default: ./telematic_system/scripts/rsu_management_service_analysis/logs)",
     )
     parser.add_argument(
         "--no-plots", action="store_true", help="Disable exporting graphs"
@@ -55,7 +53,7 @@ def main():
         return
 
     print("=" * 80)
-    print("VERIFICATION TEST LOG ANALYSIS SCRIPT")
+    print("LOG ANALYSIS SCRIPT")
     print(f" Logs Directory: {logs_dir.resolve()}")
     if args.test:
         print(f" Target Test:    {args.test}")

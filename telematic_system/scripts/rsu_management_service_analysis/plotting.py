@@ -19,7 +19,7 @@ def generate_plots_and_sheets(
     export_csv: bool = True,
 ):
     output_dir = (
-        Path("telematic_system/scripts/log_analysis/output")
+        Path("telematic_system/scripts/rsu_management_service_analysis/output")
         / f"{test_case}_run_{run_id}"
     )
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -138,11 +138,10 @@ def generate_plots_and_sheets(
             plt.close()
 
     # ------------------------------------------------------------------
-    # Execution summary CSV
+    # Data Summary CSV
     # ------------------------------------------------------------------
     if export_csv:
-        lat_stats = results.get("latency_stats", {})
-        trimmed_stats = results.get("trimmed_latency_stats", {})
+        trimmed_stats = results.get("latency_stats", {})
         rsu_counts = results.get("rsu_data_distributions", {})
 
         count_mgmt = len(mgmt_msgs)
@@ -160,13 +159,11 @@ def generate_plots_and_sheets(
             "metric_1_completeness_status": [
                 "PASS" if loss_rate_pct <= 1.0 else "FAIL"
             ],
-            "mean_latency_ms": [lat_stats.get("mean_ms", np.nan)],
-            "max_latency_ms": [lat_stats.get("max_ms", np.nan)],
-            "trimmed_mean_latency_ms": [trimmed_stats.get("mean_ms", np.nan)],
-            "trimmed_max_latency_ms": [trimmed_stats.get("max_ms", np.nan)],
-            "trimmed_std_latency_ms": [trimmed_stats.get("std_ms", np.nan)],
-            "trimmed_p75_latency_ms": [trimmed_stats.get("p75_ms", np.nan)],
-            "trimmed_p95_latency_ms": [trimmed_stats.get("p95_ms", np.nan)],
+            "mean_latency_ms": [trimmed_stats.get("mean_ms", np.nan)],
+            "max_latency_ms": [trimmed_stats.get("max_ms", np.nan)],
+            "std_latency_ms": [trimmed_stats.get("std_ms", np.nan)],
+            "p75_latency_ms": [trimmed_stats.get("p75_ms", np.nan)],
+            "p95_latency_ms": [trimmed_stats.get("p95_ms", np.nan)],
             "latency_outliers_removed": [trimmed_stats.get("outliers_removed", 0)],
             "metric_2_latency_status": [
                 "PASS" if trimmed_stats.get("mean_ms", 999999) < 1000 else "FAIL"
@@ -174,6 +171,6 @@ def generate_plots_and_sheets(
             "db_records_written": [results.get("total_records_saved_to_db", 0)],
             "unique_rsus_seen": [len(rsu_counts)],
         }
-        pd.DataFrame(summary).to_csv(output_dir / "execution_summary.csv", index=False)
+        pd.DataFrame(summary).to_csv(output_dir / "data_summary.csv", index=False)
 
     print(f"[✓] Reports exported to: {output_dir}")

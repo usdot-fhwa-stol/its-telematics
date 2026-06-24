@@ -144,15 +144,11 @@ def iter_log_messages(file_path: str) -> Generator[LogMessage, None, None]:
 
         message = "\n".join(message_parts)
         msg_type = "generic_fallback"
-        metadata_obj = None
         payload_obj = None
 
         if inner_format == "cpp":
             msg_type, extracted = extract_tru_payload(message)
-            if isinstance(extracted, tuple):
-                metadata_obj, payload_obj = extracted
-            else:
-                payload_obj = extracted
+            payload_obj = extracted
         elif inner_format == "java":
             msg_type, payload_obj = extract_mgmt_payload(message)
 
