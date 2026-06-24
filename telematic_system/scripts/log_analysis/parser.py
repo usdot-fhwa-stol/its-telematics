@@ -7,16 +7,11 @@ from typing import Any, Generator, Optional, Tuple
 from models import (
     BSM,
     BSMCoreData,
-    BSMEventMetadata,
     BSMPayload,
     BSMTraceTags,
     InfluxBSMTraceRecord,
     InfluxWriteResult,
     LogMessage,
-    RSUEndpoint,
-    RSUStatusPayload,
-    TRUHealthPayload,
-    TRUUnitStatus,
 )
 from regex import ANSI_CLEANER, INFLUX_SUFFIX_RE, MGMT_REGEX, TRU_REGEX
 
@@ -47,36 +42,6 @@ def extract_tru_payload(msg_text: str) -> Tuple[str, Any]:
             json_str = msg_text.split("Published:", 1)[1].strip()
             raw_payload_bytes = len(json_str.encode("utf-8"))
             data = json.loads(json_str)
-
-            if "unitConfig" in data or "rsuConfigs" in data:
-                uc_raw = data.get("unitConfig", {})
-                unit_config_obj = TRUUnitStatus(
-                    unit_id=uc_raw.get("unitId", ""),
-                    bridge_plugin_status=uc_raw.get("bridgePluginStatus", ""),
-                    last_updated_timestamp=uc_raw.get("lastUpdatedTimestamp"),
-                    timestamp=uc_raw.get("timestamp"),
-                )
-
-                raw_ts = data.get("timestamp", "0")
-                ts = int(raw_ts) if str(raw_ts).isdigit() else 0
-
-                payload_obj = TRUHealthPayload(
-                    unit_config=unit_config_obj,
-                    timestamp=ts,
-                    bytes_size=raw_payload_bytes,
-                    rsu_configs=data.get("rsuConfigs", []),
-                )
-                return ("tru_health_status", payload_obj)
-
-            meta = data.get("metadata", {})
-            rsu = meta.get("rsu", {})
-            metadata_obj = BSMEventMetadata(
-                event=meta.get("event", ""),
-                rsu=RSUEndpoint(ip=rsu.get("ip", ""), port=int(rsu.get("port", 0))),
-                timestamp=meta.get("timestamp", ""),
-                topicName=meta.get("topicName", ""),
-                unitId=meta.get("unitId", ""),
-            )
 
             payload_wrapper = data.get("payload", {})
             inner_payload = payload_wrapper.get("payload", {})
@@ -116,57 +81,14 @@ def extract_tru_payload(msg_text: str) -> Tuple[str, Any]:
                     partII=bsm_val.get("partII", []),
                 ),
             )
-            return ("bsm_published", (metadata_obj, payload_obj))
+            return ("bsm_published", (payload_obj))
         except Exception:
             return ("tru_json_parse_failure", None)
-
-    if "ProcessRSUStatusMessage:" in msg_text:
-        try:
-            json_str = msg_text.split("ProcessRSUStatusMessage:", 1)[1].strip()
-            data = json.loads(json_str)
-            rsu = data.get("rsu", {})
-            payload_obj = RSUStatusPayload(
-                event=data.get("event", ""),
-                rsu=RSUEndpoint(ip=rsu.get("ip", ""), port=int(rsu.get("port", 0))),
-                status=data.get("status", ""),
-            )
-            return ("rsu_status_update", (None, payload_obj))
-        except Exception:
-            return ("tru_status_parse_failure", None)
 
     return ("generic_cpp_debug", None)
 
 
 def extract_mgmt_payload(msg_text: str) -> Tuple[str, Any]:
-    if "Health Status Message:" in msg_text:
-        try:
-            unit_id = safe_search_str(r"unitId=([^,\s)]+)", msg_text)
-            status = safe_search_str(r"bridgePluginStatus=([^,\s)]+)", msg_text)
-            lut = safe_search_int(r"lastUpdatedTimestamp=(\d+)", msg_text, default=-1)
-
-            ts_match = re.findall(r"timestamp=(\d+)", msg_text)
-            top_ts = int(ts_match[-1]) if ts_match else 0
-
-            if "Message:" in msg_text:
-                body = msg_text.split("Message:", 1)[1].strip()
-                mgmt_bytes = len(body.encode("utf-8"))
-            else:
-                mgmt_bytes = len(msg_text.encode("utf-8"))
-
-            payload = TRUHealthPayload(
-                unit_config=TRUUnitStatus(
-                    unit_id=unit_id,
-                    bridge_plugin_status=status,
-                    last_updated_timestamp=lut if lut != -1 else None,
-                    timestamp=None,
-                ),
-                timestamp=top_ts,
-                bytes_size=mgmt_bytes,
-            )
-            return "tru_health_status", payload
-        except Exception:
-            return "mgmt_health_parse_failure", None
-
     if "Built Influx line:" in msg_text:
         try:
             influx_part = msg_text.split("Built Influx line:", 1)[1].strip()
@@ -237,7 +159,6 @@ def iter_log_messages(file_path: str) -> Generator[LogMessage, None, None]:
         failure_types = {
             "tru_json_parse_failure",
             "tru_status_parse_failure",
-            "mgmt_health_parse_failure",
             "mgmt_influx_parse_failure",
         }
         if msg_type in failure_types:
@@ -252,7 +173,6 @@ def iter_log_messages(file_path: str) -> Generator[LogMessage, None, None]:
             message_type=msg_type,
             level=level or "INFO",
             raw_message_text=message,
-            metadata=metadata_obj,
             payload=payload_obj,
         )
 

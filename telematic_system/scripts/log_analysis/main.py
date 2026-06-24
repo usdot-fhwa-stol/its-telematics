@@ -25,20 +25,20 @@ def process_log_file(log_path: Path, all_messages: list) -> int:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Verification Test Log Analysis Script"
+        description="Log Analysis Script"
     )
     parser.add_argument(
         "-t",
         "--test",
         type=str,
-        help="Specify test case (e.g., c12, c11). Defaults to all.",
+        help="Specify test case (e.g., --test c11). Defaults to all.",
     )
     parser.add_argument(
         "-d",
         "--dir",
         type=str,
         default="telematic_system/scripts/log_analysis/logs",
-        help="Root logs directory (default: ./telematic_system/scripts/log_analysis/logs)",
+        help="Logs directory (default: ./telematic_system/scripts/log_analysis/logs)",
     )
     parser.add_argument(
         "--no-plots", action="store_true", help="Disable exporting graphs"

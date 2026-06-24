@@ -29,11 +29,6 @@ def analyze_system_performance(messages: List[LogMessage]) -> Dict[str, Any]:
                     rsu_msg_counts.get(payload.tags.rsu_ip, 0) + 1
                 )
 
-        elif msg.message_type == "bsm_published":
-            if msg.metadata and msg.metadata.rsu and msg.metadata.rsu.ip:
-                rsu_ip = msg.metadata.rsu.ip
-                rsu_msg_counts[rsu_ip] = rsu_msg_counts.get(rsu_ip, 0) + 1
-
         elif msg.message_type == "influx_batch_written":
             total_influx_written += cast(InfluxWriteResult, msg.payload).records_written
 

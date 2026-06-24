@@ -4,33 +4,8 @@ from typing import Any, Dict, List, Optional, Union
 
 
 # ---------------------------------------------------------
-# RSU
+# TRU Instance BSM
 # ---------------------------------------------------------
-@dataclass
-class RSUEndpoint:
-    ip: str
-    port: int
-
-
-@dataclass
-class RSUStatusPayload:
-    event: str
-    rsu: RSUEndpoint
-    status: str
-
-
-# ---------------------------------------------------------
-# BSM
-# ---------------------------------------------------------
-@dataclass
-class BSMEventMetadata:
-    event: str
-    rsu: RSUEndpoint
-    timestamp: str
-    topicName: str
-    unitId: str
-
-
 @dataclass
 class BSMCoreData:
     msgCnt: str
@@ -71,26 +46,7 @@ class BSMPayload:
 
 
 # ---------------------------------------------------------
-# TRU
-# ---------------------------------------------------------
-@dataclass
-class TRUUnitStatus:
-    unit_id: str
-    bridge_plugin_status: str
-    last_updated_timestamp: Optional[int]
-    timestamp: Optional[int]
-
-
-@dataclass
-class TRUHealthPayload:
-    unit_config: TRUUnitStatus
-    timestamp: int
-    bytes_size: int
-    rsu_configs: List[Dict[str, Any]] = field(default_factory=list)
-
-
-# ---------------------------------------------------------
-# Mgmt InfluxDB BSM Trace
+# RSU Mgmt Service InfluxDB BSM Trace
 # ---------------------------------------------------------
 @dataclass
 class BSMTraceTags:
@@ -128,12 +84,9 @@ class LogMessage:
     message_type: str
     level: str
     raw_message_text: str
-    metadata: Optional[BSMEventMetadata] = None
     payload: Optional[
         Union[
             BSMPayload,
-            RSUStatusPayload,
-            TRUHealthPayload,
             InfluxBSMTraceRecord,
             InfluxWriteResult,
             Dict[str, Any],

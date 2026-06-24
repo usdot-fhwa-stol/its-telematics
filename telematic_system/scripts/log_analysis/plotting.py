@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from models import InfluxBSMTraceRecord, LogMessage, TRUHealthPayload
+from models import InfluxBSMTraceRecord, LogMessage
 
 sns.set_theme(style="darkgrid")
 
@@ -76,18 +76,6 @@ def generate_plots_and_sheets(
                             "source": "Management",
                         }
                     )
-                elif msg.message_type == "tru_health_status":
-                    payload = cast(TRUHealthPayload, msg.payload)
-                    if payload.timestamp:
-                        time_series.append(
-                            {
-                                "time": pd.to_datetime(
-                                    payload.timestamp, unit="ms", utc=True
-                                ),
-                                "bytes": payload.bytes_size,
-                                "source": "Management",
-                            }
-                        )
 
             elif msg.source_format.lower() == "cpp":
                 if msg.message_type == "bsm_published" and hasattr(
@@ -102,18 +90,6 @@ def generate_plots_and_sheets(
                             "source": "TRU",
                         }
                     )
-                elif msg.message_type == "tru_health_status":
-                    payload = cast(TRUHealthPayload, msg.payload)
-                    if payload.timestamp:
-                        time_series.append(
-                            {
-                                "time": pd.to_datetime(
-                                    payload.timestamp, unit="ms", utc=True
-                                ),
-                                "bytes": payload.bytes_size,
-                                "source": "TRU",
-                            }
-                        )
 
         if time_series:
             df = pd.DataFrame(time_series)
