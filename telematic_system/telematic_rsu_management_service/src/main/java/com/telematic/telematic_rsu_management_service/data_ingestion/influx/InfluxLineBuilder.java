@@ -18,6 +18,7 @@ package com.telematic.telematic_rsu_management_service.data_ingestion.influx;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -31,6 +32,9 @@ import lombok.extern.slf4j.Slf4j;
 public class InfluxLineBuilder {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private final InfluxPipelineLineBuilder pipelineLineBuilder;
+
+    @Value("${perf.metrics.enabled:false}")
+    private boolean perfMetricsEnabled;
 
     public InfluxLineBuilder(InfluxPipelineLineBuilder pipelineLineBuilder) {
         this.pipelineLineBuilder = pipelineLineBuilder;
@@ -51,20 +55,43 @@ public class InfluxLineBuilder {
         tags.put("rsuIp", metadata.path("rsu").path("ip").asText("0.0.0.0"));
         tags.put("topicName", metadata.path("topicName").asText("unknown"));
         tags.put("port", metadata.path("rsu").path("port").asText("0"));
+
+        if (perfMetricsEnabled) {
+            // Tag checkpoint timestamps so they are queryable dimensions in InfluxDB.
+            // perf_ts_ingress : epoch ms when the message was packaged at the radio unit
+            // perf_ts_nats_received: epoch ms when rsu_management_service received it from
+            // NATS
+            long tsIngress = metadata.path("perf_ts_ingress").asLong(0L);
+            long tsNatsReceived = metadata.path("perf_ts_nats_received").asLong(0L);
+            if (tsIngress > 0L) {
+                tags.put("perf_ts_ingress", String.valueOf(tsIngress));
+            }
+            if (tsNatsReceived > 0L) {
+                tags.put("perf_ts_nats_received", String.valueOf(tsNatsReceived));
+            }
+        }
+
         ctx.setTags(tags);
 
         Map<String, Object> fields = new LinkedHashMap<>();
         flatten("payload", payload, fields);
         ctx.setFields(fields);
 
-        long timestampMs = metadata.path("timestamp").asLong(0L);
-        ctx.setTimestamp(timestampMs);
-        
+        if (perfMetricsEnabled) {
+            // Omit explicit timestamp — InfluxDB will assign the server-side receipt time,
+            // which represents the true sink time for ingress-to-sink latency calculation.
+            ctx.setTimestamp(null);
+        } else {
+            long timestampMs = metadata.path("timestamp").asLong(0L);
+            ctx.setTimestamp(timestampMs);
+        }
+
         return pipelineLineBuilder.build(ctx);
     }
 
     private void flatten(String prefix, JsonNode node, Map<String, Object> out) {
-        if (node == null || node.isMissingNode() || node.isNull()) return;
+        if (node == null || node.isMissingNode() || node.isNull())
+            return;
         if (node.isObject()) {
             node.fields().forEachRemaining(e -> {
                 String key = prefix + "." + e.getKey();
