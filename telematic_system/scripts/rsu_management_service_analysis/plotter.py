@@ -149,14 +149,12 @@ def _plot_throughput_mgmt(
 def _export_summary_csv(
     test_case: str,
     run_id: str,
-    messages: List[LogMessage],
     results: Dict[str, Any],
     output_dir: Path,
 ):
     drops = results.get("drops", {})
     overall = drops.get("overall", {})
 
-    throughput_stats = results.get("throughput_stats", {})
     latency_stats = results.get("latency_stats", {})
 
     summary_rows = [
@@ -173,10 +171,6 @@ def _export_summary_csv(
             "std_latency_ms": latency_stats.get("std_ms", float("nan")),
             "max_latency_ms": latency_stats.get("max_ms", float("nan")),
             "unique_rsus_seen": len(results.get("rsu_ip_counts", {})),
-            "total_raw_bytes": results.get("total_raw_bytes", 0),
-            "mean_tru_throughput_bps": throughput_stats.get("tru_bytes_per_sec", 0.0),
-            "mean_mgmt_throughput_bps": throughput_stats.get("rsu_bytes_per_sec", 0.0),
-            "topic": "OVERALL",
         }
     ]
 
@@ -215,6 +209,6 @@ def generate_plots_and_sheets(
             _plot_throughput_mgmt(throughput_df, test_case, run_id, output_dir)
 
     if export_csv:
-        _export_summary_csv(test_case, run_id, messages, results, output_dir)
+        _export_summary_csv(test_case, run_id, results, output_dir)
 
     print(f"[✓] Reports exported to: {output_dir}")
