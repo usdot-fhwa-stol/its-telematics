@@ -17,6 +17,7 @@ PALETTE = {
     "violet": "darkviolet",
 }
 
+
 def _plot_latency_histogram(
     raw_latencies: list,
     trimmed_stats: dict,
@@ -29,22 +30,14 @@ def _plot_latency_histogram(
     iqr = q3 - q1
     trimmed = arr[(arr >= q1 - 1.5 * iqr) & (arr <= q3 + 1.5 * iqr)]
 
-    if len(trimmed) > 1:
-        data_range = np.max(trimmed) - np.min(trimmed)
-        bins = (
-            "auto"
-            if data_range > 0
-            else np.linspace(np.min(trimmed) - 0.5, np.max(trimmed) + 0.5, 11)
-        )
-    else:
-        bins = 10
-
     fig, ax = plt.subplots(figsize=(10, 6))
-    sns.histplot(trimmed, bins=bins, kde=True, color=PALETTE["blue"], ax=ax)
+    x_indices = np.arange(len(trimmed))
+
+    sns.scatterplot(x=x_indices, y=trimmed, color=PALETTE["blue"], alpha=0.6, ax=ax)
 
     mean_ms = trimmed_stats.get("mean_ms")
     if mean_ms is not None:
-        ax.axvline(
+        ax.axhline(
             mean_ms,
             color=PALETTE["orange"],
             linestyle="--",
@@ -52,18 +45,8 @@ def _plot_latency_histogram(
             label=f"Mean ({mean_ms:.1f} ms)",
         )
 
-    ax.axvline(
-        1_000,
-        color=PALETTE["red"],
-        linestyle="--",
-        linewidth=1.6,
-        label="1s Threshold",
-    )
-
-    max_val = np.max(trimmed) if len(trimmed) > 0 else 10
-    ax.set_xlim(0, max(max_val * 1.1, 2.0))
-    ax.set_xlabel("End-to-End Latency (ms)", fontsize=13)
-    ax.set_ylabel("Sample Count", fontsize=13)
+    ax.set_xlabel("Sample Index", fontsize=13)
+    ax.set_ylabel("End-to-End Latency (ms)", fontsize=13)
     ax.set_title(
         f"Test {test_case} Run {run_id} — Latency Distribution\n"
         f"(IQR-trimmed, n={len(trimmed)}, outliers removed: {trimmed_stats.get('outliers_removed', 0)})",
@@ -74,7 +57,7 @@ def _plot_latency_histogram(
     fig.savefig(output_dir / "latency_histogram.png")
     plt.close(fig)
 
-    
+
 def _plot_latency_over_time(
     latency_timestamps: list,
     raw_latencies: list,
@@ -86,16 +69,26 @@ def _plot_latency_over_time(
     if not latency_timestamps or not raw_latencies:
         return
 
-    paired = sorted(zip(latency_timestamps, raw_latencies), key=lambda x: x[0])
+    times_pd = pd.to_datetime(latency_timestamps, errors="coerce")
+    if times_pd.tz is None:
+        times_pd = (
+            times_pd.tz_localize("US/Eastern").tz_convert("UTC").tz_localize(None)
+        )
+    else:
+        times_pd = times_pd.tz_convert("UTC").tz_localize(None)
+
+    paired = sorted(zip(times_pd, raw_latencies), key=lambda x: x[0])
     times, latencies = zip(*paired)
 
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.scatter(
+
+    ax.plot(
         times,
         latencies,
         color=PALETTE["purple"],
-        alpha=0.5,
-        s=10,
+        alpha=0.6,
+        linewidth=1.5,
+        markersize=4,
         label="Latency",
     )
 
@@ -109,85 +102,107 @@ def _plot_latency_over_time(
             label=f"Mean ({mean_ms:.1f} ms)",
         )
 
-    ax.axhline(
-        1_000,
-        color=PALETTE["red"],
-        linestyle="--",
-        linewidth=1.4,
-        label="1s Threshold",
-    )
-
-    ax.set_xlabel("Wall-Clock Time", fontsize=13)
+    ax.set_xlabel("Wall-Clock Time (UTC)", fontsize=13)
     ax.set_ylabel("Latency (ms)", fontsize=13)
-    ax.set_title(
-        f"Test {test_case} Run {run_id} — Latency Over Time", fontsize=14
-    )
+    ax.set_title(f"Test {test_case} Run {run_id} — Latency Over Time", fontsize=14)
     ax.legend()
     plt.xticks(rotation=45)
     fig.tight_layout()
     fig.savefig(output_dir / "latency_over_time.png")
     plt.close(fig)
 
-def _plot_throughput(
-    messages: List[LogMessage],
-    test_case: str,
-    run_id: str,
-    output_dir: Path,
-):
+
+def _get_throughput_df(messages: List[LogMessage]) -> pd.DataFrame:
     rows = []
     for msg in messages:
+        bytes_size = getattr(msg, "bytes_size", 0) or 0
         if (
             msg.source_format == "rsu_management_service"
             and msg.message_type == "influx_line_built"
             and msg.timestamp
         ):
-            rows.append({"time": msg.timestamp, "source": "Management"})
+            rows.append(
+                {"time": msg.timestamp, "source": "Management", "bytes": bytes_size}
+            )
         elif (
             msg.source_format == "tru_instance"
             and msg.message_type.endswith("_published")
             and msg.timestamp
         ):
-            rows.append({"time": msg.timestamp, "source": "TRU"})
+            rows.append({"time": msg.timestamp, "source": "TRU", "bytes": bytes_size})
 
     if not rows:
-        return
+        return pd.DataFrame()
 
     df = pd.DataFrame(rows)
-    df["time"] = pd.to_datetime(df["time"], utc=True)
+
+    # Force convert to UTC and drop the timezone signature to prevent matplotlib local-time overrides
+    df["time"] = pd.to_datetime(df["time"], errors="coerce")
+    if df["time"].dt.tz is None:
+        df["time"] = (
+            df["time"]
+            .dt.tz_localize("US/Eastern")
+            .dt.tz_convert("UTC")
+            .dt.tz_localize(None)
+        )
+    else:
+        df["time"] = df["time"].dt.tz_convert("UTC").dt.tz_localize(None)
+
     df["second"] = df["time"].dt.floor("s")
+
     grouped = (
-        df.groupby(["second", "source"]).size().reset_index(name="msg_count")
+        df.groupby(["second", "source"])["bytes"].sum().reset_index(name="bytes_count")
     )
     pivot = (
-        grouped.pivot(index="second", columns="source", values="msg_count")
+        grouped.pivot(index="second", columns="source", values="bytes_count")
         .fillna(0)
         .reset_index()
     )
     for col in ("Management", "TRU"):
         if col not in pivot.columns:
             pivot[col] = 0.0
-    pivot["delta"] = pivot["Management"] - pivot["TRU"]
-    avg_delta = pivot["delta"].mean()
+
+    pivot["Management"] = pivot["Management"] / 1024.0
+    pivot["TRU"] = pivot["TRU"] / 1024.0
+
+    return pivot
+
+
+def _plot_throughput_mgmt(
+    df: pd.DataFrame, test_case: str, run_id: str, output_dir: Path
+):
+    if df.empty:
+        return
+
+    df["rolling"] = df["Management"].rolling(window=10, min_periods=1).mean()
 
     fig, ax = plt.subplots(figsize=(12, 6))
-    sns.lineplot(data=pivot, x="second", y="Management",
-                 label="Management msg/s", color=PALETTE["blue"], ax=ax)
-    sns.lineplot(data=pivot, x="second", y="TRU",
-                 label="TRU msg/s", color=PALETTE["green"], ax=ax)
-    sns.lineplot(data=pivot, x="second", y="delta",
-                 label="Loss (Mgmt − TRU)", color=PALETTE["red"], ax=ax)
-    ax.axhline(avg_delta, color=PALETTE["orange"], linestyle="-.",
-               linewidth=1.8, label=f"Avg Delta ({avg_delta:.2f} msg/s)")
-    ax.axhline(0, color="black", linestyle="--", linewidth=0.8)
-    ax.set_xlabel("Time")
-    ax.set_ylabel("Messages per Second")
-    ax.set_title(
-        f"Test {test_case} Run {run_id} — Throughput Comparison & Loss"
+    sns.lineplot(
+        data=df,
+        x="second",
+        y="Management",
+        label="Throughput",
+        color=PALETTE["blue"],
+        alpha=0.3,
+        ax=ax,
     )
+    sns.lineplot(
+        data=df,
+        x="second",
+        y="rolling",
+        label="10s Rolling Mean Throughput",
+        color=PALETTE["blue"],
+        linewidth=2,
+        ax=ax,
+    )
+
+    ax.set_xlabel("Time (UTC)")
+    ax.set_ylabel("Throughput (KB/s)")
+    ax.set_title(f"Test {test_case} Run {run_id} — RSU Management Service Throughput")
     ax.legend()
     plt.xticks(rotation=45)
     fig.tight_layout()
-    fig.savefig(output_dir / "throughput_comparison.png")
+    fig.savefig(output_dir / "throughput_mgmt.png")
     plt.close(fig)
 
 
@@ -198,15 +213,15 @@ def _export_summary_csv(
     results: Dict[str, Any],
     output_dir: Path,
 ):
-    completeness = results.get("completeness", {})
-    overall = completeness.get("overall", {})
-    per_topic = completeness.get("per_topic", {})
+    drops = results.get("drops", {})
+    overall = drops.get("overall", {})
+
+    throughput_stats = results.get("throughput_stats", {})
+    latency_stats = results.get("latency_stats", {})
+    trimmed_stats = results.get("trimmed_latency_stats", {})
 
     mgmt_count = sum(1 for m in messages if m.message_type == "influx_line_built")
     tru_count = sum(1 for m in messages if m.message_type.endswith("_published"))
-
-    latency_stats = results.get("latency_stats", {})
-    trimmed_stats = results.get("trimmed_latency_stats", {})
 
     summary_rows = [
         {
@@ -215,13 +230,8 @@ def _export_summary_csv(
             "messages_logged_mgmt": mgmt_count,
             "messages_logged_tru": tru_count,
             "total_tru_published": overall.get("tru_published", 0),
-            "total_rsu_received": overall.get("rsu_received", 0),
             "total_dropped": overall.get("dropped", 0),
-            "overall_drop_rate_pct": overall.get("drop_rate_pct", 0.0),
-            "overall_completeness_pct": overall.get("completeness_pct", 0.0),
-            "completeness_status": "PASS"
-            if overall.get("drop_rate_pct", 100) <= 1.0
-            else "FAIL",
+            "overall_drop_rate_pct": overall.get("drop_pct", 0.0),
             "mean_latency_ms": latency_stats.get("mean_ms", float("nan")),
             "p75_latency_ms": latency_stats.get("p75_ms", float("nan")),
             "p95_latency_ms": latency_stats.get("p95_ms", float("nan")),
@@ -230,45 +240,13 @@ def _export_summary_csv(
             "trimmed_mean_latency_ms": trimmed_stats.get("mean_ms", float("nan")),
             "trimmed_p95_latency_ms": trimmed_stats.get("p95_ms", float("nan")),
             "latency_outliers_removed": trimmed_stats.get("outliers_removed", 0),
-            "latency_status": "PASS"
-            if (
-                not np.isnan(latency_stats.get("mean_ms", float("nan")))
-                and latency_stats.get("mean_ms", float("inf")) < 1000
-            )
-            else "FAIL",
             "unique_rsus_seen": len(results.get("rsu_ip_counts", {})),
+            "total_raw_bytes": results.get("total_raw_bytes", 0),
+            "mean_tru_throughput_bps": throughput_stats.get("tru_bytes_per_sec", 0.0),
+            "mean_mgmt_throughput_bps": throughput_stats.get("rsu_bytes_per_sec", 0.0),
             "topic": "OVERALL",
         }
     ]
-
-    for topic, stats in sorted(per_topic.items()):
-        summary_rows.append(
-            {
-                "test_case": test_case,
-                "run_id": run_id,
-                "messages_logged_mgmt": "",
-                "messages_logged_tru": "",
-                "total_tru_published": stats["tru_published"],
-                "total_rsu_received": stats["rsu_received"],
-                "total_dropped": stats["dropped"],
-                "overall_drop_rate_pct": stats["drop_rate_pct"],
-                "overall_completeness_pct": stats["completeness_pct"],
-                "completeness_status": "PASS"
-                if stats["drop_rate_pct"] <= 1.0
-                else "FAIL",
-                "mean_latency_ms": "",
-                "p75_latency_ms": "",
-                "p95_latency_ms": "",
-                "std_latency_ms": "",
-                "max_latency_ms": "",
-                "trimmed_mean_latency_ms": "",
-                "trimmed_p95_latency_ms": "",
-                "latency_outliers_removed": "",
-                "latency_status": "",
-                "unique_rsus_seen": "",
-                "topic": topic,
-            }
-        )
 
     pd.DataFrame(summary_rows).to_csv(output_dir / "data_summary.csv", index=False)
 
@@ -296,14 +274,17 @@ def generate_plots_and_sheets(
             raw_latencies, trimmed_stats, test_case, run_id, output_dir
         )
         _plot_latency_over_time(
-                results.get("latency_timestamps", []),
-                raw_latencies,
-                latency_stats,
-                test_case,
-                run_id,
-                output_dir,
-            )
-        _plot_throughput(messages, test_case, run_id, output_dir)
+            results.get("latency_timestamps", []),
+            raw_latencies,
+            latency_stats,
+            test_case,
+            run_id,
+            output_dir,
+        )
+
+        throughput_df = _get_throughput_df(messages)
+        if not throughput_df.empty:
+            _plot_throughput_mgmt(throughput_df, test_case, run_id, output_dir)
 
     if export_csv:
         _export_summary_csv(test_case, run_id, messages, results, output_dir)

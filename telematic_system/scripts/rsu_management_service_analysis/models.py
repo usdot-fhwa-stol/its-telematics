@@ -12,3 +12,5 @@ class LogMessage:
     level: str
     raw_message_text: str
     payload: Tuple[str, Any]
+    time_key: int
+    bytes_size: int

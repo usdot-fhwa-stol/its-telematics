@@ -1,4 +1,5 @@
 import json
+import re
 import zoneinfo
 from datetime import datetime, timezone
 from pathlib import Path
@@ -6,35 +7,34 @@ from typing import Any, Generator, Optional, Tuple
 
 from models import LogMessage
 from utils import (
-    _FAILURE_TYPES,
+    # _FAILURE_TYPES,
     _SILENT_DROP,
     ANSI_CLEANER_RE,
     INFLUX_FIELD_RE,
     INFLUX_SUFFIX_RE,
     MGMT_RE,
-    TOPIC_RE,
     TRU_RE,
     _coerce_influx_value,
-    _should_skip_topic,
 )
 
 UTC = timezone.utc
 EDT = zoneinfo.ZoneInfo("America/New_York")
 
+JSON_RE = re.compile(r"(\{.*)", re.DOTALL)
+
 
 def extract_topic_payload(msg_text: str) -> Tuple[str, Any]:
-    topic_match = TOPIC_RE.search(msg_text)
-    if not topic_match:
+    json_match = JSON_RE.search(msg_text)
+    if not json_match:
         return "no_match", None
 
-    topic_name = topic_match.group(1)
-    if _should_skip_topic(topic_name):
-        return "skipped", None
-
     try:
-        data = json.loads(topic_match.group(2).strip())
+        data = json.loads(json_match.group(1).strip())
     except Exception:
         return "json_parse_failure", None
+
+    metadata = data.get("metadata", {})
+    topic_name = metadata.get("topicName", "unknown")
 
     topic_suffix = topic_name.rsplit(".", 1)[-1]
     return f"{topic_suffix}_published", {"topic": topic_name, "data": data}
@@ -80,23 +80,36 @@ def iter_log_messages(file_path: str) -> Generator[LogMessage, None, None]:
     message_parts = []
 
     def flush() -> Optional[LogMessage]:
+        nonlocal log_source, level, logger_or_file, log_time, message_parts
         if not log_source:
             return None
 
         message = "\n".join(message_parts)
+
+        bytes_size = len(message.encode("utf-8"))
+        time_key = None
+
         if log_source == "tru_instance":
             msg_type, payload_obj = extract_topic_payload(message)
+            if isinstance(payload_obj, dict):
+                data_content = payload_obj.get("data")
+                if isinstance(data_content, dict):
+                    metadata = data_content.get("metadata", {})
+                    time_key = metadata.get("timestamp")
+
         elif log_source == "rsu_management_service":
             msg_type, payload_obj = extract_mgmt_payload(message)
+            if isinstance(payload_obj, dict):
+                time_key = payload_obj.get("influx_timestamp")
         else:
             msg_type, payload_obj = "no_file", None
 
         if msg_type in _SILENT_DROP:
             return None
 
-        if msg_type in _FAILURE_TYPES:
-            print(f"[DROPPED - {msg_type.upper()}] Failed to parse: {message}")
-            return None
+        # if msg_type in _FAILURE_TYPES:
+        #    print(f"[DROPPED - {msg_type.upper()}] Failed to parse: {message}")
+        #    return None
 
         return LogMessage(
             timestamp=log_time,
@@ -106,6 +119,8 @@ def iter_log_messages(file_path: str) -> Generator[LogMessage, None, None]:
             level=level or "INFO",
             raw_message_text=message,
             payload=payload_obj,
+            bytes_size=bytes_size,
+            time_key=str(time_key) if time_key is not None else None,
         )
 
     with path.open("r", encoding="utf-8", errors="ignore") as f:

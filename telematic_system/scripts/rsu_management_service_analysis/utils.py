@@ -1,9 +1,6 @@
 import re
 from typing import Any
 
-_MS_THRESHOLD = 9_999_999_999
-
-TOPIC_RE = re.compile(r"Topic:\s*(\S+?)\.\s*Published:\s*(\{.*)", re.DOTALL)
 INFLUX_FIELD_RE = re.compile(r'([\w.\[\]-]+)=("(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?i?)')
 TRU_RE = re.compile(
     r"^\[(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\]\s+"
@@ -17,20 +14,14 @@ MGMT_RE = re.compile(
 ANSI_CLEANER_RE = re.compile(r"\x1b\[[0-9;]*m")
 INFLUX_SUFFIX_RE = re.compile(r"(\d+)\s+\(bytes:\s*(\d+)\)$")
 
-_SKIP_TOPIC_KEYWORDS = {"health_status", "wrote number"}
-
 _SILENT_DROP = {"skipped", "no_match"}
 _FAILURE_TYPES = {"json_parse_failure", "influx_parse_failure"}
 
 
 def compute_latency_ms(source_timestamp: int, influx_timestamp: int) -> int:
-    if source_timestamp > _MS_THRESHOLD:
+    if source_timestamp > 9_999_999_999:
         return influx_timestamp - source_timestamp
     return influx_timestamp - (source_timestamp * 1000)
-
-
-def _should_skip_topic(topic: str) -> bool:
-    return any(kw in topic.lower() for kw in _SKIP_TOPIC_KEYWORDS)
 
 
 def _coerce_influx_value(raw: str) -> Any:

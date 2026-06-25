@@ -1,6 +1,6 @@
 import math
 from collections import defaultdict
-from datetime import datetime
+from datetime import timezone
 from typing import Any, Dict, List
 
 from models import LogMessage
@@ -55,14 +55,25 @@ def _compute_trimmed_latency_stats(sorted_latencies: list[float]) -> dict:
     return stats
 
 
+def _rsu_latency_ms(msg: LogMessage) -> float | None:
+    if not msg.timestamp or not msg.payload:
+        return None
+    influx_ts_ms = msg.payload.get("influx_timestamp")
+    if not influx_ts_ms:
+        return None
+
+    log_dt = msg.timestamp
+    if log_dt.tzinfo is None:
+        log_dt = log_dt.replace(tzinfo=timezone.utc)
+    log_ms = log_dt.timestamp() * 1000.0
+    print(log_dt, log_ms, influx_ts_ms)
+    return log_ms - float(influx_ts_ms)
+    exit
+
+
 def analyze_system_performance(all_messages: List[LogMessage]) -> Dict[str, Any]:
-    """
-    Analyzes system performance: data completeness (overall and per topic),
-    end-to-end latency, and throughput statistics.
-    """
     tru_by_topic: Dict[str, Dict[str, LogMessage]] = defaultdict(dict)
     rsu_messages: Dict[str, LogMessage] = {}
-
     rsu_ip_counts: Dict[str, int] = defaultdict(int)
 
     for msg in all_messages:
@@ -94,97 +105,104 @@ def analyze_system_performance(all_messages: List[LogMessage]) -> Dict[str, Any]
             if rsu_ip:
                 rsu_ip_counts[rsu_ip] += 1
 
-    stream_ordered_latencies: list[float] = []
-    latency_timestamps = []
-    total_matched = 0
     total_tru = sum(len(msgs) for msgs in tru_by_topic.values())
+    tru_all_keys = {k for msgs in tru_by_topic.values() for k in msgs}
 
-    per_topic_completeness: Dict[str, dict] = {}
+    total_matched = 0
+    per_topic_drops: Dict[str, dict] = {}
 
     for topic, tru_msgs in tru_by_topic.items():
-        topic_matched = 0
-        for ts_key, tru_msg in tru_msgs.items():
-            if ts_key not in rsu_messages:
-                continue
-            topic_matched += 1
-            total_matched += 1
-            rsu_msg = rsu_messages[ts_key]
-
-            tru_ts_ms = int(ts_key)
-            rsu_ts_ms = rsu_msg.payload.get("influx_timestamp")
-            if not rsu_ts_ms:
-                continue
-
-            diff_ms = float(rsu_ts_ms - tru_ts_ms)
-
-            stream_ordered_latencies.append(diff_ms)
-            latency_timestamps.append(rsu_msg.timestamp)
+        topic_matched = sum(1 for ts_key in tru_msgs if ts_key in rsu_messages)
+        total_matched += topic_matched
 
         topic_count = len(tru_msgs)
         topic_dropped = topic_count - topic_matched
-        per_topic_completeness[topic] = {
+        per_topic_drops[topic] = {
             "tru_published": topic_count,
-            "rsu_received": topic_matched,
             "dropped": topic_dropped,
-            "drop_rate_pct": round((topic_dropped / topic_count) * 100.0, 3)
-            if topic_count > 0
-            else 0.0,
-            "completeness_pct": round((topic_matched / topic_count) * 100.0, 3)
+            "drop_pct": round((topic_dropped / topic_count) * 100.0, 3)
             if topic_count > 0
             else 0.0,
         }
 
     overall_dropped = total_tru - total_matched
-    overall_completeness = {
+    overall_drops = {
         "tru_published": total_tru,
-        "rsu_received": total_matched,
         "dropped": overall_dropped,
-        "drop_rate_pct": round((overall_dropped / total_tru) * 100.0, 3)
-        if total_tru > 0
-        else 0.0,
-        "completeness_pct": round((total_matched / total_tru) * 100.0, 3)
+        "drop_pct": round((overall_dropped / total_tru) * 100.0, 3)
         if total_tru > 0
         else 0.0,
     }
 
-    sorted_latencies = sorted(stream_ordered_latencies)
+    unmatched_rsu_keys = rsu_messages.keys() - tru_all_keys
+
+    for k in unmatched_rsu_keys:
+        rsu_msg = rsu_messages[k]
+        rsu_ip = (
+            rsu_msg.payload.get("tags", {}).get("rsuIp") if rsu_msg.payload else None
+        )
+        if rsu_ip and rsu_ip in rsu_ip_counts:
+            rsu_ip_counts[rsu_ip] -= 1
+            if rsu_ip_counts[rsu_ip] <= 0:
+                del rsu_ip_counts[rsu_ip]
+
+    rsu_messages = {k: v for k, v in rsu_messages.items() if k in tru_all_keys}
+
+    latencies: list[float] = []
+    latency_timestamps = []
+
+    for rsu_msg in rsu_messages.values():
+        lat = _rsu_latency_ms(rsu_msg)
+        if lat is None:
+            continue
+        latencies.append(lat)
+        latency_timestamps.append(rsu_msg.timestamp)
+
+    sorted_latencies = sorted(latencies)
     latency_stats = _compute_latency_stats(sorted_latencies)
     trimmed_latency_stats = _compute_trimmed_latency_stats(sorted_latencies)
 
-    tru_timestamps = [
-        msg.timestamp
+    tru_msgs = [
+        msg
         for msg in all_messages
         if msg.source_format == "tru_instance" and msg.timestamp
     ]
-    rsu_timestamps = [
-        msg.timestamp
-        for msg in all_messages
-        if msg.source_format == "rsu_management_service" and msg.timestamp
-    ]
 
-    tru_throughput_mps = 0.0
-    rsu_throughput_mps = 0.0
-    if tru_timestamps:
+    rsu_msgs = [msg for msg in rsu_messages.values() if msg.timestamp]
+
+    tru_throughput_bps = 0.0
+    rsu_throughput_bps = 0.0
+
+    if tru_msgs:
+        tru_timestamps = [msg.timestamp for msg in tru_msgs]
         duration = (max(tru_timestamps) - min(tru_timestamps)).total_seconds()
         if duration > 0:
-            tru_throughput_mps = len(tru_timestamps) / duration
-    if rsu_timestamps:
+            total_tru_bytes = sum(
+                getattr(msg, "bytes_size", 0) or 0 for msg in tru_msgs
+            )
+            tru_throughput_bps = total_tru_bytes / duration
+
+    if rsu_msgs:
+        rsu_timestamps = [msg.timestamp for msg in rsu_msgs]
         duration = (max(rsu_timestamps) - min(rsu_timestamps)).total_seconds()
         if duration > 0:
-            rsu_throughput_mps = len(rsu_timestamps) / duration
+            total_rsu_bytes = sum(
+                getattr(msg, "bytes_size", 0) or 0 for msg in rsu_msgs
+            )
+            rsu_throughput_bps = total_rsu_bytes / duration
 
     return {
         "rsu_ip_counts": dict(rsu_ip_counts),
-        "raw_latencies": stream_ordered_latencies,
+        "raw_latencies": latencies,
         "latency_stats": latency_stats,
         "trimmed_latency_stats": trimmed_latency_stats,
         "latency_timestamps": latency_timestamps,
-        "completeness": {
-            "overall": overall_completeness,
-            "per_topic": per_topic_completeness,
+        "drops": {
+            "overall": overall_drops,
+            "per_topic": per_topic_drops,
         },
         "throughput_stats": {
-            "tru_msg_per_sec": tru_throughput_mps,
-            "rsu_msg_per_sec": rsu_throughput_mps,
+            "tru_bytes_per_sec": tru_throughput_bps,
+            "rsu_bytes_per_sec": rsu_throughput_bps,
         },
     }
