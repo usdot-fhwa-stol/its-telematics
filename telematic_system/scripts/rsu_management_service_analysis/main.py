@@ -92,7 +92,7 @@ def main():
             results = analyze_system_performance(all_messages)
 
             print(
-                f"  Parsed       mgmt={mgmt_count:,}  tru={tru_count:,}  total={mgmt_count + tru_count:,}"
+                f"  Parsed       mgmt={results['mgmt_count']}  tru={results['tru_count']}  total={mgmt_count + tru_count:,}"
             )
 
             overall = results.get("drops", {}).get(
@@ -144,6 +144,60 @@ def main():
     else:
         print(f"[✓] {total_runs} run(s) processed.")
     print()
+
+    print(f"{'─' * 60}")
+    if total_runs == 0:
+        print("[!] No paired log files found.")
+        return  # Exit early if there is nothing to aggregate
+    else:
+        print(f"[✓] {total_runs} run(s) processed.")
+    print()
+
+    # --- DYNAMIC AGGREGATION BLOCK ---
+    # Dynamically find the 'output' directory relative to the logs directory location
+    base_output_dir = logs_dir.parent / "output"
+
+    if not base_output_dir.exists():
+        print(
+            f"[!] Output directory not found for aggregation: {base_output_dir.resolve()}"
+        )
+        return
+
+    import pandas as pd
+
+    output_file = base_output_dir / "aggregated_test_cases_summary.csv"
+    all_data = []
+
+    # Iterate through all run subfolders inside the output directory
+    for item in base_output_dir.iterdir():
+        if item.is_dir():
+            csv_path = item / "data_summary.csv"
+            if csv_path.exists():
+                try:
+                    df = pd.read_csv(csv_path)
+                    all_data.append(df)
+                except Exception as e:
+                    print(f"  [!] Error reading {csv_path.name} in {item.name}: {e}")
+
+    # Process and aggregate data if files were found
+    if all_data:
+        combined_df = pd.concat(all_data, ignore_index=True)
+        combined_df.columns = combined_df.columns.str.strip()
+
+        # Group by test_case and calculate the requested averaged stats
+        aggregated_df = combined_df.groupby("test_case", as_index=False).agg(
+            averaged_message_drop_percent=("overall_drop_rate_pct", "mean"),
+            averaged_mean_latency=("mean_latency_ms", "mean"),
+            averaged_mean_throughput=("mean_throughput_kbps", "mean"),
+        )
+
+        # Save directly into the output folder root
+        aggregated_df.to_csv(output_file, index=False)
+        print(
+            f"[✓] Aggregated summary successfully saved to:\n    {output_file.resolve()}\n"
+        )
+    else:
+        print("[!] No 'data_summary.csv' files found in subfolders to aggregate.\n")
 
 
 if __name__ == "__main__":

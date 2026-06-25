@@ -10,10 +10,10 @@ from models import LogMessage
 sns.set_theme(style="darkgrid")
 
 
-def _plot_latency_binned(
+def _plot_latency_continuous(
     latency_timestamps: list,
     raw_latencies: list,
-    latency_stats: Dict[str, Any],
+    latency_stats: dict,
     test_case: str,
     run_id: str,
     output_dir: Path,
@@ -28,39 +28,56 @@ def _plot_latency_binned(
         }
     )
 
-    df = df.set_index("timestamp")
+    df = df.sort_values("timestamp")
 
-    binned_df = df.resample("10s").mean().dropna()
+    mean_val = latency_stats["mean_ms"]
+    p95_val = latency_stats["p95_ms"]
+    max_val = latency_stats["max_ms"]
+    min_val = latency_stats["min_ms"]
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    ax.bar(
-        binned_df.index,
-        binned_df["latency"],
-        width=0.0001,
+    ax.plot(
+        df["timestamp"],
+        df["latency"],
         color="blue",
-        alpha=0.7,
-        label="Mean Latency (10s bins)",
+        alpha=0.5,
+        linewidth=1,
+        label="Latency",
     )
 
     ax.axhline(
-        latency_stats.get("mean_ms", 0),
-        color="red",
-        linestyle="--",
-        linewidth=2,
-        label="Latency Mean",
+        mean_val,
+        color="crimson",
+        linestyle="-.",
+        linewidth=1.5,
+        label=f"Mean ({mean_val:.1f} ms)",
+    )
+    ax.axhline(
+        p95_val,
+        color="darkred",
+        linestyle=":",
+        linewidth=1.5,
+        label=f"95th Percentile ({p95_val:.1f} ms)",
     )
 
-    ax.set_xlabel("Wall-Clock Time (UTC)", fontsize=13)
+    if (max_val - min_val) > 250:
+        ax.axhline(
+            500,
+            color="firebrick",
+            linestyle="--",
+            linewidth=1.5,
+            label="Threshold (500 ms)",
+        )
+
+    ax.set_xlabel("Time (UTC)", fontsize=13)
     ax.set_ylabel("Latency (ms)", fontsize=13)
-    ax.set_title(f"Test {test_case} Run {run_id} — Latency Binned (10s)", fontsize=14)
-    ax.legend()
+    ax.set_title(f"Test {test_case} Run {run_id} — Continuous Latency", fontsize=14)
+    ax.legend(loc="upper right")
 
-    # Format X-axis for better readability
-    fig.autofmt_xdate()
-
+    plt.xticks(rotation=45)
     fig.tight_layout()
-    fig.savefig(output_dir / "latency_binned.png")
+    fig.savefig(output_dir / "latency_continuous_metrics.png")
     plt.close(fig)
 
 
@@ -76,12 +93,6 @@ def _get_throughput_df(messages: List[LogMessage]) -> pd.DataFrame:
             rows.append(
                 {"time": msg.timestamp, "source": "Management", "bytes": bytes_size}
             )
-        elif (
-            msg.source_format == "tru_instance"
-            and msg.message_type.endswith("_published")
-            and msg.timestamp
-        ):
-            rows.append({"time": msg.timestamp, "source": "TRU", "bytes": bytes_size})
 
     if not rows:
         return pd.DataFrame()
@@ -98,14 +109,22 @@ def _get_throughput_df(messages: List[LogMessage]) -> pd.DataFrame:
         .fillna(0)
         .reset_index()
     )
-    for col in ("Management", "TRU"):
+    for col in "Management":
         if col not in pivot.columns:
             pivot[col] = 0.0
 
     pivot["Management"] = pivot["Management"] / 1024.0
-    pivot["TRU"] = pivot["TRU"] / 1024.0
 
-    return pivot
+    throughput_stats = {
+        "mean": pivot["Management"].mean(),
+        "min": pivot["Management"].min(),
+        "max": pivot["Management"].max(),
+        "p75": pivot["Management"].quantile(0.75),
+        "p95": pivot["Management"].quantile(0.95),
+        "std": pivot["Management"].std(),
+    }
+
+    return pivot, throughput_stats
 
 
 def _plot_throughput_mgmt(
@@ -150,6 +169,7 @@ def _export_summary_csv(
     test_case: str,
     run_id: str,
     results: Dict[str, Any],
+    throughput_stats: Dict[str, float],
     output_dir: Path,
 ):
     drops = results.get("drops", {})
@@ -170,6 +190,12 @@ def _export_summary_csv(
             "p95_latency_ms": latency_stats.get("p95_ms", float("nan")),
             "std_latency_ms": latency_stats.get("std_ms", float("nan")),
             "max_latency_ms": latency_stats.get("max_ms", float("nan")),
+            "mean_throughput_kbps": throughput_stats.get("mean", float("nan")),
+            "min_throughput_kbps": throughput_stats.get("min", float("nan")),
+            "max_throughput_kbps": throughput_stats.get("max", float("nan")),
+            "p75_throughput_kbps": throughput_stats.get("p75", float("nan")),
+            "p95_throughput_kbps": throughput_stats.get("p95", float("nan")),
+            "std_throughput_kbps": throughput_stats.get("std", float("nan")),
             "unique_rsus_seen": len(results.get("rsu_ip_counts", {})),
         }
     ]
@@ -195,7 +221,7 @@ def generate_plots_and_sheets(
     latency_stats = results.get("latency_stats", {})
 
     if export_plots and raw_latencies:
-        _plot_latency_binned(
+        _plot_latency_continuous(
             results.get("latency_timestamps", []),
             raw_latencies,
             latency_stats,
@@ -204,11 +230,11 @@ def generate_plots_and_sheets(
             output_dir,
         )
 
-        throughput_df = _get_throughput_df(messages)
+        throughput_df, throughput_stats = _get_throughput_df(messages)
         if not throughput_df.empty:
             _plot_throughput_mgmt(throughput_df, test_case, run_id, output_dir)
 
     if export_csv:
-        _export_summary_csv(test_case, run_id, results, output_dir)
+        _export_summary_csv(test_case, run_id, results, throughput_stats, output_dir)
 
     print(f"[✓] Reports exported to: {output_dir}")

@@ -177,6 +177,8 @@ def analyze_system_performance(all_messages: List[LogMessage]) -> Dict[str, Any]
             rsu_throughput_bps = total_rsu_bytes / duration
 
     return {
+        "tru_count": len(tru_msgs),
+        "mgmt_count": len(rsu_msgs),
         "rsu_ip_counts": dict(rsu_ip_counts),
         "raw_latencies": latencies,
         "latency_stats": latency_stats,
