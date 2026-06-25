@@ -128,7 +128,6 @@ def main():
 
             rsus = list(results.get("rsu_ip_counts", {}).keys())
             print(f"  RSU IPs      {', '.join(rsus) if rsus else 'none'}")
-            print(f"  DB records   {results.get('total_records_saved_to_db', 0):,}")
 
             if not args.no_plots or not args.no_csv:
                 generate_plots_and_sheets(

@@ -6,10 +6,6 @@ from typing import Any, Dict, List
 from models import LogMessage
 
 
-def _ms_within_minute(dt: datetime) -> float:
-    return (dt.second * 1_000) + (dt.microsecond / 1_000)
-
-
 def _extract_tru_topic(payload: dict) -> str:
     return payload.get("topic", "unknown")
 
@@ -68,7 +64,6 @@ def analyze_system_performance(all_messages: List[LogMessage]) -> Dict[str, Any]
     rsu_messages: Dict[str, LogMessage] = {}
 
     rsu_ip_counts: Dict[str, int] = defaultdict(int)
-    total_records_saved_to_db = 0
 
     for msg in all_messages:
         if msg.source_format == "tru_instance":
@@ -92,7 +87,6 @@ def analyze_system_performance(all_messages: List[LogMessage]) -> Dict[str, Any]
         elif msg.source_format == "rsu_management_service":
             if msg.message_type != "influx_line_built" or not msg.payload:
                 continue
-            total_records_saved_to_db += 1
             influx_ts = msg.payload.get("influx_timestamp")
             if influx_ts:
                 rsu_messages[str(influx_ts)] = msg
@@ -101,6 +95,7 @@ def analyze_system_performance(all_messages: List[LogMessage]) -> Dict[str, Any]
                 rsu_ip_counts[rsu_ip] += 1
 
     stream_ordered_latencies: list[float] = []
+    latency_timestamps = []
     total_matched = 0
     total_tru = sum(len(msgs) for msgs in tru_by_topic.values())
 
@@ -115,18 +110,15 @@ def analyze_system_performance(all_messages: List[LogMessage]) -> Dict[str, Any]
             total_matched += 1
             rsu_msg = rsu_messages[ts_key]
 
-            tru_dt: datetime = tru_msg.timestamp
-            rsu_dt: datetime = rsu_msg.timestamp
-            if not (tru_dt and rsu_dt):
+            tru_ts_ms = int(ts_key)
+            rsu_ts_ms = rsu_msg.payload.get("influx_timestamp")
+            if not rsu_ts_ms:
                 continue
 
-            diff_ms = _ms_within_minute(rsu_dt) - _ms_within_minute(tru_dt)
-            if diff_ms < -30_000:
-                diff_ms += 60_000
-            elif diff_ms > 30_000:
-                diff_ms -= 60_000
+            diff_ms = float(rsu_ts_ms - tru_ts_ms)
 
             stream_ordered_latencies.append(diff_ms)
+            latency_timestamps.append(rsu_msg.timestamp)
 
         topic_count = len(tru_msgs)
         topic_dropped = topic_count - topic_matched
@@ -182,11 +174,11 @@ def analyze_system_performance(all_messages: List[LogMessage]) -> Dict[str, Any]
             rsu_throughput_mps = len(rsu_timestamps) / duration
 
     return {
-        "total_records_saved_to_db": total_records_saved_to_db,
         "rsu_ip_counts": dict(rsu_ip_counts),
         "raw_latencies": stream_ordered_latencies,
         "latency_stats": latency_stats,
         "trimmed_latency_stats": trimmed_latency_stats,
+        "latency_timestamps": latency_timestamps,
         "completeness": {
             "overall": overall_completeness,
             "per_topic": per_topic_completeness,

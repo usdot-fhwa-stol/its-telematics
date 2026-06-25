@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -17,7 +16,6 @@ PALETTE = {
     "purple": "tab:purple",
     "violet": "darkviolet",
 }
-
 
 def _plot_latency_histogram(
     raw_latencies: list,
@@ -45,7 +43,6 @@ def _plot_latency_histogram(
     sns.histplot(trimmed, bins=bins, kde=True, color=PALETTE["blue"], ax=ax)
 
     mean_ms = trimmed_stats.get("mean_ms")
-    p95_ms = trimmed_stats.get("p95_ms")
     if mean_ms is not None:
         ax.axvline(
             mean_ms,
@@ -54,14 +51,14 @@ def _plot_latency_histogram(
             linewidth=1.6,
             label=f"Mean ({mean_ms:.1f} ms)",
         )
-    if p95_ms is not None:
-        ax.axvline(
-            p95_ms,
-            color=PALETTE["red"],
-            linestyle=":",
-            linewidth=1.6,
-            label=f"P95 ({p95_ms:.1f} ms)",
-        )
+
+    ax.axvline(
+        1_000,
+        color=PALETTE["red"],
+        linestyle="--",
+        linewidth=1.6,
+        label="1s Threshold",
+    )
 
     max_val = np.max(trimmed) if len(trimmed) > 0 else 10
     ax.set_xlim(0, max(max_val * 1.1, 2.0))
@@ -77,41 +74,32 @@ def _plot_latency_histogram(
     fig.savefig(output_dir / "latency_histogram.png")
     plt.close(fig)
 
-
-def _plot_latency_sequence(
+    
+def _plot_latency_over_time(
+    latency_timestamps: list,
     raw_latencies: list,
     latency_stats: dict,
     test_case: str,
     run_id: str,
     output_dir: Path,
 ):
-    x = np.arange(1, len(raw_latencies) + 1)
-    fig, ax = plt.subplots(figsize=(10, 6))
+    if not latency_timestamps or not raw_latencies:
+        return
 
+    paired = sorted(zip(latency_timestamps, raw_latencies), key=lambda x: x[0])
+    times, latencies = zip(*paired)
+
+    fig, ax = plt.subplots(figsize=(12, 6))
     ax.scatter(
-        x,
-        raw_latencies,
+        times,
+        latencies,
         color=PALETTE["purple"],
-        alpha=0.6,
-        s=12,
-        label="Latency per Message",
+        alpha=0.5,
+        s=10,
+        label="Latency",
     )
 
-    if len(raw_latencies) > 10:
-        window = max(5, len(raw_latencies) // 20)
-        rolling_mean = (
-            pd.Series(raw_latencies).rolling(window=window, min_periods=1).mean()
-        )
-        ax.plot(
-            x,
-            rolling_mean,
-            color=PALETTE["violet"],
-            linewidth=1.5,
-            label=f"Rolling Mean (w={window})",
-        )
-
     mean_ms = latency_stats.get("mean_ms")
-    p95_ms = latency_stats.get("p95_ms")
     if mean_ms is not None:
         ax.axhline(
             mean_ms,
@@ -120,26 +108,25 @@ def _plot_latency_sequence(
             linewidth=1.4,
             label=f"Mean ({mean_ms:.1f} ms)",
         )
-    if p95_ms is not None:
-        ax.axhline(
-            p95_ms,
-            color=PALETTE["red"],
-            linestyle=":",
-            linewidth=1.4,
-            label=f"P95 ({p95_ms:.1f} ms)",
-        )
 
-    ax.set_xlabel("Message Sequence Number", fontsize=13)
+    ax.axhline(
+        1_000,
+        color=PALETTE["red"],
+        linestyle="--",
+        linewidth=1.4,
+        label="1s Threshold",
+    )
+
+    ax.set_xlabel("Wall-Clock Time", fontsize=13)
     ax.set_ylabel("Latency (ms)", fontsize=13)
     ax.set_title(
-        f"Test {test_case} Run {run_id} — Latency Progression Across Stream",
-        fontsize=14,
+        f"Test {test_case} Run {run_id} — Latency Over Time", fontsize=14
     )
     ax.legend()
+    plt.xticks(rotation=45)
     fig.tight_layout()
-    fig.savefig(output_dir / "latency_sequence.png")
+    fig.savefig(output_dir / "latency_over_time.png")
     plt.close(fig)
-
 
 def _plot_throughput(
     messages: List[LogMessage],
@@ -149,43 +136,30 @@ def _plot_throughput(
 ):
     rows = []
     for msg in messages:
-        if not msg.payload:
-            continue
         if (
             msg.source_format == "rsu_management_service"
             and msg.message_type == "influx_line_built"
+            and msg.timestamp
         ):
-            rows.append(
-                {
-                    "time": msg.timestamp,
-                    "bytes": msg.payload.get("bytes_size", 0)
-                    if isinstance(msg.payload, dict)
-                    else 0,
-                    "source": "Management",
-                }
-            )
-        elif msg.source_format == "tru_instance" and msg.message_type.endswith(
-            "_published"
+            rows.append({"time": msg.timestamp, "source": "Management"})
+        elif (
+            msg.source_format == "tru_instance"
+            and msg.message_type.endswith("_published")
+            and msg.timestamp
         ):
-            rows.append(
-                {
-                    "time": msg.timestamp,
-                    "bytes": len(msg.raw_message_text.encode("utf-8"))
-                    if msg.raw_message_text
-                    else 0,
-                    "source": "TRU",
-                }
-            )
+            rows.append({"time": msg.timestamp, "source": "TRU"})
 
     if not rows:
         return
 
     df = pd.DataFrame(rows)
-    df["time"] = pd.to_datetime(df["time"])
+    df["time"] = pd.to_datetime(df["time"], utc=True)
     df["second"] = df["time"].dt.floor("s")
-    grouped = df.groupby(["second", "source"], as_index=False)["bytes"].sum()
+    grouped = (
+        df.groupby(["second", "source"]).size().reset_index(name="msg_count")
+    )
     pivot = (
-        grouped.pivot(index="second", columns="source", values="bytes")
+        grouped.pivot(index="second", columns="source", values="msg_count")
         .fillna(0)
         .reset_index()
     )
@@ -196,43 +170,21 @@ def _plot_throughput(
     avg_delta = pivot["delta"].mean()
 
     fig, ax = plt.subplots(figsize=(12, 6))
-    sns.lineplot(
-        data=pivot,
-        x="second",
-        y="Management",
-        label="Management Bytes/s",
-        color=PALETTE["blue"],
-        ax=ax,
-    )
-    sns.lineplot(
-        data=pivot,
-        x="second",
-        y="TRU",
-        label="TRU Bytes/s",
-        color=PALETTE["green"],
-        ax=ax,
-    )
-    sns.lineplot(
-        data=pivot,
-        x="second",
-        y="delta",
-        label="Delta (Mgmt − TRU)",
-        color=PALETTE["red"],
-        ax=ax,
-    )
-    ax.axhline(
-        avg_delta,
-        color=PALETTE["orange"],
-        linestyle="-.",
-        linewidth=1.8,
-        label=f"Avg Delta ({avg_delta:.1f} B/s)",
-    )
+    sns.lineplot(data=pivot, x="second", y="Management",
+                 label="Management msg/s", color=PALETTE["blue"], ax=ax)
+    sns.lineplot(data=pivot, x="second", y="TRU",
+                 label="TRU msg/s", color=PALETTE["green"], ax=ax)
+    sns.lineplot(data=pivot, x="second", y="delta",
+                 label="Loss (Mgmt − TRU)", color=PALETTE["red"], ax=ax)
+    ax.axhline(avg_delta, color=PALETTE["orange"], linestyle="-.",
+               linewidth=1.8, label=f"Avg Delta ({avg_delta:.2f} msg/s)")
     ax.axhline(0, color="black", linestyle="--", linewidth=0.8)
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Bytes per Second")
-    ax.set_title(f"Test {test_case} Run {run_id} — Throughput Comparison & Delta")
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Messages per Second")
+    ax.set_title(
+        f"Test {test_case} Run {run_id} — Throughput Comparison & Loss"
+    )
     ax.legend()
-    ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: ""))
     plt.xticks(rotation=45)
     fig.tight_layout()
     fig.savefig(output_dir / "throughput_comparison.png")
@@ -284,7 +236,6 @@ def _export_summary_csv(
                 and latency_stats.get("mean_ms", float("inf")) < 1000
             )
             else "FAIL",
-            "db_records_written": results.get("total_records_saved_to_db", 0),
             "unique_rsus_seen": len(results.get("rsu_ip_counts", {})),
             "topic": "OVERALL",
         }
@@ -314,7 +265,6 @@ def _export_summary_csv(
                 "trimmed_p95_latency_ms": "",
                 "latency_outliers_removed": "",
                 "latency_status": "",
-                "db_records_written": "",
                 "unique_rsus_seen": "",
                 "topic": topic,
             }
@@ -345,9 +295,14 @@ def generate_plots_and_sheets(
         _plot_latency_histogram(
             raw_latencies, trimmed_stats, test_case, run_id, output_dir
         )
-        _plot_latency_sequence(
-            raw_latencies, latency_stats, test_case, run_id, output_dir
-        )
+        _plot_latency_over_time(
+                results.get("latency_timestamps", []),
+                raw_latencies,
+                latency_stats,
+                test_case,
+                run_id,
+                output_dir,
+            )
         _plot_throughput(messages, test_case, run_id, output_dir)
 
     if export_csv:

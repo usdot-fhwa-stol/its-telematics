@@ -1,5 +1,6 @@
 import json
-from datetime import datetime
+import zoneinfo
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Generator, Optional, Tuple
 
@@ -16,6 +17,9 @@ from utils import (
     _coerce_influx_value,
     _should_skip_topic,
 )
+
+UTC = timezone.utc
+EDT = zoneinfo.ZoneInfo("America/New_York")
 
 
 def extract_topic_payload(msg_text: str) -> Tuple[str, Any]:
@@ -122,7 +126,10 @@ def iter_log_messages(file_path: str) -> Generator[LogMessage, None, None]:
                 log_source = "tru_instance" if tru_match else "rsu_management_service"
                 level = match_dict.get("level")
                 logger_or_file = match_dict.get("file") or match_dict.get("class")
-                log_time = datetime.strptime(match_dict["ts"], "%Y-%m-%d %H:%M:%S.%f")
+                tz = EDT if log_source == "tru_instance" else UTC
+                log_time = datetime.strptime(
+                    match_dict["ts"], "%Y-%m-%d %H:%M:%S.%f"
+                ).replace(tzinfo=tz)
                 message_parts = [match_dict["msg"]]
             elif log_source:
                 message_parts.append(cleaned_line)
