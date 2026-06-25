@@ -142,9 +142,8 @@ def iter_log_messages(file_path: str) -> Generator[LogMessage, None, None]:
                 level = match_dict.get("level")
                 logger_or_file = match_dict.get("file") or match_dict.get("class")
                 tz = EDT if log_source == "tru_instance" else UTC
-                log_time = datetime.strptime(
-                    match_dict["ts"], "%Y-%m-%d %H:%M:%S.%f"
-                ).replace(tzinfo=tz)
+                dt = datetime.strptime(match_dict["ts"], "%Y-%m-%d %H:%M:%S.%f")
+                log_time = dt.replace(tzinfo=tz).astimezone(UTC)
                 message_parts = [match_dict["msg"]]
             elif log_source:
                 message_parts.append(cleaned_line)

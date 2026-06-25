@@ -95,13 +95,24 @@ def main():
                 f"  Parsed       mgmt={mgmt_count:,}  tru={tru_count:,}  total={mgmt_count + tru_count:,}"
             )
 
-            overall = results.get("completeness", {}).get("overall", {})
+            overall = results.get("drops", {}).get(
+                "overall", {}
+            )  # Use 'drops' instead of 'completeness'
             if overall:
-                status = "PASS" if overall["drop_rate_pct"] <= 1.0 else "FAIL"
+                status = "PASS" if overall["drop_pct"] <= 1.0 else "FAIL"
                 print(
                     f"  Completeness [{status}]  "
-                    f"{overall['rsu_received']:,}/{overall['tru_published']:,} matched  "
-                    f"({overall['drop_rate_pct']:.2f}% drop)"
+                    f"{overall['rsu_published']:,}/{overall['tru_published']:,} matched  "
+                    f"({overall['drop_pct']:.2f}% drop)"
+                )
+
+            latency_stats = results.get("latency_stats", {})
+            if latency_stats:
+                print(
+                    f"  Latency      "
+                    f"mean={latency_stats['mean_ms']:.1f}ms  "
+                    f"p95={latency_stats['p95_ms']:.1f}ms  "
+                    f"std={latency_stats['std_ms']:.1f}ms"
                 )
 
             per_topic = results.get("completeness", {}).get("per_topic", {})
@@ -113,18 +124,6 @@ def main():
                         f"{stats['rsu_received']:,}/{stats['tru_published']:,}  "
                         f"({stats['drop_rate_pct']:.2f}% drop)"
                     )
-
-            trimmed = results.get("trimmed_latency_stats", {})
-            if trimmed:
-                print(
-                    f"  Latency      "
-                    f"mean={trimmed['mean_ms']:.1f}ms  "
-                    f"p95={trimmed['p95_ms']:.1f}ms  "
-                    f"std={trimmed['std_ms']:.1f}ms  "
-                    f"({trimmed['outliers_removed']} outliers removed)"
-                )
-            else:
-                print("  Latency      insufficient data")
 
             rsus = list(results.get("rsu_ip_counts", {}).keys())
             print(f"  RSU IPs      {', '.join(rsus) if rsus else 'none'}")

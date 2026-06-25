@@ -40,21 +40,6 @@ def _compute_latency_stats(values: list[float]) -> dict:
     }
 
 
-def _compute_trimmed_latency_stats(sorted_latencies: list[float]) -> dict:
-    n = len(sorted_latencies)
-    if n == 0:
-        return {}
-    q1 = sorted_latencies[int(n * 0.25)]
-    q3 = sorted_latencies[int(n * 0.75)]
-    iqr = q3 - q1
-    lower = q1 - 1.5 * iqr
-    upper = q3 + 1.5 * iqr
-    trimmed = [x for x in sorted_latencies if lower <= x <= upper]
-    stats = _compute_latency_stats(trimmed)
-    stats["outliers_removed"] = n - len(trimmed)
-    return stats
-
-
 def _rsu_latency_ms(msg: LogMessage) -> float | None:
     if not msg.timestamp or not msg.payload:
         return None
@@ -63,12 +48,9 @@ def _rsu_latency_ms(msg: LogMessage) -> float | None:
         return None
 
     log_dt = msg.timestamp
-    if log_dt.tzinfo is None:
-        log_dt = log_dt.replace(tzinfo=timezone.utc)
+
     log_ms = log_dt.timestamp() * 1000.0
-    print(log_dt, log_ms, influx_ts_ms)
     return log_ms - float(influx_ts_ms)
-    exit
 
 
 def analyze_system_performance(all_messages: List[LogMessage]) -> Dict[str, Any]:
@@ -112,13 +94,16 @@ def analyze_system_performance(all_messages: List[LogMessage]) -> Dict[str, Any]
     per_topic_drops: Dict[str, dict] = {}
 
     for topic, tru_msgs in tru_by_topic.items():
-        topic_matched = sum(1 for ts_key in tru_msgs if ts_key in rsu_messages)
-        total_matched += topic_matched
+        timestamp_key_matched_count = sum(
+            1 for ts_key in tru_msgs if ts_key in rsu_messages
+        )
+        total_matched += timestamp_key_matched_count
 
         topic_count = len(tru_msgs)
-        topic_dropped = topic_count - topic_matched
+        topic_dropped = topic_count - timestamp_key_matched_count
         per_topic_drops[topic] = {
             "tru_published": topic_count,
+            "rsu_published": timestamp_key_matched_count,
             "dropped": topic_dropped,
             "drop_pct": round((topic_dropped / topic_count) * 100.0, 3)
             if topic_count > 0
@@ -128,6 +113,7 @@ def analyze_system_performance(all_messages: List[LogMessage]) -> Dict[str, Any]
     overall_dropped = total_tru - total_matched
     overall_drops = {
         "tru_published": total_tru,
+        "rsu_published": total_matched,
         "dropped": overall_dropped,
         "drop_pct": round((overall_dropped / total_tru) * 100.0, 3)
         if total_tru > 0
@@ -160,7 +146,6 @@ def analyze_system_performance(all_messages: List[LogMessage]) -> Dict[str, Any]
 
     sorted_latencies = sorted(latencies)
     latency_stats = _compute_latency_stats(sorted_latencies)
-    trimmed_latency_stats = _compute_trimmed_latency_stats(sorted_latencies)
 
     tru_msgs = [
         msg
@@ -195,7 +180,6 @@ def analyze_system_performance(all_messages: List[LogMessage]) -> Dict[str, Any]
         "rsu_ip_counts": dict(rsu_ip_counts),
         "raw_latencies": latencies,
         "latency_stats": latency_stats,
-        "trimmed_latency_stats": trimmed_latency_stats,
         "latency_timestamps": latency_timestamps,
         "drops": {
             "overall": overall_drops,

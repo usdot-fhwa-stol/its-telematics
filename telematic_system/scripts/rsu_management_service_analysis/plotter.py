@@ -8,60 +8,12 @@ import seaborn as sns
 from models import LogMessage
 
 sns.set_theme(style="darkgrid")
-PALETTE = {
-    "blue": "tab:blue",
-    "green": "tab:green",
-    "red": "tab:red",
-    "orange": "tab:orange",
-    "purple": "tab:purple",
-    "violet": "darkviolet",
-}
 
 
-def _plot_latency_histogram(
-    raw_latencies: list,
-    trimmed_stats: dict,
-    test_case: str,
-    run_id: str,
-    output_dir: Path,
-):
-    arr = np.array(raw_latencies, dtype=float)
-    q1, q3 = np.percentile(arr, 25), np.percentile(arr, 75)
-    iqr = q3 - q1
-    trimmed = arr[(arr >= q1 - 1.5 * iqr) & (arr <= q3 + 1.5 * iqr)]
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    x_indices = np.arange(len(trimmed))
-
-    sns.scatterplot(x=x_indices, y=trimmed, color=PALETTE["blue"], alpha=0.6, ax=ax)
-
-    mean_ms = trimmed_stats.get("mean_ms")
-    if mean_ms is not None:
-        ax.axhline(
-            mean_ms,
-            color=PALETTE["orange"],
-            linestyle="--",
-            linewidth=1.6,
-            label=f"Mean ({mean_ms:.1f} ms)",
-        )
-
-    ax.set_xlabel("Sample Index", fontsize=13)
-    ax.set_ylabel("End-to-End Latency (ms)", fontsize=13)
-    ax.set_title(
-        f"Test {test_case} Run {run_id} — Latency Distribution\n"
-        f"(IQR-trimmed, n={len(trimmed)}, outliers removed: {trimmed_stats.get('outliers_removed', 0)})",
-        fontsize=14,
-    )
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(output_dir / "latency_histogram.png")
-    plt.close(fig)
-
-
-def _plot_latency_over_time(
+def _plot_latency_binned(
     latency_timestamps: list,
     raw_latencies: list,
-    latency_stats: dict,
+    latency_stats: Dict[str, Any],
     test_case: str,
     run_id: str,
     output_dir: Path,
@@ -69,46 +21,46 @@ def _plot_latency_over_time(
     if not latency_timestamps or not raw_latencies:
         return
 
-    times_pd = pd.to_datetime(latency_timestamps, errors="coerce")
-    if times_pd.tz is None:
-        times_pd = (
-            times_pd.tz_localize("US/Eastern").tz_convert("UTC").tz_localize(None)
-        )
-    else:
-        times_pd = times_pd.tz_convert("UTC").tz_localize(None)
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(latency_timestamps, errors="coerce"),
+            "latency": [float(x) for x in raw_latencies],
+        }
+    )
 
-    paired = sorted(zip(times_pd, raw_latencies), key=lambda x: x[0])
-    times, latencies = zip(*paired)
+    df = df.set_index("timestamp")
+
+    binned_df = df.resample("10s").mean().dropna()
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    ax.plot(
-        times,
-        latencies,
-        color=PALETTE["purple"],
-        alpha=0.6,
-        linewidth=1.5,
-        markersize=4,
-        label="Latency",
+    ax.bar(
+        binned_df.index,
+        binned_df["latency"],
+        width=0.0001,
+        color="blue",
+        alpha=0.7,
+        label="Mean Latency (10s bins)",
     )
 
-    mean_ms = latency_stats.get("mean_ms")
-    if mean_ms is not None:
-        ax.axhline(
-            mean_ms,
-            color=PALETTE["orange"],
-            linestyle="--",
-            linewidth=1.4,
-            label=f"Mean ({mean_ms:.1f} ms)",
-        )
+    ax.axhline(
+        latency_stats.get("mean_ms", 0),
+        color="red",
+        linestyle="--",
+        linewidth=2,
+        label="Latency Mean",
+    )
 
     ax.set_xlabel("Wall-Clock Time (UTC)", fontsize=13)
     ax.set_ylabel("Latency (ms)", fontsize=13)
-    ax.set_title(f"Test {test_case} Run {run_id} — Latency Over Time", fontsize=14)
+    ax.set_title(f"Test {test_case} Run {run_id} — Latency Binned (10s)", fontsize=14)
     ax.legend()
-    plt.xticks(rotation=45)
+
+    # Format X-axis for better readability
+    fig.autofmt_xdate()
+
     fig.tight_layout()
-    fig.savefig(output_dir / "latency_over_time.png")
+    fig.savefig(output_dir / "latency_binned.png")
     plt.close(fig)
 
 
@@ -135,18 +87,6 @@ def _get_throughput_df(messages: List[LogMessage]) -> pd.DataFrame:
         return pd.DataFrame()
 
     df = pd.DataFrame(rows)
-
-    # Force convert to UTC and drop the timezone signature to prevent matplotlib local-time overrides
-    df["time"] = pd.to_datetime(df["time"], errors="coerce")
-    if df["time"].dt.tz is None:
-        df["time"] = (
-            df["time"]
-            .dt.tz_localize("US/Eastern")
-            .dt.tz_convert("UTC")
-            .dt.tz_localize(None)
-        )
-    else:
-        df["time"] = df["time"].dt.tz_convert("UTC").dt.tz_localize(None)
 
     df["second"] = df["time"].dt.floor("s")
 
@@ -182,7 +122,7 @@ def _plot_throughput_mgmt(
         x="second",
         y="Management",
         label="Throughput",
-        color=PALETTE["blue"],
+        color="blue",
         alpha=0.3,
         ax=ax,
     )
@@ -191,7 +131,7 @@ def _plot_throughput_mgmt(
         x="second",
         y="rolling",
         label="10s Rolling Mean Throughput",
-        color=PALETTE["blue"],
+        color="blue",
         linewidth=2,
         ax=ax,
     )
@@ -218,18 +158,13 @@ def _export_summary_csv(
 
     throughput_stats = results.get("throughput_stats", {})
     latency_stats = results.get("latency_stats", {})
-    trimmed_stats = results.get("trimmed_latency_stats", {})
-
-    mgmt_count = sum(1 for m in messages if m.message_type == "influx_line_built")
-    tru_count = sum(1 for m in messages if m.message_type.endswith("_published"))
 
     summary_rows = [
         {
             "test_case": test_case,
             "run_id": run_id,
-            "messages_logged_mgmt": mgmt_count,
-            "messages_logged_tru": tru_count,
-            "total_tru_published": overall.get("tru_published", 0),
+            "messages_logged_mgmt": overall.get("rsu_published", 0),
+            "messages_logged_tru": overall.get("tru_published", 0),
             "total_dropped": overall.get("dropped", 0),
             "overall_drop_rate_pct": overall.get("drop_pct", 0.0),
             "mean_latency_ms": latency_stats.get("mean_ms", float("nan")),
@@ -237,9 +172,6 @@ def _export_summary_csv(
             "p95_latency_ms": latency_stats.get("p95_ms", float("nan")),
             "std_latency_ms": latency_stats.get("std_ms", float("nan")),
             "max_latency_ms": latency_stats.get("max_ms", float("nan")),
-            "trimmed_mean_latency_ms": trimmed_stats.get("mean_ms", float("nan")),
-            "trimmed_p95_latency_ms": trimmed_stats.get("p95_ms", float("nan")),
-            "latency_outliers_removed": trimmed_stats.get("outliers_removed", 0),
             "unique_rsus_seen": len(results.get("rsu_ip_counts", {})),
             "total_raw_bytes": results.get("total_raw_bytes", 0),
             "mean_tru_throughput_bps": throughput_stats.get("tru_bytes_per_sec", 0.0),
@@ -267,13 +199,9 @@ def generate_plots_and_sheets(
 
     raw_latencies = results.get("raw_latencies", [])
     latency_stats = results.get("latency_stats", {})
-    trimmed_stats = results.get("trimmed_latency_stats", {})
 
     if export_plots and raw_latencies:
-        _plot_latency_histogram(
-            raw_latencies, trimmed_stats, test_case, run_id, output_dir
-        )
-        _plot_latency_over_time(
+        _plot_latency_binned(
             results.get("latency_timestamps", []),
             raw_latencies,
             latency_stats,
