@@ -23,12 +23,18 @@ _LATENCY_P95_THRESHOLD_MS = 1000.0
 
 
 def _parse_local_dt(value: str) -> datetime:
-    """Parse a naive datetime string as America/New_York, return UTC-aware."""
-    try:
-        dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
-    except ValueError:
-        dt = datetime.strptime(value, "%Y-%m-%d")
-    return dt.replace(tzinfo=_LOCAL_TZ).astimezone(_UTC)
+    formats = [
+        "%Y-%m-%d %H:%M:%S.%f",  # YYYY-MM-DD HH:MM:SS.ffffff (or .fff)
+        "%Y-%m-%d %H:%M:%S",     # YYYY-MM-DD HH:MM:SS
+        "%Y-%m-%d",              # YYYY-MM-DD
+    ]
+    for fmt in formats:
+        try:
+            dt = datetime.strptime(value, fmt)
+            return dt.replace(tzinfo=_LOCAL_TZ).astimezone(_UTC)
+        except ValueError:
+            continue
+    raise ValueError(f"Unrecognised datetime format: {value!r}")
 
 
 def _collect_messages(
@@ -106,7 +112,8 @@ def main() -> None:
         help=(
             "Only include log messages at or after this time "
             "(America/New_York). "
-            'Formats: "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD".'
+            'Formats: "YYYY-MM-DD HH:MM:SS.fff", "YYYY-MM-DD HH:MM:SS", '
+            'or "YYYY-MM-DD".'
         ),
     )
     parser.add_argument(
@@ -117,7 +124,8 @@ def main() -> None:
         help=(
             "Only include log messages at or before this time "
             "(America/New_York). "
-            'Formats: "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD".'
+            'Formats: "YYYY-MM-DD HH:MM:SS.fff", "YYYY-MM-DD HH:MM:SS", '
+            'or "YYYY-MM-DD".'
         ),
     )
     parser.add_argument(
@@ -142,17 +150,19 @@ def main() -> None:
         except ValueError:
             print(
                 f'[!] Invalid --start value: "{args.start}". '
-                'Use "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD".'
+                'Use "YYYY-MM-DD HH:MM:SS.fff", "YYYY-MM-DD HH:MM:SS", '
+                'or "YYYY-MM-DD".'
             )
             return
-
+    
     if args.end:
         try:
             end_time = _parse_local_dt(args.end)
         except ValueError:
             print(
                 f'[!] Invalid --end value: "{args.end}". '
-                'Use "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD".'
+                'Use "YYYY-MM-DD HH:MM:SS.fff", "YYYY-MM-DD HH:MM:SS", '
+                'or "YYYY-MM-DD".'
             )
             return
 

@@ -27,6 +27,11 @@ python python telematic_system/scripts/rsu_management_service_analysis/main.py #
 
 --test <test_name> # Specify the test to analyze (optional) (Ex: c11)
 
+--start <start_time> # Specify the start time for analysis (optional) (Ex: "2025-09-01 10:00:00")
+
+--end <end_time> # Specify the end time for analysis (optional) (Ex: "2025-09-01 12:00:00")
+
+
 --no-plots # Disable plotting of graphs (optional)
 
 --no-csv # Disable CSV output of results (optional)

@@ -114,11 +114,6 @@ def _within_window(
     start_time: Optional[datetime],
     end_time: Optional[datetime],
 ) -> bool:
-    """Return True if ts falls within [start_time, end_time] (inclusive).
-
-    None bounds are treated as open (unbounded).
-    A None ts is always considered out-of-window when any bound is set.
-    """
     if ts is None:
         return start_time is None and end_time is None
     if start_time is not None and ts < start_time:
@@ -134,15 +129,6 @@ def iter_log_messages(
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
 ) -> Generator[LogMessage, None, None]:
-    """Iterate over parsed log messages from *file_path*.
-
-    Args:
-        file_path:  Path to the log file.
-        start_time: Optional lower bound (UTC-aware). Messages whose log
-                    timestamp is strictly before this value are skipped.
-        end_time:   Optional upper bound (UTC-aware). Messages whose log
-                    timestamp is strictly after this value are skipped.
-    """
     path = Path(file_path)
     if not path.exists():
         logger.warning("Log file not found: %s", file_path)
