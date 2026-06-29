@@ -1,29 +1,89 @@
 import argparse
 import re
+import zoneinfo
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Dict, Optional
 
-from analyzer import analyze_system_performance
+from analyzer import aggregate_runs, analyze_run
 from parser import iter_log_messages
-from plotter import generate_plots_and_sheets
-
-import pandas as pd
-import numpy as np
+from plotter import export_aggregated_summary, generate_plots_and_sheets
 
 FILE_PATTERN = re.compile(r"^(c\d+)[_-](.*)run[_-](\d+)\.log$", re.I)
 
+OUTPUT_DIR = Path(
+    "telematic_system/scripts/rsu_management_service_analysis/output"
+)
 
-def process_log_file(log_path: Path, all_messages: list) -> int:
-    if not log_path or not log_path.exists():
-        return 0
-    count = 0
-    for msg in iter_log_messages(str(log_path)):
-        all_messages.append(msg)
-        count += 1
-    return count
+_LOCAL_TZ = zoneinfo.ZoneInfo("America/New_York")
+_UTC = timezone.utc
+
+_LATENCY_P95_THRESHOLD_MS = 1000.0
 
 
-def main():
+def _parse_local_dt(value: str) -> datetime:
+    """Parse a naive datetime string as America/New_York, return UTC-aware."""
+    try:
+        dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        dt = datetime.strptime(value, "%Y-%m-%d")
+    return dt.replace(tzinfo=_LOCAL_TZ).astimezone(_UTC)
+
+
+def _collect_messages(
+    log_path: Path,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+) -> tuple[list, int]:
+    messages = []
+    for msg in iter_log_messages(str(log_path), start_time=start_time, end_time=end_time):
+        messages.append(msg)
+    return messages, len(messages)
+
+
+def _print_run_summary(
+    test_id: str, run_id: str, results: Dict[str, Any]
+) -> None:
+    overall = results["drops"]["overall"]
+    status = "PASS" if overall["drop_pct"] <= 1.0 else "FAIL"
+    print(
+        f"  Completeness [{status}]  "
+        f"{overall['rsu_received']:,}/{overall['tru_published']:,} matched  "
+        f"({overall['drop_pct']:.2f}% drop)"
+    )
+
+    lat_stats = results["latency"]["stats"]
+    if lat_stats:
+        lat_status = (
+            "PASS" if lat_stats["p95"] < _LATENCY_P95_THRESHOLD_MS else "FAIL"
+        )
+        print(
+            f"  Latency      [{lat_status}]  "
+            f"mean={lat_stats['mean']:.1f}ms  "
+            f"p95={lat_stats['p95']:.1f}ms  "
+            f"std={lat_stats['std']:.1f}ms  "
+            f"(threshold: p95 < {_LATENCY_P95_THRESHOLD_MS:.0f}ms)"
+        )
+    else:
+        print("  Latency      [N/A]  no latency data available")
+
+    rsu_tp = results["throughput"]["rsu"]["stats"]
+    if rsu_tp:
+        print(
+            f"  Throughput   "
+            f"mean={rsu_tp['mean']:.2f} KB/s  "
+            f"p95={rsu_tp['p95']:.2f} KB/s  "
+            f"std={rsu_tp['std']:.2f} KB/s"
+        )
+    else:
+        print("  Throughput   [N/A]  no throughput data available")
+
+    rsus = list(results["rsu_ip_counts"].keys())
+    print(f"  RSU IPs      {', '.join(rsus) if rsus else 'none'}")
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(description="RSU Log Analysis Script")
     parser.add_argument(
         "-t",
@@ -38,8 +98,34 @@ def main():
         default="telematic_system/scripts/rsu_management_service_analysis/logs",
         help="Path to logs directory.",
     )
-    parser.add_argument("--no-plots", action="store_true", help="Disable plot export.")
-    parser.add_argument("--no-csv", action="store_true", help="Disable CSV export.")
+    parser.add_argument(
+        "--start",
+        type=str,
+        default=None,
+        metavar="DATETIME",
+        help=(
+            "Only include log messages at or after this time "
+            "(America/New_York). "
+            'Formats: "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD".'
+        ),
+    )
+    parser.add_argument(
+        "--end",
+        type=str,
+        default=None,
+        metavar="DATETIME",
+        help=(
+            "Only include log messages at or before this time "
+            "(America/New_York). "
+            'Formats: "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD".'
+        ),
+    )
+    parser.add_argument(
+        "--no-plots", action="store_true", help="Disable plot export."
+    )
+    parser.add_argument(
+        "--no-csv", action="store_true", help="Disable CSV export."
+    )
     args = parser.parse_args()
 
     logs_dir = Path(args.dir)
@@ -47,17 +133,47 @@ def main():
         print(f"[!] Logs directory not found: {logs_dir.resolve()}")
         return
 
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+
+    if args.start:
+        try:
+            start_time = _parse_local_dt(args.start)
+        except ValueError:
+            print(
+                f'[!] Invalid --start value: "{args.start}". '
+                'Use "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD".'
+            )
+            return
+
+    if args.end:
+        try:
+            end_time = _parse_local_dt(args.end)
+        except ValueError:
+            print(
+                f'[!] Invalid --end value: "{args.end}". '
+                'Use "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD".'
+            )
+            return
+
+    if start_time and end_time and start_time >= end_time:
+        print("[!] --start must be earlier than --end.")
+        return
+
     outputs = []
     if not args.no_plots:
         outputs.append("plots")
     if not args.no_csv:
         outputs.append("csv")
-    output_label = ", ".join(outputs) if outputs else "none"
 
     print(f"\nLogs:    {logs_dir.resolve()}")
     if args.test:
         print(f"Filter:  {args.test}")
-    print(f"Export:  {output_label}\n")
+    if start_time:
+        print(f"Start:   {args.start} (ET)  →  {start_time.isoformat()} UTC")
+    if end_time:
+        print(f"End:     {args.end} (ET)  →  {end_time.isoformat()} UTC")
+    print(f"Export:  {', '.join(outputs) if outputs else 'none'}\n")
 
     runs: dict = defaultdict(lambda: defaultdict(dict))
     for log_path in logs_dir.rglob("*.log"):
@@ -74,6 +190,7 @@ def main():
             runs[test_id][run_id]["tru"] = log_path
 
     total_runs = 0
+    labeled_results: list[tuple[str, Dict[str, Any]]] = []
 
     for test_id, test_runs in sorted(runs.items()):
         for run_id, files in sorted(test_runs.items()):
@@ -81,56 +198,31 @@ def main():
             tru_log = files.get("tru")
             if not mgmt_log or not tru_log:
                 continue
-    
+
             total_runs += 1
             print(f"{'─' * 60}")
             print(f"  Test {test_id}  |  Run {run_id}")
             print(f"  mgmt: {mgmt_log.name}")
             print(f"  tru:  {tru_log.name}")
             print(f"{'─' * 60}")
-    
-            all_messages = []
-            mgmt_count = process_log_file(mgmt_log, all_messages)
-            tru_count = process_log_file(tru_log, all_messages)
-            results = analyze_system_performance(all_messages)
-    
+
+            mgmt_messages, mgmt_count = _collect_messages(
+                mgmt_log, start_time=start_time, end_time=end_time
+            )
+            tru_messages, tru_count = _collect_messages(
+                tru_log, start_time=start_time, end_time=end_time
+            )
+            results = analyze_run(mgmt_messages + tru_messages)
+
             print(
                 f"  Parsed       mgmt={results['rsu_count']:,}  "
                 f"tru={results['tru_count']:,}  "
                 f"total={mgmt_count + tru_count:,}"
             )
-    
-            overall = results.get("drops", {}).get("overall", {})
-            if overall:
-                status = "PASS" if overall["drop_pct"] <= 1.0 else "FAIL"
-                print(
-                    f"  Completeness [{status}]  "
-                    f"{overall['rsu_received']:,}/{overall['tru_published']:,} matched  "
-                    f"({overall['drop_pct']:.2f}% drop)"
-                )
-    
-            latency_stats = results.get("latency", {}).get("stats", {})
-            if latency_stats:
-                print(
-                    f"  Latency      "
-                    f"mean={latency_stats['mean']:.1f}ms  "
-                    f"p95={latency_stats['p95']:.1f}ms  "
-                    f"std={latency_stats['std']:.1f}ms"
-                )
-    
-            per_topic = results.get("drops", {}).get("per_topic", {})
-            if per_topic:
-                for topic, stats in sorted(per_topic.items()):
-                    t_status = "PASS" if stats["drop_pct"] <= 1.0 else "FAIL"
-                    print(
-                        f"    {topic:<40}  [{t_status}]  "
-                        f"{stats['rsu_received']:,}/{stats['tru_published']:,}  "
-                        f"({stats['drop_pct']:.2f}% drop)"
-                    )
-    
-            rsus = list(results.get("rsu_ip_counts", {}).keys())
-            print(f"  RSU IPs      {', '.join(rsus) if rsus else 'none'}")
-    
+            _print_run_summary(test_id, run_id, results)
+
+            labeled_results.append((test_id, results))
+
             if not args.no_plots or not args.no_csv:
                 generate_plots_and_sheets(
                     test_id,
@@ -139,117 +231,23 @@ def main():
                     export_plots=not args.no_plots,
                     export_csv=not args.no_csv,
                 )
-                
+
     print(f"{'─' * 60}")
     if total_runs == 0:
         print("[!] No paired log files found.")
         return
-    else:
-        print(f"[✓] {total_runs} run(s) processed.")
+
+    print(f"[✓] {total_runs} run(s) processed.")
     print()
-    
-    base_output_dir = logs_dir.parent / "output"
-    if not base_output_dir.exists():
-        print(f"[!] Output directory not found: {base_output_dir.resolve()}")
-        return
-    
-    output_file = base_output_dir / "aggregated_test_cases_summary.csv"
-    all_data = []
-    
-    for item in sorted(base_output_dir.iterdir()):
-        if item.is_dir():
-            csv_path = item / "data_summary.csv"
-            if csv_path.exists():
-                try:
-                    all_data.append(pd.read_csv(csv_path))
-                except Exception as e:
-                    print(f"  [!] Error reading {csv_path}: {e}")
-    
-    if not all_data:
-        print("[!] No 'data_summary.csv' files found to aggregate.")
-        return
-    
-    combined = pd.concat(all_data, ignore_index=True)
-    combined.columns = combined.columns.str.strip()
-    
-    aggregated_rows = []
-    
-    for test_case, group in combined.groupby("test_case"):
-        tru_published = group["tru_published"].sum()
-        rsu_received = group["rsu_received"].sum()
-        total_dropped = group["total_dropped"].sum()
-        drop_rate_pct = (
-            round(total_dropped / tru_published * 100.0, 3) if tru_published > 0 else 0.0
+
+    if not args.no_csv and labeled_results:
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        output_file = OUTPUT_DIR / "aggregated_test_cases_summary.csv"
+        aggregated = aggregate_runs(labeled_results)
+        export_aggregated_summary(aggregated, output_file)
+        print(
+            f"[✓] Aggregated summary saved to:\n    {output_file.resolve()}\n"
         )
-    
-        def pooled_std(
-            ns: np.ndarray, means: np.ndarray, stds: np.ndarray
-        ) -> float:
-            total_n = ns.sum()
-            if total_n <= 0:
-                return float("nan")
-            grand_mean = float(np.sum(ns * means) / total_n)
-            pooled_var = float(
-                np.sum(ns * (stds**2 + means**2)) / total_n - grand_mean**2
-            )
-            return float(np.sqrt(max(pooled_var, 0.0)))
-    
-        # Latency — weighted mean + pooled std
-        lat_weights = group["rsu_received"].values.astype(float)
-        lat_means = group["mean_latency_ms"].values.astype(float)
-        lat_stds = group["std_latency_ms"].values.astype(float)
-        total_lat_weight = lat_weights.sum()
-    
-        weighted_mean_latency = (
-            float(np.average(lat_means, weights=lat_weights))
-            if total_lat_weight > 0
-            else float("nan")
-        )
-        pooled_std_latency = pooled_std(lat_weights, lat_means, lat_stds)
-    
-        # Throughput — weighted mean + pooled std (now that we have sample counts)
-        tp_ns = group["rsu_throughput_sample_count"].values.astype(float)
-        tp_means = group["mean_rsu_throughput_kbps"].values.astype(float)
-        tp_stds = group["std_rsu_throughput_kbps"].values.astype(float)
-        total_tp_weight = tp_ns.sum()
-    
-        weighted_mean_throughput = (
-            float(np.average(tp_means, weights=tp_ns))
-            if total_tp_weight > 0
-            else float("nan")
-        )
-        pooled_std_throughput = pooled_std(tp_ns, tp_means, tp_stds)
-    
-        aggregated_rows.append(
-            {
-                "test_case": test_case,
-                "runs_aggregated": len(group),
-                # Drop analysis
-                "tru_published": int(tru_published),
-                "rsu_received": int(rsu_received),
-                "total_dropped": int(total_dropped),
-                "drop_rate_pct": drop_rate_pct,
-                # Latency
-                "mean_latency_ms": round(weighted_mean_latency, 4),
-                "pooled_std_latency_ms": round(pooled_std_latency, 4),
-                "max_latency_ms": round(group["max_latency_ms"].max(), 4),
-                # RSU throughput
-                "mean_rsu_throughput_kbps": round(weighted_mean_throughput, 4),
-                "pooled_std_rsu_throughput_kbps": round(pooled_std_throughput, 4),
-                "min_rsu_throughput_kbps": round(
-                    group["min_rsu_throughput_kbps"].min(), 4
-                ),
-                "max_rsu_throughput_kbps": round(
-                    group["max_rsu_throughput_kbps"].max(), 4
-                ),
-                # Misc
-                "unique_rsus_seen": int(group["unique_rsus_seen"].max()),
-            }
-        )
-    
-    aggregated_df = pd.DataFrame(aggregated_rows)
-    aggregated_df.to_csv(output_file, index=False)
-    print(f"[✓] Aggregated summary saved to:\n    {output_file.resolve()}\n")
 
 
 if __name__ == "__main__":
