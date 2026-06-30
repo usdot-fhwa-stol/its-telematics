@@ -82,3 +82,10 @@ rsu_influx:
     batch-size: ${rsu_influx_write_batch_size:5000}
     flush-interval-ms: ${rsu_influx_write_flush_interval_ms:10}
     queue-capacity: ${rsu_influx_write_queue_capacity:50000}
+
+perf:
+  metrics:
+    # Enable performance checkpoint timestamp logging for latency analysis.
+    # Set PERF_METRICS_ENABLED=true to activate all checkpoint logs:
+    #   [PERF][TRANSIT_DELAY_NATS]  - ingress to NATS receive delay
+    enabled: ${PERF_METRICS_ENABLED:false}

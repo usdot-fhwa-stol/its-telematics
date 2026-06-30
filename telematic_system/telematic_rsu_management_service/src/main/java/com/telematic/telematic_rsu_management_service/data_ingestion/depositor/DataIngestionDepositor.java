@@ -48,6 +48,9 @@ public class DataIngestionDepositor {
     @Value("${rsu_influx.write.queue-capacity:50000}")
     private int queueCapacity;
 
+    @Value("${perf.metrics.enabled:false}")
+    private boolean perfMetricsEnabled;
+
     private LinkedBlockingQueue<String> queue;
     private volatile boolean running = false;
     private Thread writerThread;
@@ -140,6 +143,11 @@ public class DataIngestionDepositor {
             
             if (queue != null) {
                 boolean enqueued = queue.offer(line);
+                if (perfMetricsEnabled) {
+                    long tsMessageTransform = System.currentTimeMillis();
+                    log.info("[PERF][MESSAGE_TRANSFORM] line={} perf_ts_message_transform={} enqueued={}",
+                            line, tsMessageTransform, enqueued);
+                }
                 if (!enqueued) {
                     log.warn("Influx writer queue full; dropping write. Queue size: {}", queue.size());
                 }
