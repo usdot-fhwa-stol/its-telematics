@@ -48,7 +48,7 @@ services:
       - influxdb3_plugins:/var/lib/influxdb3/plugins
 
   mysqldb:
-    image: mysql:5.7
+    image: mysql:9.7.1
     profiles:
       - default
       - rsu_integration
@@ -128,7 +128,6 @@ services:
       depends_on:
         - mysqldb
         - grafana
-        - rsu_management_service
       env_file:
         - .env
       command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:3000 && /app/service.sh'
