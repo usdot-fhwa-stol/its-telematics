@@ -88,7 +88,7 @@ services:
   grafana:
       build:
         context: "./telematic_apps/grafana"
-      image: usdotfhwastoldev/telematic_grafana:develop
+      image: ${DOCKER_ORG}/telematic_grafana:${DOCKER_TAG}
       profiles:
         - rsu_integration
         - default
@@ -114,7 +114,7 @@ services:
       build:
         context: "./telematic_apps/web_app/server"
         dockerfile: "Dockerfile"
-      image: usdotfhwastoldev/telematic_web_server:develop
+      image: ${DOCKER_ORG}/telematic_web_server:${DOCKER_TAG}
       profiles:
         - rsu_integration
         - default
@@ -138,7 +138,7 @@ services:
   web_client:
     build:
       context: "./telematic_apps/web_app/client"
-    image: usdotfhwastoldev/telematic_web_client:develop
+    image: ${DOCKER_ORG}/telematic_web_client:${DOCKER_TAG}
     profiles:
       - rsu_integration
       - default
@@ -156,7 +156,7 @@ services:
     build:
       context: "./telematic_apps/apache2"
       dockerfile: "./local.Dockerfile"
-    image: usdotfhwastoldev/telematic_local_apache2:develop
+    image: ${DOCKER_ORG}/telematic_local_apache2:${DOCKER_TAG}
     profiles:
       - rsu_integration
       - default
@@ -184,7 +184,7 @@ services:
     build:
       context: "./telematic_cloud_messaging"
     container_name: messaging_server
-    image: usdotfhwastoldev/telematic_cloud_messaging:develop
+    image: ${DOCKER_ORG}/telematic_cloud_messaging:${DOCKER_TAG}
     profiles:
       - default
     depends_on:
@@ -205,7 +205,7 @@ services:
     build:
       context: "./telematic_rsu_management_service"
     container_name: rsu_management_service
-    image: usdotfhwastoldev/telematic_rsu_management_service:develop
+    image: ${DOCKER_ORG}/telematic_rsu_management_service:${DOCKER_TAG}
     profiles:
       - rsu_integration
     depends_on:
@@ -229,7 +229,7 @@ services:
           context: ./telematic_historical_data_processing
           dockerfile: Dockerfile
           network: host
-    image: usdotfhwastoldev/telematic_historical_data_processing:develop
+    image: ${DOCKER_ORG}/telematic_historical_data_processing:${DOCKER_TAG}
     container_name: rosbag2_processing_service
     restart: always
     profiles:
