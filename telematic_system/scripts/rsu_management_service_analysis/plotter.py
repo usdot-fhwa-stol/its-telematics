@@ -7,10 +7,11 @@ import seaborn as sns
 
 from analyzer import Stats
 
-sns.set_theme(style="darkgrid")
-
 import zoneinfo
 from datetime import datetime
+
+sns.set_theme(style="darkgrid")
+
 LOCAL_TZ = zoneinfo.ZoneInfo("America/New_York")
 
 def _apply_time_bounds(
