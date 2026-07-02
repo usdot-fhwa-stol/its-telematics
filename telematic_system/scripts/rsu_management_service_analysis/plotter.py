@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -9,7 +9,20 @@ from analyzer import Stats
 
 sns.set_theme(style="darkgrid")
 
+import zoneinfo
+from datetime import datetime
+LOCAL_TZ = zoneinfo.ZoneInfo("America/New_York")
 
+def _apply_time_bounds(
+    ax,
+    start_time: Optional[datetime],
+    end_time: Optional[datetime],
+) -> None:
+    left = start_time.astimezone(LOCAL_TZ) if start_time else None
+    right = end_time.astimezone(LOCAL_TZ) if end_time else None
+    if left or right:
+        ax.set_xlim(left=left, right=right)
+        
 def _plot_latency_over_time(
     latency_timestamps: list,
     raw_latencies: list,
@@ -17,10 +30,12 @@ def _plot_latency_over_time(
     test_case: str,
     run_id: str,
     output_dir: Path,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
 ) -> None:
     df = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(latency_timestamps, errors="coerce"),
+            "timestamp": pd.to_datetime(latency_timestamps, utc=True).tz_convert(LOCAL_TZ),
             "latency_ms": [float(x) for x in raw_latencies],
         }
     ).sort_values("timestamp")
@@ -57,7 +72,8 @@ def _plot_latency_over_time(
             label="Threshold (500 ms)",
         )
 
-    ax.set_xlabel("Time (UTC)", fontsize=13)
+    _apply_time_bounds(ax, start_time, end_time)
+    ax.set_xlabel("Time (ET)", fontsize=13)
     ax.set_ylabel("Latency (ms)", fontsize=13)
     ax.set_title(f"Test {test_case} Run {run_id} — End-to-End Latency", fontsize=14)
     ax.legend(loc="upper right")
@@ -72,8 +88,11 @@ def _plot_rsu_throughput(
     test_case: str,
     run_id: str,
     output_dir: Path,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
 ) -> None:
     df = pd.DataFrame(series, columns=["second", "kb_per_sec"])
+    df["second"] = pd.to_datetime(df["second"], utc=True).dt.tz_convert(LOCAL_TZ)
     df["rolling"] = df["kb_per_sec"].rolling(window=10, min_periods=1).mean()
 
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -95,7 +114,8 @@ def _plot_rsu_throughput(
         linewidth=2,
         ax=ax,
     )
-    ax.set_xlabel("Time (UTC)")
+    _apply_time_bounds(ax, start_time, end_time)
+    ax.set_xlabel("Time (ET)", fontsize=13)
     ax.set_ylabel("Throughput (KB/s)")
     ax.set_title(
         f"Test {test_case} Run {run_id} — RSU Management Service Throughput"
@@ -178,6 +198,8 @@ def generate_plots_and_sheets(
     results: Dict[str, Any],
     export_plots: bool = True,
     export_csv: bool = True,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
 ) -> None:
     output_dir = (
         Path("telematic_system/scripts/rsu_management_service_analysis/output")
@@ -197,9 +219,11 @@ def generate_plots_and_sheets(
                 test_case,
                 run_id,
                 output_dir,
+                start_time,
+                end_time,
             )
         if rsu_series:
-            _plot_rsu_throughput(rsu_series, test_case, run_id, output_dir)
+            _plot_rsu_throughput(rsu_series, test_case, run_id, output_dir, start_time, end_time)
 
     if export_csv:
         _export_run_csv(test_case, run_id, results, output_dir)

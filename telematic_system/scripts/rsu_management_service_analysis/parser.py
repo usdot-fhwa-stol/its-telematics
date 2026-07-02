@@ -26,7 +26,7 @@ _JSON_RE = re.compile(r"(\{.*)", re.DOTALL)
 
 _SOURCE_TIMEZONE: dict[str, zoneinfo.ZoneInfo | timezone] = {
     "tru_instance": EDT,
-    "rsu_management_service": UTC,
+    "rsu_management_service": UTC,  # if mgmt logs are also local time
 }
 
 
@@ -103,10 +103,21 @@ def _extract_time_key(
     return str(ts) if ts is not None else None
 
 
+_TIMESTAMP_FORMATS = [
+    "%Y-%m-%d %H:%M:%S.%f",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d",
+]
+
 def _parse_timestamp(raw_ts: str, source: str) -> datetime:
     tz = _SOURCE_TIMEZONE[source]
-    dt = datetime.strptime(raw_ts, "%Y-%m-%d %H:%M:%S.%f")
-    return dt.replace(tzinfo=tz).astimezone(UTC)
+    for fmt in _TIMESTAMP_FORMATS:
+        try:
+            dt = datetime.strptime(raw_ts, fmt)
+            return dt.replace(tzinfo=tz).astimezone(UTC)
+        except ValueError:
+            continue
+    raise ValueError(f"Unrecognised timestamp format: {raw_ts!r}")
 
 
 def _within_window(
@@ -115,7 +126,7 @@ def _within_window(
     end_time: Optional[datetime],
 ) -> bool:
     if ts is None:
-        return start_time is None and end_time is None
+        return False
     if start_time is not None and ts < start_time:
         return False
     if end_time is not None and ts > end_time:
@@ -136,7 +147,7 @@ def iter_log_messages(
 
     filter_active = start_time is not None or end_time is not None
 
-    source = level = origin = log_time = None
+    source = level = origin = None
     message_parts: list[str] = []
 
     def flush() -> Optional[LogMessage]:
@@ -188,7 +199,12 @@ def iter_log_messages(
                 )
                 level = match_dict.get("level")
                 origin = match_dict.get("file") or match_dict.get("class")
-                log_time = _parse_timestamp(match_dict["ts"], source)
+                try:
+                    log_time = _parse_timestamp(match_dict["ts"], source)
+                except ValueError as e:
+                    logger.warning("Timestamp parse failed: %s", e)
+                    source = None
+                    continue
                 message_parts = [match_dict["msg"]]
             elif source:
                 message_parts.append(cleaned)
