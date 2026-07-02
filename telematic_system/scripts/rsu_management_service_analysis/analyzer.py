@@ -1,8 +1,10 @@
 import math
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, TypedDict
+from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from models import LogMessage
 
@@ -210,56 +212,59 @@ def analyze_run(all_messages: List[LogMessage]) -> Dict[str, Any]:
     }
 
 
-def aggregate_runs(
-    labeled_results: list[tuple[str, Dict[str, Any]]],
+def aggregate_from_csvs(
+    output_dir: Path,
+    test_filter: Optional[str] = None,
 ) -> Dict[str, Dict[str, Any]]:
-    by_test: Dict[str, list[Dict[str, Any]]] = defaultdict(list)
-    for test_id, result in labeled_results:
-        by_test[test_id].append(result)
+    by_test: Dict[str, list] = defaultdict(list)
+
+    for csv_path in output_dir.glob("*/data_summary.csv"):
+        folder = csv_path.parent.name
+        parts = folder.rsplit("_run_", 1)
+        if len(parts) != 2:
+            continue
+        test_case, run_id = parts
+        if test_filter and test_case.lower() != test_filter.lower():
+            continue
+        try:
+            df = pd.read_csv(csv_path)
+        except Exception:
+            continue
+        if df.empty:
+            continue
+        by_test[test_case].append(df.iloc[0].to_dict())
 
     aggregated: Dict[str, Dict[str, Any]] = {}
 
-    for test_id, results in by_test.items():
-        tru_published = sum(
-            r["drops"]["overall"]["tru_published"] for r in results
-        )
-        rsu_received = sum(
-            r["drops"]["overall"]["rsu_received"] for r in results
-        )
-        total_dropped = sum(r["drops"]["overall"]["dropped"] for r in results)
+    for test_id, rows in by_test.items():
+        tru_published = sum(r["tru_published"] for r in rows)
+        rsu_received = sum(r["rsu_received"] for r in rows)
+        total_dropped = sum(r["total_dropped"] for r in rows)
         drop_rate_pct = (
             round(total_dropped / tru_published * 100.0, 3)
             if tru_published > 0
             else 0.0
         )
 
-        lat_weights = np.array(
-            [r["drops"]["overall"]["rsu_received"] for r in results], dtype=float
-        )
-        lat_stats = [r["latency"]["stats"] for r in results]
-        lat_means = np.array(
-            [s["mean"] if s else float("nan") for s in lat_stats], dtype=float
-        )
-        lat_stds = np.array(
-            [s["std"] if s else float("nan") for s in lat_stats], dtype=float
-        )
+        lat_weights = np.array([r["rsu_received"] for r in rows], dtype=float)
+        lat_means = np.array([r["mean_latency_ms"] for r in rows], dtype=float)
+        lat_stds = np.array([r["std_latency_ms"] for r in rows], dtype=float)
         weighted_mean_latency = (
             float(np.average(lat_means, weights=lat_weights))
             if lat_weights.sum() > 0
             else float("nan")
         )
-        max_latency = max(
-            (s["max"] for s in lat_stats if s), default=float("nan")
-        )
+        max_latency = float(np.nanmax([r["max_latency_ms"] for r in rows]))
 
-        rsu_tp_stats = [
-            r["throughput"]["rsu"]["stats"]
-            for r in results
-            if r["throughput"]["rsu"]["stats"]
-        ]
-        tp_ns = np.array([s["count"] for s in rsu_tp_stats], dtype=float)
-        tp_means = np.array([s["mean"] for s in rsu_tp_stats], dtype=float)
-        tp_stds = np.array([s["std"] for s in rsu_tp_stats], dtype=float)
+        tp_ns = np.array(
+            [r["rsu_throughput_sample_count"] for r in rows], dtype=float
+        )
+        tp_means = np.array(
+            [r["mean_rsu_throughput_kbps"] for r in rows], dtype=float
+        )
+        tp_stds = np.array(
+            [r["std_rsu_throughput_kbps"] for r in rows], dtype=float
+        )
         weighted_mean_throughput = (
             float(np.average(tp_means, weights=tp_ns))
             if tp_ns.sum() > 0
@@ -267,7 +272,7 @@ def aggregate_runs(
         )
 
         aggregated[test_id] = {
-            "runs_aggregated": len(results),
+            "runs_aggregated": len(rows),
             "tru_published": tru_published,
             "rsu_received": rsu_received,
             "total_dropped": total_dropped,
@@ -285,15 +290,15 @@ def aggregate_runs(
                     _pooled_std(tp_ns, tp_means, tp_stds), 4
                 ),
                 "min_kbps": round(
-                    min((s["min"] for s in rsu_tp_stats), default=float("nan")), 4
+                    float(np.nanmin([r["min_rsu_throughput_kbps"] for r in rows])), 4
                 ),
                 "max_kbps": round(
-                    max((s["max"] for s in rsu_tp_stats), default=float("nan")), 4
+                    float(np.nanmax([r["max_rsu_throughput_kbps"] for r in rows])), 4
                 ),
                 "sample_count": int(tp_ns.sum()),
             },
             "unique_rsus_seen": max(
-                (len(r["rsu_ip_counts"]) for r in results), default=0
+                (r["unique_rsus_seen"] for r in rows), default=0
             ),
         }
 

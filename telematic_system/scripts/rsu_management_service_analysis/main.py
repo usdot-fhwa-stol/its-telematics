@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from analyzer import aggregate_runs, analyze_run
+from analyzer import aggregate_from_csvs, analyze_run
 from parser import iter_log_messages
 from plotter import export_aggregated_summary, generate_plots_and_sheets
 
@@ -284,7 +284,6 @@ def main() -> None:
         print(f"End:     {args.end} (ET)  →  {end_time.isoformat()} UTC")
     print(f"Export:  {', '.join(outputs) if outputs else 'none'}\n")
 
-    # --- Analysis pass (respects --run, --start, --end) ---
     filtered_runs = _discover_runs(
         logs_dir, test_filter=args.test, run_filter=args.run
     )
@@ -304,26 +303,18 @@ def main() -> None:
     print(f"[✓] {total_runs} run(s) processed.")
     print()
 
-    # --- Aggregate pass (respects --test only, ignores --run/--start/--end) ---
     if not args.no_csv and not args.no_aggregate:
-        seen_test_ids = {tid for tid, _ in labeled_results}
-        if seen_test_ids:
-            all_runs = _discover_runs(logs_dir, test_filter=args.test)
-            aggregate_labeled, _ = _process_runs(
-                all_runs,
-                start_time=None,
-                end_time=None,
-                export_plots=False,
-                export_csv=False,
-                silent=True,
-            )
-            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-            output_file = OUTPUT_DIR / "aggregated_test_cases_summary.csv"
-            aggregated = aggregate_runs(aggregate_labeled)
-            export_aggregated_summary(aggregated, output_file)
-            print(
-                f"[✓] Aggregated summary saved to:\n    {output_file.resolve()}\n"
-            )
+            aggregated = aggregate_from_csvs(OUTPUT_DIR, test_filter=args.test)
+            if aggregated:
+                OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+                output_file = OUTPUT_DIR / "aggregated_test_cases_summary.csv"
+                export_aggregated_summary(aggregated, output_file)
+                print(
+                    f"[✓] Aggregated summary ({sum(v['runs_aggregated'] for v in aggregated.values())} run(s)) saved to:\n"
+                    f"    {output_file.resolve()}\n"
+                )
+            else:
+                print("[!] No per-run data_summary.csv files found in output folder for aggregation.")
 
 
 if __name__ == "__main__":
