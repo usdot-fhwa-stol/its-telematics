@@ -44,7 +44,7 @@ def _plot_latency_over_time(
     ax.plot(
         df["timestamp"],
         df["latency_ms"],
-        color="steelblue",
+        color="blue",
         alpha=0.5,
         linewidth=1,
         label="Latency",
@@ -101,7 +101,7 @@ def _plot_rsu_throughput(
         x="second",
         y="kb_per_sec",
         label="Throughput",
-        color="steelblue",
+        color="blue",
         alpha=0.3,
         ax=ax,
     )
