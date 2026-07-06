@@ -26,7 +26,7 @@ _JSON_RE = re.compile(r"(\{.*)", re.DOTALL)
 
 _SOURCE_TIMEZONE: dict[str, zoneinfo.ZoneInfo | timezone] = {
     "tru_instance": EDT,
-    "rsu_management_service": UTC,  # if mgmt logs are also local time
+    "rsu_management_service": UTC,
 }
 
 
