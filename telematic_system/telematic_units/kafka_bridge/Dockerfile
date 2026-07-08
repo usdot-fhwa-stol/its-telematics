@@ -10,6 +10,12 @@ WORKDIR /ws
 
 ADD kafka_nats_bridge src/kafka_nats_bridge
 
+RUN addgroup -S app && \
+    adduser -S app -G app && \
+    chown -R app:app /ws
+
+USER app
+
 WORKDIR /ws/src/kafka_nats_bridge/src
 
 CMD [ "python", "-u", "main.py" ]
