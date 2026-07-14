@@ -39,6 +39,7 @@ import ServerContext from '../context/server-context';
 import { getMobileWrapperStyles, getMobileContainerStyles, getMobileBoxStyles } from '../utils/mobileStyles';
 
 const theme = createTheme();
+const hasValidScheme = (url) => /^https?:\/\//i.test(url.trim());
 
 const ServerConfigPage = React.memo(() => {
   const serverContext = useContext(ServerContext);
@@ -83,6 +84,20 @@ const ServerConfigPage = React.memo(() => {
 
     if (!serverUrl.trim()) {
       setError('Please enter a server URL.');
+      setShowError(true);
+      setTesting(false);
+      return;
+    }
+
+    if (!hasValidScheme(serverUrl)) {
+      setError('Server URL must start with http:// or https://');
+      setShowError(true);
+      setTesting(false);
+      return;
+    }
+
+    if (useCustomGrafana && customGrafanaUri.trim() && !hasValidScheme(customGrafanaUri)) {
+      setError('Grafana URL must start with http:// or https://');
       setShowError(true);
       setTesting(false);
       return;
@@ -143,6 +158,12 @@ const ServerConfigPage = React.memo(() => {
               placeholder="https://example.com"
               value={serverUrl}
               onChange={(e) => setServerUrl(e.target.value)}
+              error={serverUrl.trim().length > 0 && !hasValidScheme(serverUrl)}
+              helperText={
+                serverUrl.trim().length > 0 && !hasValidScheme(serverUrl)
+                  ? 'Must start with http:// or https://'
+                  : ' '
+              }
               sx={{ mb: 2 }}
             />
 
@@ -191,6 +212,12 @@ const ServerConfigPage = React.memo(() => {
                   placeholder="http://###.###.###.###"
                   value={customGrafanaUri}
                   onChange={(e) => setCustomGrafanaUri(e.target.value)}
+                  error={customGrafanaUri.trim().length > 0 && !hasValidScheme(customGrafanaUri)}
+                  helperText={
+                    customGrafanaUri.trim().length > 0 && !hasValidScheme(customGrafanaUri)
+                      ? 'Must start with http:// or https://'
+                      : ' '
+                  }
                   sx={{ mt: 1 }}
                 />
               </Collapse>
