@@ -14,5 +14,5 @@
 #  License for the specific language governing permissions and limitations under
 #  the License.
 
-source /opt/ros/foxy/setup.bash
+source /opt/ros/humble/setup.bash
 colcon build
