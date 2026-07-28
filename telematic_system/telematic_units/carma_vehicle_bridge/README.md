@@ -49,6 +49,23 @@ command to start the container :
 
 	docker run -ti --rm --name ros2_nats_bridge --network host ros2-nats-bridge:latest bash
 
+with env:
+
+	sudo docker run -ti --rm --name ros2_nats_bridge \
+  --network host \
+  -e VEHICLE_BRIDGE_UNIT_ID="my_unit" \
+  -e VEHICLE_BRIDGE_UNIT_TYPE="car" \
+  -e VEHICLE_BRIDGE_UNIT_NAME="my_car" \
+  -e NATS_SERVER_IP_PORT="nats://127.0.0.1:4222" \
+  -e IS_SIM="false" \
+  -e VEHICLE_BRIDGE_LOG_LEVEL="debug" \
+  -e VEHICLE_BRIDGE_LOG_NAME="bridge" \
+  -e VEHICLE_BRIDGE_LOG_PATH="/tmp/" \
+  -e VEHICLE_BRIDGE_LOG_ROTATION_SIZE_BYTES="10485760" \
+  -e VEHICLE_BRIDGE_LOG_HANDLER_TYPE="console" \
+  -e VEHICLE_BRIDGE_EXCLUSION_LIST="/rosout" \
+  ros2-nats-bridge:latest bash
+
 ### Unit Tests
 
 Run the unit tests with

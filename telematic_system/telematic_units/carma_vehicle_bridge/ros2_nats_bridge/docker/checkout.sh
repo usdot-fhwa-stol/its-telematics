@@ -44,16 +44,16 @@ if [[ "$BRANCH" = "develop" ]]; then
       git clone --depth=1 https://github.com/usdot-fhwa-stol/carma-msgs.git --branch  $BRANCH
       git clone --depth=1 https://github.com/usdot-fhwa-stol/novatel_gps_driver.git --branch $BRANCH
 else
-      git clone --depth=1 https://github.com/usdot-fhwa-stol/carma-msgs.git --branch carma-system-4.5.0
+      git clone --depth=1 https://github.com/usdot-fhwa-stol/carma-msgs.git --branch carma-system-4.11.0
       git clone --depth=1 https://github.com/usdot-fhwa-stol/novatel_gps_driver.git --branch carma-system-4.5.0
 fi
 
-sudo git clone https://github.com/NewEagleRaptor/raptor-dbw-ros2.git raptor-dbw-ros2 --branch humble
-cd raptor-dbw-ros2
-sudo git reset --hard 4ad958dd07bb9c7128dc75bc7397bc8f5be30a3c
-cd ..
+# sudo git clone https://github.com/NewEagleRaptor/raptor-dbw-ros2.git raptor-dbw-ros2 --branch humble
+# cd raptor-dbw-ros2
+# sudo git reset --hard 4ad958dd07bb9c7128dc75bc7397bc8f5be30a3c
+# cd ..
 
-rm -rf can_dbc_parser raptor_dbw_can raptor_dbw_joystick raptor_pdu
+# rm -rf can_dbc_parser raptor_dbw_can raptor_dbw_joystick raptor_pdu
 
 # Install automotive_autonomy_msgs
 sudo git clone https://github.com/astuff/automotive_autonomy_msgs.git automotive_autonomy_msgs --branch master
