@@ -48,7 +48,7 @@ else
       git clone --depth=1 https://github.com/usdot-fhwa-stol/novatel_gps_driver.git --branch carma-system-4.5.0
 fi
 
-sudo git clone https://github.com/NewEagleRaptor/raptor-dbw-ros2.git raptor-dbw-ros2 --branch foxy
+sudo git clone https://github.com/NewEagleRaptor/raptor-dbw-ros2.git raptor-dbw-ros2 --branch humble
 cd raptor-dbw-ros2
 sudo git reset --hard 4ad958dd07bb9c7128dc75bc7397bc8f5be30a3c
 cd ..
@@ -78,23 +78,23 @@ sudo rm -rf novatel_oem7_driver
 # Required to build pacmod_msgs
 git clone https://github.com/astuff/astuff_sensor_msgs.git astuff_sensor_msgs --branch 3.0.1
 
-sudo apt-get install -y ros-foxy-lgsvl-msgs \
-                   ros-foxy-udp-msgs \
-                   ros-foxy-rosapi-msgs \
-                   ros-foxy-rosbridge-msgs \
-                   ros-foxy-automotive-platform-msgs \
-                   ros-foxy-gps-msgs \
-                   ros-foxy-nmea-msgs \
-                   ros-foxy-gps-tools \
-                   ros-foxy-osqp-vendor \
-                   ros-foxy-osrf-testing-tools-cpp \
-                   ros-foxy-std-msgs \
-                   ros-foxy-velodyne-msgs \
+sudo apt-get install -y ros-humble-lgsvl-msgs \
+                   ros-humble-udp-msgs \
+                   ros-humble-rosapi-msgs \
+                   ros-humble-rosbridge-msgs \
+                   ros-humble-automotive-platform-msgs \
+                   ros-humble-gps-msgs \
+                   ros-humble-nmea-msgs \
+                   ros-humble-gps-tools \
+                   ros-humble-osqp-vendor \
+                   ros-humble-osrf-testing-tools-cpp \
+                   ros-humble-std-msgs \
+                   ros-humble-velodyne-msgs \
                    apt-transport-https
 
 sudo sh -c 'echo "deb [trusted=yes] https://s3.amazonaws.com/autonomoustuff-repo/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/autonomoustuff-public.list'
 sudo apt update
-sudo apt install -y ros-foxy-pacmod3-msgs ros-foxy-pcl-msgs
+sudo apt install -y ros-humble-pacmod3-msgs ros-humble-pcl-msgs
 
 #autoware ai
 sudo git clone https://github.com/usdot-fhwa-stol/autoware.ai.git

@@ -1,38 +1,36 @@
-FROM ros:foxy-ros1-bridge AS base
+# Use minimal official Humble image
+FROM ros:humble-ros-base
 
 SHELL ["/bin/bash", "-c"]
 
-RUN set -xe \
-    && sudo apt-get update \
-    && sudo apt-get install -y \
-    git \
-    vim \
-    python3-pip
+# Install only what the bridge needs
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    python3-colcon-common-extensions \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN sudo pip install --upgrade pip nats-py
+# Install NATS dependency
+RUN pip3 install --no-cache-dir nats-py
 
-FROM base AS dep
-
+# Set workspace
 WORKDIR /ws
 
+# Copy bridge source
 COPY ros2_nats_bridge src/ros2_nats_bridge
-RUN sudo src/ros2_nats_bridge/docker/checkout.sh
-RUN src/ros2_nats_bridge/docker/install.sh
 
-FROM base AS install
-COPY --from=dep /opt/ros/foxy /opt/ros/foxy
+# Build the bridge
+# Note: If your bridge uses custom message packages from other repos,
+# you must include those packages in the /ws/src folder before building.
+RUN source /opt/ros/humble/setup.bash && \
+    colcon build --packages-select ros2_nats_bridge
 
-WORKDIR /ws
-COPY --from=dep /ws/build /ws/build
-COPY --from=dep /ws/install /ws/install
-# Make ros2_nats_bridge source code available
-COPY --from=dep /ws/src/ros2_nats_bridge /ws/src/
+# Entrypoint script to handle environment sourcing
+COPY ros2_nats_bridge/docker/ros_entrypoint.sh /ros_entrypoint.sh
+RUN chmod +x /ros_entrypoint.sh
 
-COPY ros2_nats_bridge/docker/ros_entrypoint.sh ros_entrypoint.sh
-RUN chmod +x ros_entrypoint.sh
+# Use the bridge user (consistent with your other containers)
+RUN useradd -m bridge_user
+USER bridge_user
 
-RUN sudo rm -rf src /var/lib/apt/lists/*
-
-RUN echo "source /ws/install/setup.bash" >> ~/.bashrc
-
-CMD ["bash"]
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["ros2", "run", "ros2_nats_bridge", "your_node_executable"]

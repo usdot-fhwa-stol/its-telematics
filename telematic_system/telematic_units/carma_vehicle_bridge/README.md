@@ -10,7 +10,12 @@ This is a ros2 nats bridge. this package is meant to create conection between ro
 
 The source code is released under a [Apache-2.0 license](cda-telematics/LICENSE).
 
-The PACKAGE NAME package has been tested under [ROS] foxy on respectively Ubuntu 18.04.
+The PACKAGE NAME package has been tested under [ROS] Humble on respectively Ubuntu 22.04.
+File	Change
+ros_entrypoint.sh:19	source /opt/ros/foxy/setup.bash → humble
+install.sh:17	source /opt/ros/foxy/setup.bash → humble
+checkout.sh	raptor-dbw-ros2 branch foxy → humble; all ros-foxy-* apt packages → ros-humble-* (14 packages)
+README.md:13	Updated tested platform from ROS Foxy / Ubuntu 18.04 → ROS Humble / Ubuntu 22.04
 This code, expect that it changes often and any fitness for a particular purpose is disclaimed.
 
 [![Build Status]()]()
