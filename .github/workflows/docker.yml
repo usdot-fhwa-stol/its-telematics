@@ -195,8 +195,8 @@ jobs:
           only-fixed: true
           # Severity filter
           only-severities: critical,high
-          # Explicitly enable comment writing
-          write-comment: true
+          # Disable the PR comment to avoid the exceeding limit on PR comments
+          write-comment: false
           # Use summary to avoid bloated output if still too long. This will summarize results rather than listing every single package occurrence
           summary: true
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
