@@ -191,7 +191,14 @@ jobs:
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
           to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           ignore-unchanged: true
+          # Focus only on actionable items
+          only-fixed: true
+          # Severity filter
           only-severities: critical,high
+          # Explicitly enable comment writing
+          write-comment: true
+          # Use summary to avoid bloated output if still too long. This will summarize results rather than listing every single package occurrence
+          summary: true
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
           keep-previous-comments: true
 
