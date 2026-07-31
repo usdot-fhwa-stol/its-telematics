@@ -194,13 +194,45 @@ jobs:
           # Focus only on actionable items
           only-fixed: true
           # Severity filter
-          only-severities: critical
+          only-severities: critical,high
           # Disable the PR comment to avoid the exceeding limit on PR comments
-          write-comment: true
+          write-comment: false
           # Use summary to avoid bloated output if still too long. This will summarize results rather than listing every single package occurrence
           summary: true
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
           keep-previous-comments: true
+          # Save result to a file instead of trying to post it
+          output: scout-report.txt
+      - name: Upload Scout Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-report-carma-bridge
+          path: scout-report.txt
+      - name: Post Comment to PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('scout-report.txt', 'utf8');
+            // Truncate or provide a tiny preview
+            const preview = report.substring(0, 500); 
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### Docker Scout Analysis: Critical Fixed Vulnerabilities
+              
+              The security comparison has completed.
+              
+              **Preview:**
+              \`\`\`
+              ${preview}...
+              \`\`\`
+              
+              [Download Full Report Artifact](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+            })
 
   telematic-historical-data-processing:
     needs: [determine_docker_org_and_tag, changes]
