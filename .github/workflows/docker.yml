@@ -184,51 +184,42 @@ jobs:
           file: ./telematic_system/telematic_units/carma_vehicle_bridge/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare telematic-carma-vehicle-bridge
-        uses: docker/scout-action@v1
-        with:
-          command: compare
-          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
-          to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
-          ignore-unchanged: true
-          # Focus only on actionable items
-          only-fixed: true
-          # Severity filter
-          only-severities: critical,high
-          # Disable the PR comment to avoid the exceeding limit on PR comments
-          write-comment: false
-          # Use summary to avoid bloated output if still too long. This will summarize results rather than listing every single package occurrence
-          summary: true
-          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
-          keep-previous-comments: true
-          # Save result to a file instead of trying to post it
-          format: json
-          output: ./scout-report.json  # Scout will write to this file
+      - name: Docker Scout Compare carma vehicle bridge
+        id: scout-compare
+        run: |
+          docker scout compare \
+            ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }} \
+            --to ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }} \
+            --ignore-unchanged \
+            --only-fixed \
+            --only-severities critical \
+            --format text > scout-report.txt
+        env:
+          DOCKER_SCOUT_ORGANIZATION: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          # You might need to login for the CLI to work
+          DOCKER_SCOUT_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Upload Artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: scout-report
-          path: ./scout-report.json
+          path: scout-report.txt
+
       - name: Post Comment
+        if: always()
         uses: actions/github-script@v7
-        if: always() # Run even if previous steps failed
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            const path = './scout-report.json';
+            // Check if file exists and has content
+            const content = fs.existsSync('scout-report.txt') ? fs.readFileSync('scout-report.txt', 'utf8') : "No critical issues found.";
             
-            let body = "### Docker Scout Analysis\n\n";
+            // Limit the body size to prevent 422 errors
+            const body = `### Docker Scout Analysis\n\n\`\`\`text\n${content.substring(0, 5000)}\n\`\`\`\n\nFull report available in artifacts.`;
             
-            if (fs.existsSync(path)) {
-              const report = fs.readFileSync(path, 'utf8');
-              body += "Analysis complete. See the attached artifact for details.";
-            } else {
-              body += "Analysis finished, but no report file was generated.";
-            }
-            
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
