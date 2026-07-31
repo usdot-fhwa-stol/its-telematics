@@ -202,37 +202,38 @@ jobs:
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
           keep-previous-comments: true
           # Save result to a file instead of trying to post it
-          output: scout-report.txt
-      - name: Upload Scout Report
+          format: json
+          output: ./scout-report.json  # Scout will write to this file
+      - name: Upload Artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scout-report-carma-bridge
-          path: scout-report.txt
-      - name: Post Comment to PR
+          name: scout-report
+          path: ./scout-report.json
+      - name: Post Comment
         uses: actions/github-script@v7
+        if: always() # Run even if previous steps failed
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            const report = fs.readFileSync('scout-report.txt', 'utf8');
-            // Truncate or provide a tiny preview
-            const preview = report.substring(0, 500); 
+            const path = './scout-report.json';
+            
+            let body = "### Docker Scout Analysis\n\n";
+            
+            if (fs.existsSync(path)) {
+              const report = fs.readFileSync(path, 'utf8');
+              body += "Analysis complete. See the attached artifact for details.";
+            } else {
+              body += "Analysis finished, but no report file was generated.";
+            }
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `### Docker Scout Analysis: Critical Fixed Vulnerabilities
-              
-              The security comparison has completed.
-              
-              **Preview:**
-              \`\`\`
-              ${preview}...
-              \`\`\`
-              
-              [Download Full Report Artifact](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`
-            })
+              body: body
+            });
 
   telematic-historical-data-processing:
     needs: [determine_docker_org_and_tag, changes]
