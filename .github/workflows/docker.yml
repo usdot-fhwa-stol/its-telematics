@@ -189,6 +189,7 @@ jobs:
         with:
           command: cves
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
+          github-token: ''
       - name: Login to Docker Scout
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker scout login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
