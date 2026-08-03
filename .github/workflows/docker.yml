@@ -184,8 +184,18 @@ jobs:
           file: ./telematic_system/telematic_units/carma_vehicle_bridge/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
+      - name: Setup Docker Scout
+        uses: docker/scout-action@v1
+        with:
+          command: cpes # This is just a dummy command to force the action to install/configure the CLI
+          # We just use this action to ensure the environment is ready for 'docker scout' commands
+      
+      - name: Login to Docker Scout
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker scout login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          docker scout version
+
       - name: Docker Scout Compare carma vehicle bridge
-        id: scout-compare
         run: |
           docker scout compare \
             ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }} \
@@ -196,8 +206,6 @@ jobs:
             --format text > scout-report.txt
         env:
           DOCKER_SCOUT_ORGANIZATION: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
-          # You might need to login for the CLI to work
-          DOCKER_SCOUT_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Upload Artifact
         if: always()
