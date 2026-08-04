@@ -193,7 +193,7 @@ jobs:
         run: |
           docker scout compare \
             local://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }} \
-            --to registry:${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }} \
+            --to registry://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }} \
             --ignore-unchanged \
             --only-severity critical \
             --format text > scout-report.txt || true
