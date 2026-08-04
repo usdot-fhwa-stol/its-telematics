@@ -192,10 +192,6 @@ jobs:
           write-comment: false 
           dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Login to Docker Scout
-        run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker scout login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-          docker scout version
 
       - name: Docker Scout Compare carma vehicle bridge
         run: |
