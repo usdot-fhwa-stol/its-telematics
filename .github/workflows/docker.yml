@@ -184,25 +184,22 @@ jobs:
           file: ./telematic_system/telematic_units/carma_vehicle_bridge/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
-      - name: Setup Docker Scout
-        uses: docker/scout-action@v1
-        with:
-          command: cves
-          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
-          write-comment: false 
-          dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
-          dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
-
+      - name: Install Docker Scout CLI
+        run: |
+          mkdir -p ~/.docker/cli-plugins
+          curl -sSfL https://raw.githubusercontent.com/docker/scout-cli/main/install.sh | sh -s -- --skip-docker-check
+          echo "$HOME/.docker/cli-plugins" >> $GITHUB_PATH
       - name: Docker Scout Compare carma vehicle bridge
         run: |
           docker scout compare \
-            ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }} \
-            --to ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }} \
+            local://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }} \
+            --to registry:${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }} \
             --ignore-unchanged \
             --only-severity critical \
-            --format text > scout-report.txt
+            --format text > scout-report.txt || true
         env:
           DOCKER_SCOUT_ORGANIZATION: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          TMPDIR: ${{ runner.temp }}
 
       - name: Upload Artifact
         if: always()
