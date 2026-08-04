@@ -184,49 +184,16 @@ jobs:
           file: ./telematic_system/telematic_units/carma_vehicle_bridge/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
-      - name: Install Docker Scout CLI
-        run: |
-          mkdir -p ~/.docker/cli-plugins
-          curl -sSfL https://raw.githubusercontent.com/docker/scout-cli/main/install.sh | sh -s -- --skip-docker-check
-          echo "$HOME/.docker/cli-plugins" >> $GITHUB_PATH
-      - name: Docker Scout Compare carma vehicle bridge
-        run: |
-          docker scout compare \
-            local://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }} \
-            --to registry://${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }} \
-            --ignore-unchanged \
-            --only-severity critical \
-            --format text > scout-report.txt || true
-        env:
-          DOCKER_SCOUT_ORGANIZATION: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
-          TMPDIR: ${{ runner.temp }}
-
-      - name: Upload Artifact
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Docker Scout Compare telematic-vehicle-nats-bridge
+        uses: docker/scout-action@v1
         with:
-          name: scout-report
-          path: scout-report.txt
-
-      - name: Post Comment
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            // Check if file exists and has content
-            const content = fs.existsSync('scout-report.txt') ? fs.readFileSync('scout-report.txt', 'utf8') : "No critical issues found.";
-            
-            // Limit the body size to prevent 422 errors
-            const body = `### Docker Scout Analysis\n\n\`\`\`text\n${content.substring(0, 5000)}\n\`\`\`\n\nFull report available in artifacts.`;
-            
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body
-            });
+          command: compare
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
+          to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
+          ignore-unchanged: true
+          only-severities: critical,high
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          keep-previous-comments: true
 
   telematic-historical-data-processing:
     needs: [determine_docker_org_and_tag, changes]
