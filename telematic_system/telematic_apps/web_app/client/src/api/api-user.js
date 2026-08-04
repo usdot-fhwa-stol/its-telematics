@@ -4,7 +4,7 @@ import {env} from "../env"
 import { constructError } from './api-utils';
 
 const isMobile = Capacitor.isNativePlatform();
-const REQUEST_TIMEOUT_MS = isMobile ? 5000 : 0;
+const REQUEST_TIMEOUT_MS = isMobile ? 60000 : 0;
 
 const registerNewUser = async (username, email, password, org_id) => {
     const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/register`
