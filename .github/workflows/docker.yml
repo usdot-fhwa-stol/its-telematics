@@ -197,10 +197,10 @@ jobs:
         run: |
           docker scout compare \
             ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }} \
-            --to-env ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }} \
+            --to ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }} \
             --ignore-unchanged \
             --only-fixed \
-            --only-severities critical \
+            --only-severity critical \
             --format text > scout-report.txt
         env:
           DOCKER_SCOUT_ORGANIZATION: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
