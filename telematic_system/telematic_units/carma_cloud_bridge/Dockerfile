@@ -16,6 +16,11 @@ WORKDIR /ws
 
 ADD cloud_nats_bridge src/cloud_nats_bridge
 
+RUN useradd --create-home --shell /bin/bash app && \
+    chown -R app:app /ws
+
+USER app
+
 WORKDIR /ws/src/cloud_nats_bridge/src/cloud_nats_bridge
 
 CMD [ "python", "-u", "main.py" ]
