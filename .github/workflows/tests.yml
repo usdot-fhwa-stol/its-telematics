@@ -13,7 +13,7 @@ jobs:
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Install dependencies
         run: |
           apt-get update
@@ -27,11 +27,44 @@ jobs:
           python3 -m coverage run -m pytest
           python3 -m coverage xml --omit="/opt/*,/root/*,/tmp/*,/usr/*,/var/*,**/__init__.py,setup.py"
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v6
         with:
           name: carma-cloud-bridge-coverage
           path: telematic_system/telematic_units/carma_cloud_bridge/cloud_nats_bridge/test/coverage.xml
           if-no-files-found: error
+
+  kafka_nats_bridge_coverage:
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.11
+      options: --user root
+    steps:
+      - name: Checkout ${{ github.event.repository.name }}
+        uses: actions/checkout@v7
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get -y install python3-coverage python3-pip python3-pytest
+      - name: Install requirements
+        run: |
+          python3 -m pip install \
+            nats-py \
+            aiokafka \
+            pydantic \
+            pydantic-settings
+      - name: Run tests
+        run: |
+          export PYTHONPATH=$PYTHONPATH:/usr/lib/python3/dist-packages
+          cd $GITHUB_WORKSPACE/telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test/
+          python3 -m coverage run -m pytest
+          python3 -m coverage xml --omit="/opt/*,/root/*,/tmp/*,/usr/*,/var/*,**/__init__.py"
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v6
+        with:
+          name: kafka-nats-bridge-coverage
+          path: telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test/coverage.xml
+          if-no-files-found: error
+
   carma_vehicle_bridge_coverage:
     runs-on: ubuntu-latest
     container:
@@ -39,7 +72,7 @@ jobs:
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Install dependencies
         shell: bash
         run: |
@@ -62,7 +95,7 @@ jobs:
           python3 -m coverage run -m pytest
           python3 -m coverage xml --omit="/opt/*,/root/*,/tmp/*,/usr/*,/var/*,**/__init__.py"
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v6
         with:
           name: carma-vehicle-bridge-coverage
           path: telematic_system/telematic_units/carma_vehicle_bridge/ros2_nats_bridge/test/coverage.xml
@@ -70,22 +103,43 @@ jobs:
   telematic_cloud_messaging_coverage:
     runs-on: ubuntu-latest
     container:
-      image: openjdk:17-jdk-slim-buster
+      image: maven:3.9-eclipse-temurin-17-alpine
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Build
         run: |
           cd $GITHUB_WORKSPACE/telematic_system/telematic_cloud_messaging
-          ./mvnw org.jacoco:jacoco-maven-plugin:prepare-agent package
-          ./mvnw org.jacoco:jacoco-maven-plugin:report package
+          mvn org.jacoco:jacoco-maven-plugin:prepare-agent package
+          mvn org.jacoco:jacoco-maven-plugin:report package
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v6
         with:
           name: telematic-cloud-messaging
           path: telematic_system/telematic_cloud_messaging/target
           if-no-files-found: error
+
+  telematic_rsu_management_service_coverage:
+    runs-on: ubuntu-latest
+    container:
+      image: maven:3.9-eclipse-temurin-17-alpine
+      options: --user root
+    steps:
+      - name: Checkout ${{ github.event.repository.name }}
+        uses: actions/checkout@v7
+      - name: Build
+        run: |
+          cd $GITHUB_WORKSPACE/telematic_system/telematic_rsu_management_service
+          mvn org.jacoco:jacoco-maven-plugin:prepare-agent package
+          mvn org.jacoco:jacoco-maven-plugin:report package
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v6
+        with:
+          name: telematic-rsu-management-service
+          path: telematic_system/telematic_rsu_management_service/target
+          if-no-files-found: error
+
   web_app_client_coverage:
     runs-on: ubuntu-latest
     container:
@@ -95,16 +149,14 @@ jobs:
         CI: true
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Build
         run: |
           cd $GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/client
-          npm install -g nodemon
-          npm init -y
           npm install --force
           npm test
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v6
         with:
           name: web-app-client
           path: telematic_system/telematic_apps/web_app/client/coverage/*
@@ -118,15 +170,14 @@ jobs:
         CI: true
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Build
         run: |
           cd $GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/server
-          npm init -y
           npm install --force
           npm run test --coverage || true
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v6
         with:
           name: web-app-server
           path: telematic_system/telematic_apps/web_app/server/coverage/*
@@ -138,7 +189,7 @@ jobs:
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           path: src/${{ github.event.repository.name }}
@@ -166,49 +217,57 @@ jobs:
         run: |
           find "$GITHUB_WORKSPACE" -name "coverage.xml"
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v6
         with:
           name: rosbag2-processing-service
           path: src/cda-telematics/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/coverage.xml
           if-no-files-found: error
   sonar:
-    # Remove cloud bridge and vehicle bridge coverage temporarily as test build failed
-    needs: [telematic_cloud_messaging_coverage, web_app_client_coverage, web_app_server_coverage, rosbag2_processing_service_coverage]
+    # Remove cloud bridge, vehicle bridge, and telematic_cloud_messaging coverage temporarily as test build failed
+    needs: [telematic_rsu_management_service_coverage, web_app_client_coverage, web_app_server_coverage, rosbag2_processing_service_coverage, telematic_cloud_messaging_coverage, carma_vehicle_bridge_coverage, carma_cloud_bridge_coverage, kafka_nats_bridge_coverage]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      # Comment out cloud bridge code coverage temporarily because of test failure
-      # - name: Download code coverage results
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: carma-cloud-bridge-coverage
-      #     path: carma_cloud_bridge
-      # Comment out vehicle bridge code coverage temporarily because of test failure
-      # - name: Download code coverage results
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: carma-vehicle-bridge-coverage
-      #     path: carma_vehicle_bridge
+      - name: Download code coverage results
+        uses: actions/download-artifact@v8
+        with:
+          name: carma-cloud-bridge-coverage
+          path: carma_cloud_bridge
+      - name: Download code coverage results
+        uses: actions/download-artifact@v8
+        with:
+          name: carma-vehicle-bridge-coverage
+          path: carma_vehicle_bridge
+      - name: Download kafka-nats-bridge code coverage results
+        uses: actions/download-artifact@v8
+        with:
+          name: kafka-nats-bridge-coverage
+          path: telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test
       - name: Download telematic cloud messaging server code coverage results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v8
         with:
           name: telematic-cloud-messaging
           path: telematic_system/telematic_cloud_messaging/target
+      - name: Download telematic RSU management service code coverage results
+        uses: actions/download-artifact@v8
+        with:
+          name: telematic-rsu-management-service
+          path: telematic_system/telematic_rsu_management_service/target
       - name: Download web app client code coverage results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v8
         with:
           name: web-app-client
           path: telematic_system/telematic_apps/web_app/client/coverage
       - name: Download rosbag2-processing-service code coverage results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v8
         with:
           name: rosbag2-processing-service
           path: telematic_system/telematic_historical_data_processing/rosbag2_processing_service/
       - name: Download web app server code coverage results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v8
         with:
           name: web-app-server
           path: telematic_system/telematic_apps/web_app/server/coverage
@@ -216,18 +275,21 @@ jobs:
         shell: bash
         run: |
           find "$GITHUB_WORKSPACE" -name "jacoco.xml"
-      # Comment out coverage for vehicle and cloud bridge temporarily because of test failure
-      # - name: Rewrite workspace path in coverage.xml
-      #   shell: python
-      #   run: |
-      #     for coverage_file in ["/home/runner/work/cda-telematics/cda-telematics/carma_cloud_bridge/coverage.xml", "/home/runner/work/cda-telematics/cda-telematics/carma_vehicle_bridge/coverage.xml"] :
-      #       with open(coverage_file, 'r') as coverage :
-      #         coverage_content = coverage.read()
+      - name: Rewrite workspace path in coverage.xml
+        shell: python
+        run: |
+          for coverage_file in [
+            "/home/runner/work/cda-telematics/cda-telematics/carma_cloud_bridge/coverage.xml",
+            "/home/runner/work/cda-telematics/cda-telematics/carma_vehicle_bridge/coverage.xml",
+            "/home/runner/work/cda-telematics/cda-telematics/telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test/coverage.xml",
+          ]:
+            with open(coverage_file, 'r') as coverage :
+              coverage_content = coverage.read()
 
-      #       coverage_content = coverage_content.replace('/__w/', '/home/runner/work/')
+            coverage_content = coverage_content.replace('/__w/', '/home/runner/work/')
 
-      #       with open(coverage_file, 'w') as coverage:
-      #         coverage.write(coverage_content)
+            with open(coverage_file, 'w') as coverage:
+              coverage.write(coverage_content)
       - name: Move web app client and server code coverage files into one
         run: |
             cd $GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app
@@ -237,58 +299,8 @@ jobs:
             npm install -g lcov-result-merger
             npx lcov-result-merger 'coverage/lcov_*.info' 'coverage/lcov.info'
             cat coverage/lcov.info
-      - name: Find lcov*.info
-        shell: bash
-        run: |
-          find "$GITHUB_WORKSPACE" -name "lcov*.info"
-      - name: Setup SonarScanner
-        uses: warchant/setup-sonar-scanner@v7
-      - name: Generate sonar properties file
-        run: |
-          cat <<EOF > /tmp/sonar-scanner.properties
-          sonar.host.url=https://sonarcloud.io
-          sonar.coverage.jacoco.xmlReportPaths=$GITHUB_WORKSPACE/telematic_system/telematic_cloud_messaging/target/site/jacoco/jacoco.xml
-          sonar.exclusions=**/__init__.py,**/*test*.py,**/test/**
-          sonar.coverage.exclusions=**/__init__.py,**/*test*.py,**/test/**,setup.py
-          sonar.java.binaries=$GITHUB_WORKSPACE/telematic_system/telematic_cloud_messaging/target/
-          sonar.javascript.lcov.reportPaths=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/coverage/lcov.info
-          sonar.modules=cloud_nats_bridge,ros2_nats_bridge,streets_nats_bridge,telematic_cloud_messaging,web_app_client,web_app_server,rosbag2_processing_service
-          sonar.organization=usdot-fhwa-stol
-          sonar.projectBaseDir=$GITHUB_WORKSPACE
-          sonar.projectKey=usdot-fhwa-stol_cda-telematics
-          sonar.projectName=cda-telematics
-          sonar.scm.exclusions.disabled=true
-          extraProperties: |
-            sonar.verbose=true
-          sonar.python.coverage.reportPaths=$GITHUB_WORKSPACE/carma_cloud_bridge/coverage.xml,$GITHUB_WORKSPACE/carma_vehicle_bridge/coverage.xml,$GITHUB_WORKSPACE/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/coverage.xml
-          sonar.python.version=3.9
-          cloud_nats_bridge.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_units/carma_cloud_bridge/cloud_nats_bridge
-          cloud_nats_bridge.sonar.sources=src
-          cloud_nats_bridge.sonar.tests=test
-          ros2_nats_bridge.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_units/carma_vehicle_bridge/ros2_nats_bridge
-          ros2_nats_bridge.sonar.sources=.
-          ros2_nats_bridge.sonar.tests=test
-          rosbag2_processing_service.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_historical_data_processing/rosbag2_processing_service
-          rosbag2_processing_service.sonar.sources=.
-          rosbag2_processing_service.sonar.tests=test
-          streets_nats_bridge.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_units/carma_street_bridge/streets_nats_bridge
-          streets_nats_bridge.sonar.sources=src
-          telematic_cloud_messaging.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_cloud_messaging
-          telematic_cloud_messaging.sonar.sources=src
-          telematic_cloud_messaging.sonar.tests=src/test
-          telematic_cloud_messaging.sonar.test.inclusions=src/test/**
-          web_app_client.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/client
-          web_app_client.sonar.sources=src
-          web_app_client.sonar.tests=src/tests
-          web_app_client.sonar.exclusions =src/tests/**
-          web_app_server.sonar.projectBaseDir=$GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/server
-          web_app_server.sonar.sources=.
-          web_app_server.sonar.tests=tests
-          web_app_server.sonar.exclusions=tests/**
-          EOF
       - name: Run SonarScanner
         uses: usdot-fhwa-stol/actions/sonar-scanner@main
         with:
-          sonar-properties-path: /tmp/sonar-scanner.properties
           sonar-token: ${{ secrets.SONAR_TOKEN }}
-          working-dir: $GITHUB_WORKSPACE
+          working-dir: ${{ github.workspace }}

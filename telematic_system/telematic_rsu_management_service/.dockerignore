@@ -1,0 +1,21 @@
+# Ignore build output
+target/
+
+# Ignore IDE files
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Ignore logs
+logs/
+*.log
+
+# Ignore secrets
+secrets/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db

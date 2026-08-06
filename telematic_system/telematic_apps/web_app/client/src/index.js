@@ -13,6 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
+import { Capacitor } from '@capacitor/core';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -35,23 +36,35 @@ import './index.css';
  */
 import { CookiesProvider } from "react-cookie";
 import { BrowserRouter } from 'react-router-dom';
+import { ServerContextProvider } from './context/server-context';
 import { AuthContextProvider } from './context/auth-context';
+import { ROS2RosbagContextProvider } from './context/ros2-rosbag-context';
 import { TopicContextProvider } from './context/topic-context';
-import {ROS2RosbagContextProvider} from './context/ros2-rosbag-context';
+
+// Import mobile-specific CSS
+import './mobile.css';
+
+// Detect if running in Capacitor and add class to html and body
+if (Capacitor.isNativePlatform()) {
+  document.documentElement.classList.add('mobile-app');
+  document.body.classList.add('mobile-app');
+}
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <BrowserRouter>
       <CookiesProvider>
-        <AuthContextProvider>
-          <TopicContextProvider>
-            <ROS2RosbagContextProvider>
-              <App />
-            </ROS2RosbagContextProvider>
-          </TopicContextProvider>
-        </AuthContextProvider>
+        <ServerContextProvider>
+          <AuthContextProvider>
+            <TopicContextProvider>
+              <ROS2RosbagContextProvider>
+                <App />
+              </ROS2RosbagContextProvider>
+            </TopicContextProvider>
+          </AuthContextProvider>
+        </ServerContextProvider>
       </CookiesProvider>
     </BrowserRouter>
   </React.StrictMode>
 );
-

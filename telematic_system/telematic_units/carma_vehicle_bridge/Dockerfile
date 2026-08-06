@@ -33,6 +33,11 @@ RUN chmod +x ros_entrypoint.sh
 
 RUN sudo rm -rf src /var/lib/apt/lists/*
 
-RUN echo "source /ws/install/setup.bash" >> ~/.bashrc
+RUN useradd --create-home --shell /bin/bash app && \
+    chown -R app:app /ws && \
+    echo "source /ws/install/setup.bash" >> /home/app/.bashrc && \
+    chown app:app /home/app/.bashrc
+
+USER app
 
 CMD ["bash"]

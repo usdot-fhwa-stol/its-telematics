@@ -4,7 +4,7 @@ services:
     build:
           context: ./telematic_units/carma_vehicle_bridge
           dockerfile: Dockerfile
-    image: usdotfhwastol/carma_vehicle_nats_bridge:carma-system-4.7.3
+    image: ${DOCKER_ORG}/carma_vehicle_nats_bridge:${DOCKER_TAG}
     logging:
       options:
         max-size: "2g"
@@ -28,39 +28,48 @@ services:
     - VEHICLE_BRIDGE_EXCLUSION_LIST= ${ROS2_TOPIC_EXCLUSION_LIST} #OPTIONAL variable to set a comma separated list of topics not available to publish, leave empty if none
     - IS_SIM=False #OPTIONAL variable to treat incoming messages as coming from simulation env.  In this case the bridge will use system time as message timestamp. Defaults to False.
 
-  streets_nats_bridge:
+  kafka_nats_bridge:
     build:
-          context: ./telematic_units/carma_street_bridge
+          context: ./telematic_units/kafka_bridge
           dockerfile: Dockerfile
-    image: usdotfhwastol/carma_street_nats_bridge:carma-system-4.7.3
+    image: ${DOCKER_ORG}/telematics-kafka-nats-bridge:${DOCKER_TAG}
     logging:
       options:
         max-size: "2g"
         max-file: "1"
-    container_name: streets_nats_bridge
+    container_name: kafka_nats_bridge
     network_mode: host
     volumes:
            - ./logs:/var/logs
     environment:
-    - STREETS_BRIDGE_UNIT_ID=streets_id
-    - STREETS_BRIDGE_UNIT_TYPE=infrastructure
-    - STREETS_BRIDGE_LOG_LEVEL=debug
-    - STREETS_BRIDGE_LOG_NAME=streets_nats_bridge
-    - STREETS_BRIDGE_LOG_PATH=/var/logs/
-    - STREETS_BRIDGE_LOG_ROTATION_SIZE_BYTES=2147483648 #2 gigabytes
-    - STREETS_BRIDGE_LOG_HANDLER_TYPE=console #console: Print logs on console; file: Save logs to file; all: Prints logs on console and file
+    - KAFKA_BRIDGE_UNIT_ID=kafka_id
+    - KAFKA_BRIDGE_UNIT_TYPE=infrastructure
+    - KAFKA_BRIDGE_UNIT_NAME=West Intersection
+    - KAFKA_BRIDGE_LOG_LEVEL=debug
+    - KAFKA_BRIDGE_LOG_NAME=kafka_nats_bridge
+    - KAFKA_BRIDGE_LOG_PATH=/var/logs/
+    - KAFKA_BRIDGE_LOG_ROTATION_SIZE_BYTES=2147483648 #2 gigabytes
+    - KAFKA_BRIDGE_LOG_HANDLER_TYPE=console #console: Print logs on console; file: Save logs to file; all: Prints logs on console and file
     - KAFKA_BROKER_IP=localhost
     - KAFKA_BROKER_PORT=9092
-    - NATS_SERVER_IP_PORT=nats://<IP>:4222 #REQUIRED variable, replace IP with IP address of NATS server
     - KAFKA_CONSUMER_RESET=earliest
-    - STREETS_BRIDGE_EXCLUSION_LIST= ${STREETS_BRIDGE_EXCLUSION_LIST} #OPTIONAL variable to set a comma separated list of topics not available to publish, leave empty if none
+    - KAFKA_MAX_RETRIES=5 #Max retries to start Kafka consumer
+    - KAFKA_RETRY_BASE_DELAY_SECONDS=1.0 #Exponential backoff base delay for Kafka startup
+    - NATS_SERVER_IP_PORT=nats://<IP>:4222 #REQUIRED variable, replace IP with IP address of NATS server
+    - NATS_RECONNECT_TIME_WAIT_SECONDS=1.0 #Seconds between reconnect attempts
+    - NATS_MAX_RECONNECT_ATTEMPTS=30 #Set to -1 for infinite reconnect attempts
+    - NATS_REGISTRATION_MAX_RETRIES=5 #Set to -1 for infinite retries
+    - NATS_PUBLISH_MAX_RETRIES=3 #Max retries for NATS publish 
+    - NATS_PUBLISH_RETRY_BASE_DELAY_SECONDS=0.2 #Exponential backoff base delay
+    - NATS_FAILED_PUBLISH_BUFFER_MAX_MESSAGES=100 #Maximum number of failed NATS publishes kept in memory for diagnostics before oldest entries are dropped
+    - KAFKA_BRIDGE_EXCLUSION_LIST= ${KAFKA_BRIDGE_EXCLUSION_LIST} #OPTIONAL variable to set a comma separated list of topics not available to publish, leave empty if none
     - IS_SIM=False #OPTIONAL variable to treat incoming messages as coming from simulation env.  In this case the bridge will use system time as message timestamp. Defaults to False.
 
   cloud_nats_bridge:
     build:
           context: ./telematic_units/carma_cloud_bridge
           dockerfile: Dockerfile
-    image: usdotfhwastol/carma_cloud_nats_bridge:carma-system-4.7.3
+    image: ${DOCKER_ORG}/carma_cloud_nats_bridge:${DOCKER_TAG}
     logging:
       options:
         max-size: "2g"

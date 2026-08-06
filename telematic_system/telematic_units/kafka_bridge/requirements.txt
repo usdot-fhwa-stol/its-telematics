@@ -1,0 +1,6 @@
+pip
+nats-py
+kafka-python
+pyyaml
+aiokafka
+pydantic-settings>=2.0

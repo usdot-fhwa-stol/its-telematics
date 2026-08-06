@@ -1,0 +1,91 @@
+server:
+  port: ${rsu_server_port:8083}
+
+logging:
+  config: classpath:log4j2-spring.xml
+  level:
+    root: INFO
+    com.telematic.telematic_rsu_management_service: ${logging_level_com_telematic_telematic_rsu_management_service:DEBUG}
+    
+spring:
+  datasource:
+    url: ${rsu_spring_datasource_url:jdbc:mysql://localhost:3307/rsm?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${rsu_spring_datasource_username:telematic}
+    password: ${rsu_spring_datasource_password:telematic}
+    driver-class-name: ${rsu_spring_datasource_driver:com.mysql.cj.jdbc.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate.dialect: ${rsu_spring_jpa_hibernate_dialect:org.hibernate.dialect.MySQLDialect}
+
+messaging:
+  nats:
+    enabled: ${rsu_messaging_nats_enabled:true}
+    uri: ${rsu_messaging_nats_uri:nats://localhost:4222}
+ 
+
+registration:
+  tru:
+    autoconfig:
+      subject:  ${rsu_registration_tru_autoconfig_subject:unit.*.register.rsu.autoconfig}
+    config:
+        subject: ${rsu_registration_tru_config_subject:unit.*.register.rsu.config}
+        request.timeout: ${rsu_registration_tru_config_request_timeout:5}
+
+monitor:
+  rsu:
+    health:
+      subject: ${rsu_monitor_rsu_health_subject:unit.*.monitor.rsu.health_status}
+      health.timeout.seconds: ${rsu_monitor_rsu_health_health_timeout_seconds:10}
+  plugin:
+    health:
+      subject: ${rsu_monitor_plugin_health_subject:unit.*.monitor.plugin.health_status}
+      health.timeout.seconds: ${rsu_monitor_plugin_health_health_timeout_seconds:10}
+  unit:
+    health:
+      check:
+        # Enable/disable unit health check scheduler
+        enabled: ${rsu_monitor_unit_health_check_enabled:true}
+        # Interval in milliseconds for the scheduler to run the health check
+        interval-ms: ${rsu_monitor_unit_health_check_interval_ms:60000}
+        # Maximum number of missed heartbeats before removing a unit
+        # Unit is removed if: currentTime > lastPingTimestamp + (max-missed-heartbeats * pluginHeartbeatInterval)
+        max-missed-heartbeats: ${rsu_monitor_unit_health_check_max_missed_heartbeats:5}
+
+data:
+  selection:
+    available.topics:
+      subject: ${rsu_data_selection_available_topics_subject:unit.*.topic.rsu.available_topics}
+      request.timeout.seconds: ${rsu_data_selection_available_topics_request_timeout_seconds:10}
+    confirm.topics:
+      subject: ${rsu_data_selection_confirm_topics_subject:unit.*.topic.rsu.selected_topics}
+      request.timeout.seconds: ${rsu_data_selection_confirm_topics_request_timeout_seconds:10}
+  ingestion:
+    # subject prefix with wildcards for unit_Id and rsu_ip
+    subject-prefix: ${rsu_data_ingestion_subject_prefix:unit.*.stream.rsu.*} 
+    influx:
+      remove-fields: ${rsu_data_ingestion_influx_remove_fields:}
+    workers-per-unit-rsu-pair: ${rsu_data_ingestion_workers_per_unit_rsu_pair:3}
+    refresh:
+      initial-delay-ms: ${rsu_data_ingestion_refresh_initial_delay_ms:30000}
+      interval-ms: ${rsu_data_ingestion_refresh_interval_ms:30000}
+      
+rsu_influx:
+  url: ${rsu_data_ingestion_influx_url:http://localhost:8181}
+  token: ${rsu_data_ingestion_influx_token:apiv3_YOUR_ADMIN_TOKEN_VALUE}
+  database: ${rsu_data_ingestion_influx_database:rsu_data_dev}
+  endpoints:
+    configure-database: ${rsu_influx_endpoint_configure_database:/api/v3/configure/database?format=json}
+    query-sql: ${rsu_influx_endpoint_query_sql:/api/v3/query_sql}
+  write:
+    batch-size: ${rsu_influx_write_batch_size:5000}
+    flush-interval-ms: ${rsu_influx_write_flush_interval_ms:10}
+    queue-capacity: ${rsu_influx_write_queue_capacity:50000}
+
+perf:
+  metrics:
+    # Enable performance checkpoint timestamp logging for latency analysis.
+    # Set PERF_METRICS_ENABLED=true to activate all checkpoint logs:
+    #   [PERF][TRANSIT_DELAY_NATS]  - ingress to NATS receive delay
+    enabled: ${PERF_METRICS_ENABLED:false}

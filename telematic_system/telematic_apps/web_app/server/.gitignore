@@ -1,1 +1,7 @@
-package-lock.json
+coverage/
+node_modules/
+dist/
+.env
+.DS_Store
+.vscode/
+.idea/

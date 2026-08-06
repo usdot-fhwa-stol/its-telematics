@@ -5,7 +5,7 @@ services:
         context: "./telematic_apps/web_app/server"
       restart: always
       container_name: web_server
-      image: usdotfhwastol/telematic_web_server:carma-system-4.7.3
+      image: ${DOCKER_ORG}/telematic_web_server:${DOCKER_TAG}
       logging:
         options:
           max-size: "10m"
@@ -14,7 +14,7 @@ services:
       environment:
         - NODE_ENV=development
         - CHOKIDAR_USEPOLLING=true
-        - ALLOW_CLIENT_URL=https://cav-telematics.com
+        - ALLOW_CLIENT_URL=https://cav-telematics.com,http://localhost
         - GRAFANA_HTPASSWORD=/opt/apache2/grafana_htpasswd
         - SESSION_TIMEOUT=3600
         - SECRET=my_secret_telematic_ui
@@ -48,7 +48,7 @@ services:
   web_client:
     build:
       context: "./telematic_apps/web_app/client"
-    image: usdotfhwastol/telematic_web_client:carma-system-4.7.3
+    image: ${DOCKER_ORG}/telematic_web_client:${DOCKER_TAG}
     restart: always
     container_name: web_client
     logging:
@@ -65,7 +65,7 @@ services:
     build:
       context: "./telematic_apps/apache2"
     restart: always
-    image: usdotfhwastol/telematic_apache2:carma-system-4.7.3
+    image: ${DOCKER_ORG}/telematic_apache2:${DOCKER_TAG}
     container_name: apache2
     logging:
       options:
@@ -88,7 +88,7 @@ services:
   grafana:
     build:
       context: "./telematic_apps/grafana"
-    image: usdotfhwastol/telematic_grafana:carma-system-4.7.3
+    image: ${DOCKER_ORG}/telematic_grafana:${DOCKER_TAG}
     restart: always
     container_name: grafana
     logging:

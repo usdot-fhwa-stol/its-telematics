@@ -1,6 +1,12 @@
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
 import {env} from "../env"
 import { constructError } from './api-utils';
+
+const isMobile = Capacitor.isNativePlatform();
+
+const REQUEST_TIMEOUT_MS = isMobile ? 60000 : 0;
+
 
 const registerNewUser = async (username, email, password, org_id) => {
     const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/register`
@@ -60,12 +66,12 @@ const deleteUser = async (username) => {
     const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/delete`
 
     try {
-        const { data } = await axios.delete(URL + "?username=" + username, { withCredentials: true });
+        const { data } = await axios.delete(URL + "?username=" + username, { withCredentials: true, timeout: REQUEST_TIMEOUT_MS });
         return data;
     } catch (err) {
-        
+
           return constructError(err)
-  
+
     }
 }
 
@@ -97,7 +103,7 @@ const checkServerSession = async (token) => {
     axios.defaults.headers.common['Authorization'] = token;
     const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/ping`
     try {
-        const { data } = await axios.get(URL, { withCredentials: true });
+        const { data } = await axios.get(URL, { withCredentials: true, timeout: REQUEST_TIMEOUT_MS });
         return data;
     } catch (err) {
         

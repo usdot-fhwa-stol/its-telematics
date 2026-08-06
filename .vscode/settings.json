@@ -1,0 +1,6 @@
+{
+  "sonarlint.connectedMode.project": {
+    "connectionId": "SonarCloud Connection",
+    "projectKey": "usdot-fhwa-stol_cda-telematics"
+  }
+}

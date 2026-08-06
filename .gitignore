@@ -1,0 +1,14 @@
+.github/workflows/influx_admin_token.txt
+**/*.pptx
+secrets/
+
+*.log
+*.csv
+*.png
+
+__pycache__/
+
+logs/
+output/
+
+.gitconfig

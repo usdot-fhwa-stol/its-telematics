@@ -1,0 +1,36 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate.dialect: org.hibernate.dialect.H2Dialect
+  main:
+    allow-bean-definition-overriding: true
+
+messaging:
+  nats:
+    enabled: false
+    uri: nats://localhost:4222
+
+rsu_influx:
+  url: http://localhost:8181
+  token: test-token
+  database: test_db
+  write:
+    batch-size: 100
+    flush-interval-ms: 50
+    queue-capacity: 1000
+
+data:
+  ingestion:
+    workers-per-unit-rsu-pair: 1
+    
+logging:
+  level:
+    root: INFO
+    com.telematic: DEBUG
