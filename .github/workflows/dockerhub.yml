@@ -1,13 +1,15 @@
 name: Docker Hub build
 
 on:
+  workflow_dispatch:
   push:
     branches:
-      - "develop"
-      - "master"
-      - "release/*"
+      - develop
+      - master
+      - 'release/**'
+      - 'feature/**'
     tags:
-      - "carma-system-*"
+      - '*'
 
 jobs:
   determine_docker_org_and_tag:
