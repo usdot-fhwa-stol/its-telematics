@@ -184,7 +184,7 @@ jobs:
           file: ./telematic_system/telematic_units/carma_vehicle_bridge/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare telematic-carma-vehicle-bridge
+      - name: Docker Scout Compare telematic-vehicle-nats-bridge
         uses: docker/scout-action@v1
         with:
           command: compare
