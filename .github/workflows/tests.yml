@@ -199,15 +199,15 @@ jobs:
         run: |
           apt-get update
           apt-get -y install python3-coverage python3-pip python3-pytest python3-pytest-asyncio
-          cd src/cda-telematics/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/docker
+          cd "$GITHUB_WORKSPACE/src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/docker"
           chmod 777 checkout.sh install.sh
           ./checkout.sh
-          cp -R $GITHUB_WORKSPACE/src/cda-telematics/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/** /ws/src/
+          cp -R "$GITHUB_WORKSPACE/src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/." /ws/src/
           ./install.sh
       - name: Run tests
         shell: bash
         run: |
-          cd $GITHUB_WORKSPACE/src/cda-telematics/telematic_system/telematic_historical_data_processing/rosbag2_processing_service
+          cd "$GITHUB_WORKSPACE/src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service"
           source /ws/install/setup.bash
           pip3 install pytest==8.0.2
           python3 -m coverage run -m pytest
@@ -220,7 +220,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: rosbag2-processing-service
-          path: src/cda-telematics/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/coverage.xml
+          path: src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/coverage.xml
           if-no-files-found: error
   sonar:
     # Remove cloud bridge, vehicle bridge, and telematic_cloud_messaging coverage temporarily as test build failed
@@ -278,10 +278,12 @@ jobs:
       - name: Rewrite workspace path in coverage.xml
         shell: python
         run: |
+          import os
+
           for coverage_file in [
-            "/home/runner/work/cda-telematics/cda-telematics/carma_cloud_bridge/coverage.xml",
-            "/home/runner/work/cda-telematics/cda-telematics/carma_vehicle_bridge/coverage.xml",
-            "/home/runner/work/cda-telematics/cda-telematics/telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test/coverage.xml",
+            os.path.join(os.environ["GITHUB_WORKSPACE"], "carma_cloud_bridge", "coverage.xml"),
+            os.path.join(os.environ["GITHUB_WORKSPACE"], "carma_vehicle_bridge", "coverage.xml"),
+            os.path.join(os.environ["GITHUB_WORKSPACE"], "telematic_system", "telematic_units", "kafka_bridge", "kafka_nats_bridge", "test", "coverage.xml"),
           ]:
             with open(coverage_file, 'r') as coverage :
               coverage_content = coverage.read()

@@ -2,7 +2,7 @@
 
 ## Overview
 
-[Visual Studio Code](https://code.visualstudio.com/) is a free IDE that works well for cda-telematics development. This guide covers setting up SonarLint for real-time code quality feedback against the cda-telematics SonarCloud project.
+[Visual Studio Code](https://code.visualstudio.com/) is a free IDE that works well for its-telematics development. This guide covers setting up SonarLint for real-time code quality feedback against the its-telematics SonarCloud project.
 
 SonarLint runs in VS Code and flags code smells, bugs, and security issues as you type, using the same rules that SonarCloud applies during CI. This shortens the feedback loop between writing code and catching issues.
 
@@ -17,7 +17,7 @@ You will need:
 
 This repo includes a `.vscode/extensions.json` file that recommends helpful extensions when you open the workspace. The main one is:
 
-- **SonarLint** (`SonarSource.sonarlint-vscode`) - code quality and linting tool that provides feedback on best practices and security issues. Connected to the cda-telematics SonarCloud project so findings match what runs in CI.
+- **SonarLint** (`SonarSource.sonarlint-vscode`) - code quality and linting tool that provides feedback on best practices and security issues. Connected to the its-telematics SonarCloud project so findings match what runs in CI.
 
 When you open the repo for the first time, VS Code will prompt you to install recommended extensions. Accept the prompt, or install SonarLint manually from the Extensions panel.
 
@@ -38,7 +38,7 @@ Set the connection details as follows:
 - **Connection ID**: `SonarCloud Connection`
 - **Organization Key**: `usdot-fhwa-stol`
 
-The **Connection ID** must match exactly. The workspace `.vscode/settings.json` references this name to bind the project to the `usdot-fhwa-stol_cda-telematics` SonarCloud project.
+The **Connection ID** must match exactly. The workspace `.vscode/settings.json` references this name to bind the project to the `usdot-fhwa-stol_its-telematics` SonarCloud project.
 
 > Note: Please ensure you save the connection after generating the token. Sometimes the **Save Connection** button is greyed out, but resetting the organization or connection name should allow you to save the connection.
 
