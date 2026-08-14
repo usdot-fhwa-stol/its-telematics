@@ -21,10 +21,10 @@ services:
         # Server port
         - PORT=9010
         # MYSQL DB credentials. Need to be replaced with actual MYSQL DB during deployment
-        - DB_HOST=<DB_HOST>
-        - DB_USER=<DB_USER>
-        - DB_PASSWORD=<DB_PASSWORD>
-        - GRAFANA_DB=<GRAFANA_DB>
+        - MYSQL_HOST=<MYSQL_HOST>
+        - MYSQL_USER=<MYSQL_USER>
+        - MYSQL_PASSWORD=<MYSQL_PASSWORD>
+        - MYSQL_DATABASE=<MYSQL_DATABASE>
         # File upload service settings
         - UPLOAD_DESTINATION=s3
         - UPLOAD_DESTINATION_PATH=/opt/telematics/upload
@@ -37,7 +37,7 @@ services:
         - UPLOAD_MAX_FILE_SIZE=21474836480 #20 GB
         - CONCURRENT_QUEUE_SIZE=5
         - PART_SIZE=10485760
-        - NATS_SERVERS=<NATS_IP>:4222
+        - NATS_URL=nats://<NATS_IP>:4222
         - FILE_PROCESSING_SUBJECT=ui.file.processing
         - FILE_EXTENSIONS=.mcap
       command: bash -c '/app/service.sh'

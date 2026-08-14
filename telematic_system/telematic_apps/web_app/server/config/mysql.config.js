@@ -16,11 +16,11 @@
 require('dotenv').config();
 
 module.exports = {
-    HOST: process.env.DB_HOST,
-    PORT: process.env.DB_PORT,
-    USER: process.env.DB_USER,
-    PASSWORD: process.env.DB_PASSWORD,
-    GRAFANA_DB: process.env.GRAFANA_DB,
+    HOST: process.env.MYSQL_HOST,
+    PORT: process.env.MYSQL_PORT,
+    USER: process.env.MYSQL_USER,
+    PASSWORD: process.env.MYSQL_PASSWORD,
+    GRAFANA_DB: process.env.MYSQL_DATABASE,
     dialect: 'mysql',
     define: {
         timestamps: false

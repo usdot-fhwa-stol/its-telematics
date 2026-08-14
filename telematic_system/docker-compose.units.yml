@@ -16,7 +16,7 @@ services:
            - ./logs:/var/logs
     environment:
     - VEHICLE_BRIDGE_UNIT_ID=vehicle_id
-    - NATS_SERVER_IP_PORT=nats://<IP>:4222 #REQUIRED variable, replace IP with IP address of NATS server
+    - NATS_SERVER_IP_PORT=nats://127.0.0.1:4222 #REQUIRED variable, replace IP with IP address of NATS server
     - VEHICLE_BRIDGE_UNIT_TYPE=platform
     - VEHICLE_BRIDGE_UNIT_NAME=vehicle_id
     - VEHICLE_BRIDGE_LOG_LEVEL=debug

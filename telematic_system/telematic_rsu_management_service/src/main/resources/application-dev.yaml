@@ -9,9 +9,9 @@ logging:
     
 spring:
   datasource:
-    url: ${rsu_spring_datasource_url:jdbc:mysql://localhost:3307/rsm?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true}
-    username: ${rsu_spring_datasource_username:telematic}
-    password: ${rsu_spring_datasource_password:telematic}
+    url: ${rsu_spring_datasource_url:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3307}/rsm?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${MYSQL_USER:telematic}
+    password: ${MYSQL_PASSWORD:telematic}
     driver-class-name: ${rsu_spring_datasource_driver:com.mysql.cj.jdbc.Driver}
   jpa:
     hibernate:
@@ -22,7 +22,7 @@ spring:
 messaging:
   nats:
     enabled: ${rsu_messaging_nats_enabled:true}
-    uri: ${rsu_messaging_nats_uri:nats://localhost:4222}
+    uri: ${NATS_URL:nats://localhost:4222}
  
 
 registration:
