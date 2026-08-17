@@ -1,10 +1,19 @@
+# Local (on-premise) stack.
+# Each service loads its config from the layered env files under deployment/,
+# in this order (later files win):
+#   1. targets/on-premise/.env       - hosts, ports, URLs
+#   2. use_cases/<use case>/.env     - per-feature tuning
+#   3. environment/dev/.env          - credentials, tier overrides
 version: "3"
+
+x-profiles-all: &profiles-all [default, core, historical_data_processing, rsu_integration]
+x-profiles-influxdb2: &profiles-influxdb2 [default, core, historical_data_processing]
+
 services:
 
   influxdb:
     image:  influxdb:latest
-    profiles:
-      - default
+    profiles: *profiles-influxdb2
     container_name: influxdb
     ports:
       - '8086:8086'
@@ -14,7 +23,8 @@ services:
         max-size: "10m"
         max-file: "1"
     env_file:
-      - .env
+      - ../deployment/targets/on-premise/.env
+      - ../deployment/environment/dev/.env
     volumes:
       - /opt/influxdb2/data:/var/lib/influxdb2 # data directory
       - /opt/influxdb2/:/etc/influxdb2 # config directory
@@ -49,20 +59,22 @@ services:
 
   mysqldb:
     image: mysql:9.7.1
-    profiles:
-      - default
-      - rsu_integration
+    profiles: *profiles-all
     restart: always
     container_name: mysqldb
     logging:
       options:
         max-size: "10m"
         max-file: "1"
+    env_file:
+      - ../deployment/targets/on-premise/.env
+      - ../deployment/environment/dev/.env
     environment:
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_USER=${MYSQL_USER}
       - MYSQL_PASSWORD_FILE=/run/secrets/mysql_password
       - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
+      # Blanked because the entrypoint rejects MYSQL_PASSWORD and
+      # MYSQL_PASSWORD_FILE both being set; the secret above is the source.
+      - MYSQL_PASSWORD=
     ports:
       - '3307:3306'  # Mapping required for CAVe-in-a-box deployment where port 3306 is used by v2xhub
     secrets:
@@ -74,9 +86,7 @@ services:
 
   nats:
     image: 'nats:2.7.3-alpine3.15'
-    profiles:
-      - rsu_integration
-      - default
+    profiles: *profiles-all
     restart: always
     container_name: nats
     logging:
@@ -88,10 +98,8 @@ services:
   grafana:
       build:
         context: "./telematic_apps/grafana"
-      image: ${DOCKER_ORG}/telematic_grafana:${DOCKER_TAG}
-      profiles:
-        - rsu_integration
-        - default
+      image: ${DOCKER_ORG:-usdotfhwastoldev}/telematic_grafana:${DOCKER_TAG:-develop}
+      profiles: *profiles-all
       restart: always
       container_name: grafana
       logging:
@@ -114,10 +122,8 @@ services:
       build:
         context: "./telematic_apps/web_app/server"
         dockerfile: "Dockerfile"
-      image: ${DOCKER_ORG}/telematic_web_server:${DOCKER_TAG}
-      profiles:
-        - rsu_integration
-        - default
+      image: ${DOCKER_ORG:-usdotfhwastoldev}/telematic_web_server:${DOCKER_TAG:-develop}
+      profiles: *profiles-all
       restart: always
       container_name: web_server
       logging:
@@ -128,8 +134,12 @@ services:
       depends_on:
         - mysqldb
         - grafana
+      # Upload endpoints mount at boot regardless of profile, so the
+      # historical_data_processing layer is always loaded.
       env_file:
-        - .env
+        - ../deployment/targets/on-premise/.env
+        - ../deployment/use_cases/historical_data_processing/.env
+        - ../deployment/environment/dev/.env
       command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:3000 && /app/service.sh'
       volumes:
         - /opt/apache2/grafana_htpasswd:/opt/apache2/grafana_htpasswd
@@ -138,10 +148,8 @@ services:
   web_client:
     build:
       context: "./telematic_apps/web_app/client"
-    image: ${DOCKER_ORG}/telematic_web_client:${DOCKER_TAG}
-    profiles:
-      - rsu_integration
-      - default
+    image: ${DOCKER_ORG:-usdotfhwastoldev}/telematic_web_client:${DOCKER_TAG:-develop}
+    profiles: *profiles-all
     restart: always
     container_name: web_client
     logging:
@@ -156,10 +164,8 @@ services:
     build:
       context: "./telematic_apps/apache2"
       dockerfile: "./local.Dockerfile"
-    image: ${DOCKER_ORG}/telematic_local_apache2:${DOCKER_TAG}
-    profiles:
-      - rsu_integration
-      - default
+    image: ${DOCKER_ORG:-usdotfhwastoldev}/telematic_local_apache2:${DOCKER_TAG:-develop}
+    profiles: *profiles-all
     restart: always
     container_name: apache2
     logging:
@@ -184,9 +190,10 @@ services:
     build:
       context: "./telematic_cloud_messaging"
     container_name: messaging_server
-    image: ${DOCKER_ORG}/telematic_cloud_messaging:${DOCKER_TAG}
+    image: ${DOCKER_ORG:-usdotfhwastoldev}/telematic_cloud_messaging:${DOCKER_TAG:-develop}
     profiles:
       - default
+      - core
     depends_on:
       - nats
       - mysqldb
@@ -199,13 +206,15 @@ services:
     network_mode: host
     command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:4222 && wait-for-it localhost:8086 && java -jar /telematic_cloud_messaging/app.jar'
     env_file:
-      - .env
+      - ../deployment/targets/on-premise/.env
+      - ../deployment/use_cases/core/.env
+      - ../deployment/environment/dev/.env
 
   rsu_management_service:
     build:
       context: "./telematic_rsu_management_service"
     container_name: rsu_management_service
-    image: ${DOCKER_ORG}/telematic_rsu_management_service:${DOCKER_TAG}
+    image: ${DOCKER_ORG:-usdotfhwastoldev}/telematic_rsu_management_service:${DOCKER_TAG:-develop}
     profiles:
       - rsu_integration
     depends_on:
@@ -222,18 +231,21 @@ services:
     volumes:
       - /opt/telematics/logs:/workspace/logs
     env_file:
-      - .env
+      - ../deployment/targets/on-premise/.env
+      - ../deployment/use_cases/rsu_integration/.env
+      - ../deployment/environment/dev/.env
 
   rosbag2_processing_service:
     build:
           context: ./telematic_historical_data_processing
           dockerfile: Dockerfile
           network: host
-    image: ${DOCKER_ORG}/telematic_historical_data_processing:${DOCKER_TAG}
+    image: ${DOCKER_ORG:-usdotfhwastoldev}/telematic_historical_data_processing:${DOCKER_TAG:-develop}
     container_name: rosbag2_processing_service
     restart: always
     profiles:
       - default
+      - historical_data_processing
     depends_on:
       - nats
       - mysqldb
@@ -248,7 +260,9 @@ services:
            - /opt/telematics/logs:/opt/telematics/logs
            - /opt/telematics/upload:/opt/telematics/upload
     env_file:
-      - .env
+      - ../deployment/targets/on-premise/.env
+      - ../deployment/use_cases/historical_data_processing/.env
+      - ../deployment/environment/dev/.env
     command: bash -c 'source /ws/install/setup.bash && wait-for-it 127.0.0.1:3307 -- ros2 run rosbag2_processing_service main'
 
 
