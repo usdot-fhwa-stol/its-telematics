@@ -1,2 +1,5 @@
-secrets/*.txt
-!secrets/*.txt.example
+# Ignore everything inside secrets/
+secrets/*
+
+# EXCEPT .example.txt files
+!secrets/*.example.txt
