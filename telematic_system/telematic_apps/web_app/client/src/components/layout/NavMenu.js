@@ -23,15 +23,17 @@ import { List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, To
 import MuiDrawer from '@mui/material/Drawer';
 import { styled } from '@mui/material/styles';
 import { withStyles } from '@mui/styles';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { getVerifiedAdminAccess } from '../../api/api-admin-access';
 import { getUserRole } from '../../api/api-org';
 import { checkServerSession, deleteUser } from '../../api/api-user';
 import AuthContext from '../../context/auth-context';
-import { USER_ROLES } from '../users/UserMetadata';
 
 const NavMenu = React.memo(() => {
     const authCtx = React.useContext(AuthContext);
+    const [hasAdminAccess, setHasAdminAccess] = useState(false);
+    const adminAccessRequestIdRef = useRef(0);
     useEffect(() => {
         //update user role if changed
         if (authCtx.user_id !== null && authCtx.user_id !== undefined && authCtx.org_id !== null
@@ -43,7 +45,7 @@ const NavMenu = React.memo(() => {
                 org_id: parseInt(authCtx.org_id)
             }).then(data => {
                 if (data !== undefined && data.errCode === undefined && Array.isArray(data) && data.length > 0) {
-                    if (data[0].role !== undefined && data[0].role.length > 0 && data[0].role !== authCtx) {
+                    if (data[0].role !== undefined && data[0].role.length > 0 && data[0].role !== authCtx.role) {
                         authCtx.updateRole(data[0].role);
                     }
                 }
@@ -53,7 +55,27 @@ const NavMenu = React.memo(() => {
                 }
             });
         }
-    })
+    }, [authCtx.org_id, authCtx.sessionToken, authCtx.updateRole, authCtx.user_id])
+
+    useEffect(() => {
+        if (authCtx.sessionToken === null) {
+            setHasAdminAccess(false);
+            return;
+        }
+
+        const requestId = adminAccessRequestIdRef.current + 1;
+        adminAccessRequestIdRef.current = requestId;
+
+        getVerifiedAdminAccess(authCtx.user_id, authCtx.org_id).then((isAdmin) => {
+            if (adminAccessRequestIdRef.current === requestId) {
+                setHasAdminAccess(isAdmin);
+            }
+        }).catch(() => {
+            if (adminAccessRequestIdRef.current === requestId) {
+                setHasAdminAccess(false);
+            }
+        });
+    }, [authCtx.org_id, authCtx.sessionToken, authCtx.user_id]);
 
     const location = useLocation();
     const logoutHandler = React.useCallback(() => {
@@ -145,7 +167,7 @@ const NavMenu = React.memo(() => {
                     </ListItem>
                     }
                     {
-                        (location.pathname.includes("/telematic") && ( parseInt(authCtx.is_admin) === 1 ||  authCtx.role === USER_ROLES.ADMIN)) &&
+                        (location.pathname.includes("/telematic") && hasAdminAccess) &&
                         <ListItem key="admin" disablePadding sx={{ display: 'block' }}>
                             <StyledListItemButton
                                 component={Link} to="/telematic/admin"

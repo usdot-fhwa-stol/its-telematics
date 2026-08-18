@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { expect, test } from '@jest/globals';
-import { loginUser, deleteUser, updatePassword, registerNewUser, listUsers, updateUserServerAdmin, checkServerSession } from '../../api/api-user';
+import { loginUser, deleteUser, updatePassword, registerNewUser, listUsers, getCurrentUserAccess, updateUserServerAdmin, checkServerSession } from '../../api/api-user';
 
 jest.mock('axios');
 
@@ -41,8 +41,27 @@ test('List all users', async () => {
     await expect(() => listUsers()).not.toThrowError();
 })
 
+test('Get current user access', async () => {
+    await getCurrentUserAccess().then(data=>expect(data).toEqual({status: 'success'}));
+    jest.resetAllMocks();
+    await expect(() => getCurrentUserAccess()).not.toThrowError();
+})
+
 test('Update user permission to server admin', async () => {
     await updateUserServerAdmin({}).then(data=>expect(data).toEqual({status: 'success'}));
+    expect(axios.post).toHaveBeenCalledWith(
+        expect.any(String),
+        { user_id: undefined, is_admin: undefined },
+        expect.any(Object)
+    );
+    jest.resetAllMocks();
+    axios.post.mockResolvedValue({ data: { status: 'success' } });
+    await updateUserServerAdmin({ user_id: 10, is_admin: 1, role: 'Admin' });
+    expect(axios.post).toHaveBeenCalledWith(
+        expect.any(String),
+        { user_id: 10, is_admin: 1 },
+        expect.any(Object)
+    );
     jest.resetAllMocks();
     await expect(() => updateUserServerAdmin({})).not.toThrowError();
 })
@@ -52,4 +71,3 @@ test('Check if server session is established', async () => {
     jest.resetAllMocks();
     await expect(() => checkServerSession()).not.toThrowError();
 })
-

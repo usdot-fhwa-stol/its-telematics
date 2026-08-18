@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2024 LEIDOS.
+ * Copyright (C) 2019-2026 LEIDOS.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -15,6 +15,10 @@
  */
 module.exports = app => {
   const users = require("../controllers/user.controller");
+  const {
+    requireCurrentOrgAdminOrServerAdmin,
+    requireServerAdmin,
+  } = require("../utils/authorization");
   const { loginLimiter, registerLimiter } = require("../utils/rate_limiters");
   let router = require('express').Router();
 
@@ -23,6 +27,9 @@ module.exports = app => {
     res.sendStatus(200);
   });
 
+  /* GET current user access. */
+  router.get('/access', users.getCurrentUserAccess);
+
   /* POST users creation. */
   router.post("/register", registerLimiter, users.registerUser);
   //Update existing or create a new user
@@ -30,11 +37,11 @@ module.exports = app => {
   //authenticate user
   router.post('/login', loginLimiter, users.loginUser);
   //Update existing or create a new user
-  router.post('/update/server/admin', users.updateUserServerAdmin)
+  router.post('/update/server/admin', requireServerAdmin, users.updateUserServerAdmin)
   //Delete a user
   router.delete('/delete', users.deleteUser);
   //Retrieve all users
-  router.get("/all", users.findAll);
+  router.get("/all", requireCurrentOrgAdminOrServerAdmin, users.findAll);
 
   app.use('/api/users', router);
 
