@@ -21,10 +21,10 @@ services:
         # Server port
         - PORT=9010
         # MYSQL DB credentials. Need to be replaced with actual MYSQL DB during deployment
-        - DB_HOST=<DB_HOST>
-        - DB_USER=<DB_USER>
-        - DB_PASSWORD=<DB_PASSWORD>
-        - GRAFANA_DB=<GRAFANA_DB>
+        - DB_HOST=${MYSQL_HOST}
+        - DB_USER=${MYSQL_USER}
+        - DB_PASSWORD_FILE=/run/secrets/mysql_password
+        - GRAFANA_DB=${MYSQL_DATABASE}
         # File upload service settings
         - UPLOAD_DESTINATION=s3
         - UPLOAD_DESTINATION_PATH=/opt/telematics/upload
@@ -37,7 +37,7 @@ services:
         - UPLOAD_MAX_FILE_SIZE=21474836480 #20 GB
         - CONCURRENT_QUEUE_SIZE=5
         - PART_SIZE=10485760
-        - NATS_SERVERS=<NATS_IP>:4222
+        - NATS_SERVERS=${NATS_SERVER_IP_PORT}
         - FILE_PROCESSING_SUBJECT=ui.file.processing
         - FILE_EXTENSIONS=.mcap
       command: bash -c '/app/service.sh'
@@ -96,6 +96,18 @@ services:
         max-size: "10m"
         max-file: "1"
     network_mode: host
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SECURITY_SECRET_KEY__FILE=/run/secrets/grafana_secret_key
+      - GF_DATABASE_TYPE=mysql
+      - GF_DATABASE_HOST=${MYSQL_HOST}:${MYSQL_PORT}
+      - GF_DATABASE_NAME=${MYSQL_DATABASE}
+      - GF_DATABASE_USER=${MYSQL_USER}
+      - GF_DATABASE_PASSWORD__FILE=/run/secrets/mysql_password
+    secrets:
+        - mysql_password
+        - grafana_secret_key
     volumes:
       - /opt/grafana/logs:/var/log/grafana
       - ./telematic_apps/grafana/grafana.ini:/etc/grafana/grafana.ini
@@ -103,3 +115,10 @@ services:
       - /opt/grafana/provisioning:/home/grafana/conf/provisioning
       - /home/ubuntu/.aws/credentials:/usr/share/grafana/.aws/credentials
     user: "472" #grafana user id
+
+
+secrets:
+  mysql_password:
+      file: ./secrets/mysql_password.txt
+  grafana_secret_key:
+    file: ./secrets/grafana_secret_key.txt

@@ -15,6 +15,7 @@
  */
 module.exports = app => {
   const users = require("../controllers/user.controller");
+  const { loginLimiter, registerLimiter } = require("../utils/rate_limiters");
   let router = require('express').Router();
 
   /* GET users ping. */
@@ -23,11 +24,11 @@ module.exports = app => {
   });
 
   /* POST users creation. */
-  router.post("/register", users.registerUser);
+  router.post("/register", registerLimiter, users.registerUser);
   //Update existing or create a new user
-  router.post('/forget/password', users.forgetPwd);
+  router.post('/forget/password', loginLimiter, users.forgetPwd);
   //authenticate user
-  router.post('/login', users.loginUser);
+  router.post('/login', loginLimiter, users.loginUser);
   //Update existing or create a new user
   router.post('/update/server/admin', users.updateUserServerAdmin)
   //Delete a user

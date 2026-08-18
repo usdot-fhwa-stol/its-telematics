@@ -20,6 +20,7 @@ const { Op } = require("sequelize");
 const { addOrgUser } = require('./org.controller');
 const getUuid = require('uuid-by-string');
 const jwt = require("jsonwebtoken");
+const { validatePassword } = require('../utils/password_policy');
 require('dotenv').config();
 var grafana_htpasswd = process.env.GRAFANA_HTPASSWORD!=undefined && process.env.GRAFANA_HTPASSWORD.length > 0 ? process.env.GRAFANA_HTPASSWORD : '/opt/apache2/grafana_htpasswd';
 var htpasswordManager = manager(grafana_htpasswd)
@@ -62,6 +63,13 @@ exports.registerUser = (req, res) => {
     if (req == undefined || req.body == undefined || req.body.username == undefined
         || req.body.org_id == undefined || req.body.email == undefined || req.body.password == undefined) {
         res.sendStatus(400);
+        return;
+    }
+
+    //Reject weak passwords or passwords that match identity fields (username/email)
+    const passwordCheck = validatePassword(req.body.password, req.body.username, req.body.email);
+    if (!passwordCheck.valid) {
+        res.status(400).send({ message: passwordCheck.message });
         return;
     }
 
@@ -135,6 +143,14 @@ exports.forgetPwd = (req, res) => {
         res.sendStatus(400);
         return;
     }
+
+    //Reject weak passwords or passwords that match identity fields (username/email)
+    const passwordCheck = validatePassword(req.body.new_password, req.body.username, req.body.email);
+    if (!passwordCheck.valid) {
+        res.status(400).send({ message: passwordCheck.message });
+        return;
+    }
+
     user.findAll({
         where: {
             [Op.and]: [

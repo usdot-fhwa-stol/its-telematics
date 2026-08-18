@@ -1,6 +1,6 @@
 {
   "name": "server",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "scripts": {
     "start": "nodemon --exec ts-node ./bin/www",
@@ -22,6 +22,7 @@
     "debug": "~2.6.9",
     "dotenv": "^16.0.3",
     "express": "~4.16.1",
+    "express-rate-limit": "^8.6.2",
     "express-session": "^1.17.3",
     "htpasswd-mgr": "^1.1.7",
     "http-errors": "~1.6.3",
@@ -31,14 +32,15 @@
     "mysql": "^2.18.1",
     "mysql2": "^2.3.3",
     "nats": "^2.19.0",
+    "node-wait-for-it": "^0.2.0",
     "password-salt-and-hash": "^1.0.5",
     "pug": "2.0.0-beta11",
     "request": "^2.88.2",
     "rest-request": "^1.0.12",
     "sequelize": "^6.25.2",
     "supertest": "^6.3.3",
-    "node-wait-for-it":"^0.2.0",
-    "uuid-by-string": "^4.0.0"
+    "uuid-by-string": "^4.0.0",
+    "zxcvbn": "^4.4.2"
   },
   "license": "Apache-2.0",
   "description": "telematic web app",
@@ -51,8 +53,8 @@
     "@types/node": "^20.11.17",
     "@types/supertest": "^6.0.2",
     "nodemon": "^2.0.21",
-    "ts-node": "^10.9.2",
     "ts-jest": "^29.1.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   },
   "jest": {
