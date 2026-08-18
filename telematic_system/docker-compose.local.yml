@@ -69,6 +69,7 @@ services:
     env_file:
       - ../deployment/targets/on-premise/.env
       - ../deployment/environment/dev/.env
+      - ../deployment/use_cases/core/.env
     environment:
       - MYSQL_PASSWORD_FILE=/run/secrets/mysql_password
       - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
@@ -138,6 +139,7 @@ services:
       # historical_data_processing layer is always loaded.
       env_file:
         - ../deployment/targets/on-premise/.env
+        - ../deployment/use_cases/core/.env
         - ../deployment/use_cases/historical_data_processing/.env
         - ../deployment/environment/dev/.env
       command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:3000 && /app/service.sh'
@@ -232,6 +234,7 @@ services:
       - /opt/telematics/logs:/workspace/logs
     env_file:
       - ../deployment/targets/on-premise/.env
+      - ../deployment/use_cases/core/.env
       - ../deployment/use_cases/rsu_integration/.env
       - ../deployment/environment/dev/.env
 
@@ -261,6 +264,7 @@ services:
            - /opt/telematics/upload:/opt/telematics/upload
     env_file:
       - ../deployment/targets/on-premise/.env
+      - ../deployment/use_cases/core/.env
       - ../deployment/use_cases/historical_data_processing/.env
       - ../deployment/environment/dev/.env
     command: bash -c 'source /ws/install/setup.bash && wait-for-it 127.0.0.1:3307 -- ros2 run rosbag2_processing_service main'
