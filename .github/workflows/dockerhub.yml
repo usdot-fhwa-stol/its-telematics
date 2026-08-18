@@ -124,7 +124,7 @@ jobs:
           context: ./telematic_system/telematic_units/kafka_bridge/
           push: true
           sbom: true
-          provenance: true
+          provenance: mode=max
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematics-kafka-nats-bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
@@ -190,7 +190,7 @@ jobs:
           context: ./telematic_system/telematic_units/carma_cloud_bridge/
           push: true
           sbom: true
-          provenance: true
+          provenance: mode=max
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_cloud_nats_bridge:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
@@ -223,7 +223,7 @@ jobs:
           context: ./telematic_system/telematic_historical_data_processing/
           push: true
           sbom: true
-          provenance: true
+          provenance: mode=max
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_historical_data_processing:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
@@ -256,7 +256,7 @@ jobs:
           context: ./telematic_system/telematic_apps/web_app/server
           push: true
           sbom: true
-          provenance: true
+          provenance: mode=max
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_server:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
@@ -289,7 +289,7 @@ jobs:
           context: ./telematic_system/telematic_apps/web_app/client
           push: true
           sbom: true
-          provenance: true
+          provenance: mode=max
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_client:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
@@ -322,7 +322,7 @@ jobs:
           context: ./telematic_system/telematic_apps/apache2
           push: true
           sbom: true
-          provenance: true
+          provenance: mode=max
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_apache2:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
@@ -355,7 +355,7 @@ jobs:
           context: ./telematic_system/telematic_apps/grafana
           push: true
           sbom: true
-          provenance: true
+          provenance: mode=max
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_grafana:${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           build-args: |
             BUILD_DATE=${{ needs.determine_docker_image_metadata.outputs.build_date }}
