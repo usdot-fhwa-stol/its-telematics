@@ -25,7 +25,9 @@ const loginLimiter = rateLimit({
     max: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { message: "Too many login attempts. Please try again later." },
+    message: (req, res) => ({
+        message: `Too many login attempts (${req.rateLimit.current} of ${req.rateLimit.limit} allowed). Please try again later in 15 minutes.`,
+    }),
 });
 
 //Allow a limited number of registration attempts per IP address in a 1 hour window.
@@ -34,7 +36,9 @@ const registerLimiter = rateLimit({
     max: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { message: "Too many registration attempts. Please try again later." },
+    message: (req, res) => ({
+        message: `Too many registration attempts (${req.rateLimit.current} of ${req.rateLimit.limit} allowed). Please try again later in 1 hour.`,
+    }),
 });
 
 module.exports = { loginLimiter, registerLimiter };

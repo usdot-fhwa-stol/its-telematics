@@ -38,7 +38,7 @@ module.exports = app => {
   router.post('/login', loginLimiter, users.loginUser);
   //Update existing or create a new user
   router.post('/update/server/admin', requireServerAdmin, users.updateUserServerAdmin)
-  //Delete a user
+  //Delete a user — Do not require any role as this is for logout and account deletion for basic HTTP authentication on Apache2
   router.delete('/delete', users.deleteUser);
   //Retrieve all users
   router.get("/all", requireCurrentOrgAdminOrServerAdmin, users.findAll);

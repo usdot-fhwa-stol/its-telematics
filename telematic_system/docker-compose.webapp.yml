@@ -41,6 +41,8 @@ services:
         - FILE_PROCESSING_SUBJECT=ui.file.processing
         - FILE_EXTENSIONS=.mcap
       command: bash -c '/app/service.sh'
+      secrets:
+        - mysql_password
       volumes:
         - /opt/apache2/grafana_htpasswd:/opt/apache2/grafana_htpasswd
         - /opt/telematics/upload:/opt/telematics/upload

@@ -142,6 +142,66 @@ const requireOrgAdminOrServerAdmin = (resolveOrgId) => async (req, res, next) =>
   }
 };
 
+/**
+ * Resolves the org-level role ("Admin", "Editor", "Viewer") for the given user
+ * in their current organisation. Returns undefined when the user has no membership.
+ */
+const getOrgRole = async (userId, orgId) => {
+  if (userId == null || orgId == null) return undefined;
+  const memberships = await org_user.findAll({ where: { user_id: userId, org_id: orgId } });
+  if (!Array.isArray(memberships) || memberships.length === 0) return undefined;
+  return memberships[0].role; // "Admin" | "Editor" | "Viewer"
+};
+
+/**
+ * Allows any authenticated user with a valid token (any org role or server admin).
+ * Attach as middleware on endpoints that need authentication but no specific role.
+ */
+const requireAuthenticated = async (req, res, next) => {
+  try {
+    const authUser = await loadAuthenticatedUser(req);
+    if (!authUser) {
+      res.status(401).send({ message: "User session is expired", reason: "expire" });
+      return;
+    }
+    req.authUser = authUser;
+    next();
+  } catch (err) {
+    res.status(500).send({ message: err.message || "Authorization failed." });
+  }
+};
+
+/**
+ * Requires the user to have an org role of "Editor" or "Admin" (or be a server
+ * admin). Viewers receive a 403.
+ */
+const requireEditorOrAbove = async (req, res, next) => {
+  try {
+    const authUser = await loadAuthenticatedUser(req);
+    if (!authUser) {
+      res.status(401).send({ message: "User session is expired", reason: "expire" });
+      return;
+    }
+
+    if (hasServerAdminAccess(authUser)) {
+      req.authUser = authUser;
+      next();
+      return;
+    }
+
+    const role = await getOrgRole(authUser.id, authUser.org_id);
+    if (role === "Admin" || role === "Editor") {
+      req.authUser = authUser;
+      next();
+      return;
+    }
+
+    res.status(403).send({ message: "Editor or Administrator privileges are required." });
+  } catch (err) {
+    res.status(500).send({ message: err.message || "Authorization failed." });
+  }
+};
+
 const requireSelfOrServerAdmin = (resolveUserId) => async (req, res, next) => {
   try {
     const authUser = await loadAuthenticatedUser(req);
@@ -169,10 +229,13 @@ const requireSelfOrServerAdmin = (resolveUserId) => async (req, res, next) => {
 };
 
 module.exports = {
+  getOrgRole,
   hasServerAdminAccess,
   isOrgAdmin,
   loadAuthenticatedUser,
+  requireAuthenticated,
   requireCurrentOrgAdminOrServerAdmin,
+  requireEditorOrAbove,
   requireOrgAdminOrServerAdmin,
   requireSelfOrServerAdmin,
   requireServerAdmin,
