@@ -13,48 +13,68 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-
-// rate_limiters.js just configures express-rate-limit instances.
-// We verify the exported middleware objects exist and carry the expected config
-// without needing a live HTTP server.
+const express = require("express");
+const request = require("supertest");
 const { loginLimiter, registerLimiter } = require("../utils/rate_limiters");
 
 describe("rate_limiters", () => {
-    test("loginLimiter is exported as a function (Express middleware)", () => {
+    test("loginLimiter and registerLimiter are exported as Express middleware functions", () => {
         expect(typeof loginLimiter).toBe("function");
-    });
-
-    test("registerLimiter is exported as a function (Express middleware)", () => {
         expect(typeof registerLimiter).toBe("function");
     });
 
-    test("loginLimiter message function includes attempt count and limit", () => {
-        // Access the options the limiter was constructed with via its internal store.
-        // express-rate-limit exposes options on the middleware function itself.
-        const mockReq = { rateLimit: { current: 5, limit: 10 } };
-        const mockRes = {};
-        const msg = loginLimiter.options
-            ? loginLimiter.options.message(mockReq, mockRes)
-            : loginLimiter.message?.(mockReq, mockRes);
+    describe("loginLimiter", () => {
+        let app;
+        beforeEach(() => {
+            app = express();
+            app.set("trust proxy", 1);
+            // Attach the limiter directly to a test route
+            app.post("/login", loginLimiter, (req, res) => res.sendStatus(200));
+        });
 
-        if (msg) {
-            expect(msg.message).toContain("5");
-            expect(msg.message).toContain("10");
-            expect(msg.message).toContain("15 minutes");
-        }
+        test("allows requests within the limit", async () => {
+            const res = await request(app).post("/login");
+            expect(res.status).toBe(200);
+        });
+
+        test("message function includes current attempt count and limit", () => {
+            const mockReq = { rateLimit: { current: 5, limit: 10 } };
+            const mockRes = {};
+            // Access the message option directly from the middleware's options object
+            const msg = loginLimiter.options?.message?.(mockReq, mockRes)
+                ?? loginLimiter.message?.(mockReq, mockRes);
+            if (msg) {
+                expect(msg.message).toContain("5");
+                expect(msg.message).toContain("10");
+                expect(msg.message).toContain("15 minutes");
+            }
+        });
     });
 
-    test("registerLimiter message function includes attempt count and limit", () => {
-        const mockReq = { rateLimit: { current: 3, limit: 10 } };
-        const mockRes = {};
-        const msg = registerLimiter.options
-            ? registerLimiter.options.message(mockReq, mockRes)
-            : registerLimiter.message?.(mockReq, mockRes);
+    describe("registerLimiter", () => {
+        let app;
+        beforeEach(() => {
+            app = express();
+            app.set("trust proxy", 1);
+            app.post("/register", registerLimiter, (req, res) => res.sendStatus(200));
+        });
 
-        if (msg) {
-            expect(msg.message).toContain("3");
-            expect(msg.message).toContain("10");
-            expect(msg.message).toContain("1 hour");
-        }
+        test("allows requests within the limit", async () => {
+            const res = await request(app).post("/register");
+            expect(res.status).toBe(200);
+        });
+
+        test("message function includes current attempt count and limit", () => {
+            const mockReq = { rateLimit: { current: 3, limit: 10 } };
+            const mockRes = {};
+            const msg = registerLimiter.options?.message?.(mockReq, mockRes)
+                ?? registerLimiter.message?.(mockReq, mockRes);
+            if (msg) {
+                expect(msg.message).toContain("3");
+                expect(msg.message).toContain("10");
+                expect(msg.message).toContain("1 hour");
+            }
+        });
     });
 });
+
