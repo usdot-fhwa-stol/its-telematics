@@ -60,6 +60,7 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
+    "coverageReporters": ["lcov", "text", "clover"],
     "coveragePathIgnorePatterns": [
       "/node_modules/"
     ]
