@@ -294,6 +294,8 @@ jobs:
         run: |
             cd $GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app
             mkdir coverage
+            sed -i 's|SF:|SF:telematic_system/telematic_apps/web_app/server/|g' server/coverage/lcov.info
+            sed -i 's|SF:|SF:telematic_system/telematic_apps/web_app/client/|g' client/coverage/lcov.info
             mv server/coverage/lcov.info coverage/lcov_server.info
             mv client/coverage/lcov.info coverage/lcov_client.info
             npm install -g lcov-result-merger
