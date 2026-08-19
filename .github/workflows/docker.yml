@@ -89,7 +89,7 @@ jobs:
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_apache2:pr-${{ github.event.pull_request.number }}
       # Compare PR image against the base branch env on Docker Scout and post results to the PR
       - name: Docker Scout Compare telematic-apache
-        uses: docker/scout-action@v1
+        uses: docker/scout-action@v1.12.0
         with:
           command: compare
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_apache2:pr-${{ github.event.pull_request.number }}
@@ -97,7 +97,14 @@ jobs:
           ignore-unchanged: true              # only show CVEs introduced by this PR
           only-severities: critical,high      # ignore low/medium noise
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           keep-previous-comments: true        # replace prior Scout comment on each push
+      - name: Docker Scout Policy Evaluation telematic-apache
+        uses: docker/scout-action@v1.24.0
+        with:
+          command: policy
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_apache2:pr-${{ github.event.pull_request.number }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   telematic-carma-cloud-nats-bridge:
     needs: [determine_docker_org_and_tag, changes]
@@ -121,7 +128,7 @@ jobs:
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_cloud_nats_bridge:pr-${{ github.event.pull_request.number }}
       - name: Docker Scout Compare telematic-carma-cloud-nats-bridge
-        uses: docker/scout-action@v1
+        uses: docker/scout-action@v1.12.0
         with:
           command: compare
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_cloud_nats_bridge:pr-${{ github.event.pull_request.number }}
@@ -129,7 +136,14 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           keep-previous-comments: true
+      - name: Docker Scout Policy Evaluation telematic-carma-cloud-nats-bridge
+        uses: docker/scout-action@v1.24.0
+        with:
+          command: policy
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_cloud_nats_bridge:pr-${{ github.event.pull_request.number }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   telematic-kafka-nats-bridge:
     needs: [determine_docker_org_and_tag, changes]
@@ -153,7 +167,7 @@ jobs:
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematics-kafka-nats-bridge:pr-${{ github.event.pull_request.number }}
       - name: Docker Scout Compare telematic-kafka-nats-bridge
-        uses: docker/scout-action@v1
+        uses: docker/scout-action@v1.12.0
         with:
           command: compare
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematics-kafka-nats-bridge:pr-${{ github.event.pull_request.number }}
@@ -161,7 +175,14 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           keep-previous-comments: true
+      - name: Docker Scout Policy Evaluation telematic-kafka-nats-bridge
+        uses: docker/scout-action@v1.24.0
+        with:
+          command: policy
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematics-kafka-nats-bridge:pr-${{ github.event.pull_request.number }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   telematic-carma-vehicle-bridge:
     needs: [determine_docker_org_and_tag, changes]
@@ -185,7 +206,7 @@ jobs:
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
       - name: Docker Scout Compare telematic-carma-vehicle-bridge
-        uses: docker/scout-action@v1
+        uses: docker/scout-action@v1.12.0
         with:
           command: compare
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
@@ -193,10 +214,14 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
-          dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
-          dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           keep-previous-comments: true
+      - name: Docker Scout Policy Evaluation telematic-carma-vehicle-bridge
+        uses: docker/scout-action@v1.24.0
+        with:
+          command: policy
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   telematic-historical-data-processing:
     needs: [determine_docker_org_and_tag, changes]
@@ -220,7 +245,7 @@ jobs:
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_historical_data_processing:pr-${{ github.event.pull_request.number }}
       - name: Docker Scout Compare telematic-historical-data-processing
-        uses: docker/scout-action@v1
+        uses: docker/scout-action@v1.12.0
         with:
           command: compare
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_historical_data_processing:pr-${{ github.event.pull_request.number }}
@@ -228,7 +253,14 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           keep-previous-comments: true
+      - name: Docker Scout Policy Evaluation telematic-historical-data-processing
+        uses: docker/scout-action@v1.24.0
+        with:
+          command: policy
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_historical_data_processing:pr-${{ github.event.pull_request.number }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   telematic-grafana:
     needs: [determine_docker_org_and_tag, changes]
@@ -252,7 +284,7 @@ jobs:
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_grafana:pr-${{ github.event.pull_request.number }}
       - name: Docker Scout Compare telematic-grafana
-        uses: docker/scout-action@v1
+        uses: docker/scout-action@v1.12.0
         with:
           command: compare
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_grafana:pr-${{ github.event.pull_request.number }}
@@ -260,7 +292,14 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           keep-previous-comments: true
+      - name: Docker Scout Policy Evaluation telematic-grafana
+        uses: docker/scout-action@v1.24.0
+        with:
+          command: policy
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_grafana:pr-${{ github.event.pull_request.number }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   telematic-cloud-messaging:
     needs: [determine_docker_org_and_tag, changes]
@@ -284,7 +323,7 @@ jobs:
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_cloud_messaging:pr-${{ github.event.pull_request.number }}
       - name: Docker Scout Compare telematic-cloud-messaging
-        uses: docker/scout-action@v1
+        uses: docker/scout-action@v1.12.0
         with:
           command: compare
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_cloud_messaging:pr-${{ github.event.pull_request.number }}
@@ -292,7 +331,14 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           keep-previous-comments: true
+      - name: Docker Scout Policy Evaluation telematic-cloud-messaging
+        uses: docker/scout-action@v1.24.0
+        with:
+          command: policy
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_cloud_messaging:pr-${{ github.event.pull_request.number }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   telematic-rsu-management-service:
     needs: [determine_docker_org_and_tag, changes]
@@ -316,7 +362,7 @@ jobs:
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_rsu_management_service:pr-${{ github.event.pull_request.number }}
       - name: Docker Scout Compare telematic-rsu-management-service
-        uses: docker/scout-action@v1
+        uses: docker/scout-action@v1.12.0
         with:
           command: compare
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_rsu_management_service:pr-${{ github.event.pull_request.number }}
@@ -324,7 +370,14 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           keep-previous-comments: true
+      - name: Docker Scout Policy Evaluation telematic-rsu-management-service
+        uses: docker/scout-action@v1.24.0
+        with:
+          command: policy
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_rsu_management_service:pr-${{ github.event.pull_request.number }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   telematic-web-app-client:
     needs: [determine_docker_org_and_tag, changes]
@@ -348,7 +401,7 @@ jobs:
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_client:pr-${{ github.event.pull_request.number }}
       - name: Docker Scout Compare telematic-web-app-client
-        uses: docker/scout-action@v1
+        uses: docker/scout-action@v1.12.0
         with:
           command: compare
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_client:pr-${{ github.event.pull_request.number }}
@@ -356,7 +409,14 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           keep-previous-comments: true
+      - name: Docker Scout Policy Evaluation telematic-web-app-client
+        uses: docker/scout-action@v1.24.0
+        with:
+          command: policy
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_client:pr-${{ github.event.pull_request.number }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
   telematic-web-app-server:
     needs: [determine_docker_org_and_tag, changes]
@@ -380,7 +440,7 @@ jobs:
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_server:pr-${{ github.event.pull_request.number }}
       - name: Docker Scout Compare telematic-web-app-server
-        uses: docker/scout-action@v1
+        uses: docker/scout-action@v1.12.0
         with:
           command: compare
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_server:pr-${{ github.event.pull_request.number }}
@@ -388,4 +448,12 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           keep-previous-comments: true
+
+      - name: Docker Scout Policy Evaluation telematic-web-app-server
+        uses: docker/scout-action@v1.24.0
+        with:
+          command: policy
+          image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_web_server:pr-${{ github.event.pull_request.number }}
+          organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
