@@ -290,17 +290,11 @@ jobs:
 
             with open(coverage_file, 'w') as coverage:
               coverage.write(coverage_content)
-      - name: Move web app client and server code coverage files into one
+      - name: Verify web app server code coverage results
         run: |
-            cd $GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app
-            mkdir coverage
-            sed -i 's|SF:|SF:telematic_system/telematic_apps/web_app/server/|g' server/coverage/lcov.info
-            sed -i 's|SF:|SF:telematic_system/telematic_apps/web_app/client/|g' client/coverage/lcov.info
-            mv server/coverage/lcov.info coverage/lcov_server.info
-            mv client/coverage/lcov.info coverage/lcov_client.info
-            npm install -g lcov-result-merger
-            npx lcov-result-merger 'coverage/lcov_*.info' 'coverage/lcov.info'
-            cat coverage/lcov.info
+          cd $GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/server/coverage
+          ls -la
+          head -n 20 lcov.info
       - name: Run SonarScanner
         uses: usdot-fhwa-stol/actions/sonar-scanner@main
         with:
