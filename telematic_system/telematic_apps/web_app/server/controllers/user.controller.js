@@ -358,6 +358,7 @@ exports.deleteUser = async (req, res) => {
         await htpasswordManager.removeUser(req.query.username);
         res.sendStatus(200);
     } catch (err) {
+        console.error('User %s logout error:', req?.query?.username, err);
         res.sendStatus(501);
     }
 }

@@ -60,14 +60,16 @@ const MainRouter = React.memo(() => {
       }
     });
   }, [authContext.org_id, authContext.sessionToken, authContext.user_id]);
-
+  
+  const renderConditionalAdminPage = hasAdminAccess ? <AdminPage /> : <Navigate to={postLoginRoute} replace></Navigate>;
+  
   const adminRouteElement = hasAdminAccess === null
     ? (
       <Box sx={{ display: 'flex', width: '100%', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
         <CircularProgress />
       </Box>
     )
-    : (hasAdminAccess ? <AdminPage /> : <Navigate to={postLoginRoute} replace></Navigate>);
+    : (renderConditionalAdminPage);
 
   if (isMobile && !serverContext.isInitialized) {
     return (

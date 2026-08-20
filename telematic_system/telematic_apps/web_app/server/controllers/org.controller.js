@@ -17,12 +17,12 @@
 const { user, org_user, org, Sequelize } = require("../models");
 const { hasServerAdminAccess, isOrgAdmin, loadAuthenticatedUser } = require("../utils/authorization");
 
-const ALLOWED_ORG_USER_UPDATE_FIELDS = ["org_id", "user_id", "role"];
-const ALLOWED_ORG_ROLES = ["Admin", "Editor", "Viewer"];
+const ALLOWED_ORG_USER_UPDATE_FIELDS = new set ("org_id", "user_id", "role");
+const ALLOWED_ORG_ROLES = new set ("Admin", "Editor", "Viewer");
 
 const sanitizeOrgUserPayload = (payload) => {
     const source = payload || {};
-    const unexpectedFields = Object.keys(source).filter((field) => !ALLOWED_ORG_USER_UPDATE_FIELDS.includes(field));
+    const unexpectedFields = Object.keys(source).filter((field) => !ALLOWED_ORG_USER_UPDATE_FIELDS.has(field));
     if (unexpectedFields.length > 0) {
         return {
             valid: false,
@@ -30,7 +30,7 @@ const sanitizeOrgUserPayload = (payload) => {
         };
     }
 
-    if (!ALLOWED_ORG_ROLES.includes(source.role)) {
+    if (!ALLOWED_ORG_ROLES.has(source.role)) {
         return {
             valid: false,
             message: `Invalid organization role: ${source.role}.`

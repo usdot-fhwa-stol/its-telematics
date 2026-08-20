@@ -1,8 +1,8 @@
 import { getCurrentUserAccess } from './api-user';
 
 const hasValidIdentifiers = (userId, orgId) => {
-    const normalizedUserId = parseInt(userId);
-    const normalizedOrgId = parseInt(orgId);
+    const normalizedUserId = Number.parseInt(userId);
+    const normalizedOrgId = Number.parseInt(orgId);
     return !Number.isNaN(normalizedUserId) && normalizedUserId > 0
         && !Number.isNaN(normalizedOrgId) && normalizedOrgId > 0;
 };

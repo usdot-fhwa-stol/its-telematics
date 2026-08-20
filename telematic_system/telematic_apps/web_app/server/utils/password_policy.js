@@ -32,7 +32,7 @@ const MIN_ZXCVBN_SCORE = 3;
  * @returns {{valid: boolean, message: string|undefined}} validation result. If valid is false, message describes the reason.
  */
 const validatePassword = (password, username, email) => {
-    if (password === undefined || password === null || typeof password !== "string") {
+    if (password == undefined || password == null || typeof password !== "string") {
         return { valid: false, message: "Password is required." };
     }
 
@@ -42,15 +42,15 @@ const validatePassword = (password, username, email) => {
 
     //Reject passwords that are the same as the username or email (identity fields)
     const lowerPassword = password.toLowerCase();
-    if (username !== undefined && username !== null && lowerPassword === String(username).toLowerCase()) {
+    if (username != undefined && username != null && lowerPassword === String(username).toLowerCase()) {
         return { valid: false, message: "Password cannot be the same as the username." };
     }
-    if (email !== undefined && email !== null && lowerPassword === String(email).toLowerCase()) {
+    if (email != undefined && email != null && lowerPassword === String(email).toLowerCase()) {
         return { valid: false, message: "Password cannot be the same as the email." };
     }
 
     //Use zxcvbn to catch weak passwords and variations of identity fields (e.g. username123!)
-    const inputs = [username, email].filter((field) => field !== undefined && field !== null && field !== "");
+    const inputs = [username, email].filter((field) => field != undefined && field != null && field !== "");
     const result = zxcvbn(password, inputs);
     if (result.score < MIN_ZXCVBN_SCORE) {
         const feedback = result.feedback && result.feedback.warning ? result.feedback.warning : "Password is too weak or too easy to guess.";

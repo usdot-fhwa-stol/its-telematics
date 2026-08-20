@@ -17,30 +17,28 @@ test("Test NavMenu checkServerSession", async () => {
   jest.spyOn(userApi, "checkServerSession").mockResolvedValue({});
   jest.spyOn(orgApi, "getUserRole").mockResolvedValue([{ role: "Admin" }]);
   adminAccessApi.getVerifiedAdminAccess.mockResolvedValue(true);
-  await act(async() => {
-    const value = {
-      user_id: 1,
-      isAuth: "true",
-      username: "test",
-      email: "test@telematic.com",
-      sessionToken: "sessionToken",
-      last_seen_at: 0,
-      org_id: "1",
-      name: "test",
-      org_name: "my-org",
-      is_admin: "1",
-      role: "Admin",
-      sessionExpiredAt: 100000,
-      updateRole: jest.fn(),
-    };
+  const value = {
+    user_id: 1,
+    isAuth: "true",
+    username: "test",
+    email: "test@telematic.com",
+    sessionToken: "sessionToken",
+    last_seen_at: 0,
+    org_id: "1",
+    name: "test",
+    org_name: "my-org",
+    is_admin: "1",
+    role: "Admin",
+    sessionExpiredAt: 100000,
+    updateRole: jest.fn(),
+  };
   render(
-     <MemoryRouter initialEntries={["/telematic/events"]}>
-       <AuthContext.Provider value={value}>
-         <NavMenu />
-       </AuthContext.Provider>
-     </MemoryRouter>
+      <MemoryRouter initialEntries={["/telematic/events"]}>
+        <AuthContext.Provider value={value}>
+          <NavMenu />
+        </AuthContext.Provider>
+      </MemoryRouter>
   );
-});
 
 await waitFor(() => {
     expect(screen.getByTitle('Logout')).toBeInTheDocument();
@@ -52,30 +50,28 @@ test("NavMenu hides admin link when backend denies admin access", async () => {
  jest.spyOn(userApi, "checkServerSession").mockResolvedValue({});
  jest.spyOn(orgApi, "getUserRole").mockResolvedValue([{ role: "Viewer" }]);
  adminAccessApi.getVerifiedAdminAccess.mockResolvedValue(false);
- await act(async() => {
-   const value = {
-     user_id: 1,
-     isAuth: "true",
-     username: "test",
-     email: "test@telematic.com",
-     sessionToken: "sessionToken",
-     last_seen_at: 0,
-     org_id: "1",
-     name: "test",
-     org_name: "my-org",
-     is_admin: "1",
-     role: "Admin",
-     sessionExpiredAt: 100000,
-     updateRole: jest.fn(),
-   };
-   render(
-     <MemoryRouter initialEntries={["/telematic/events"]}>
-       <AuthContext.Provider value={value}>
-         <NavMenu />
-       </AuthContext.Provider>
-     </MemoryRouter>
-   );
- });
+const value = {
+    user_id: 1,
+    isAuth: "true",
+    username: "test",
+    email: "test@telematic.com",
+    sessionToken: "sessionToken",
+    last_seen_at: 0,
+    org_id: "1",
+    name: "test",
+    org_name: "my-org",
+    is_admin: "1",
+    role: "Admin",
+    sessionExpiredAt: 100000,
+    updateRole: jest.fn(),
+  };
+  render(
+    <MemoryRouter initialEntries={["/telematic/events"]}>
+      <AuthContext.Provider value={value}>
+        <NavMenu />
+      </AuthContext.Provider>
+    </MemoryRouter>
+  );
 
  await waitFor(() => {
    expect(screen.getByTitle('Logout')).toBeInTheDocument();
