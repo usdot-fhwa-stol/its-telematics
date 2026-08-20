@@ -17,8 +17,8 @@
 const { user, org_user, org, Sequelize } = require("../models");
 const { hasServerAdminAccess, isOrgAdmin, loadAuthenticatedUser } = require("../utils/authorization");
 
-const ALLOWED_ORG_USER_UPDATE_FIELDS = new set ("org_id", "user_id", "role");
-const ALLOWED_ORG_ROLES = new set ("Admin", "Editor", "Viewer");
+const ALLOWED_ORG_USER_UPDATE_FIELDS = new Set(["org_id", "user_id", "role"]);
+const ALLOWED_ORG_ROLES = new Set(["Admin", "Editor", "Viewer"]);
 
 const sanitizeOrgUserPayload = (payload) => {
     const source = payload || {};

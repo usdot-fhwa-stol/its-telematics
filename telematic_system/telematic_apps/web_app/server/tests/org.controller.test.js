@@ -119,6 +119,7 @@ describe("org.controller", () => {
             await orgCtrl.addOrgUser({
                 body: { data: { org_id: 1, user_id: 2, role: "Editor" } }
             }, res);
+            await flushPromises();
             expect(res.status).toHaveBeenCalledWith(200);
         });
     });
@@ -146,6 +147,7 @@ describe("org.controller", () => {
             await orgCtrl.updateOrgUser({
                 body: { data: { org_id: 1, user_id: 2, role: "Admin" } }
             }, res);
+            await flushPromises();
             expect(org_user.update).toHaveBeenCalled();
         });
     });

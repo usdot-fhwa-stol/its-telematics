@@ -32,9 +32,12 @@ app.set("trust proxy", process.env.TRUST_PROXY_HOPS ? Number(process.env.TRUST_P
 const cors = require("cors");
 
 require("dotenv").config();
-const allowedOrigins = process.env.ALLOW_CLIENT_URL.split(",");
+const allowedOrigins = (process.env.ALLOW_CLIENT_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
 var corsOptions = {
-  origin: allowedOrigins,
+  origin: allowedOrigins.length > 0 ? allowedOrigins : true,
   credentials: true,
   optionsSuccessStatus: 200,
 };

@@ -7,20 +7,28 @@ jest.mock("../models", () => {
 });
 
 jest.mock("../utils/verify_token", () => ({ verifyToken: jest.fn() }));
+const mockHtpasswordManager = { upsertUser: jest.fn(), removeUser: jest.fn() };
+jest.mock("htpasswd-mgr", () => jest.fn(() => mockHtpasswordManager));
 
 const { user, org_user, org } = require("../models");
 const { verifyToken } = require("../utils/verify_token");
-const manager = require('htpasswd-mgr');
 const user_controller = require('../controllers/user.controller');
 const saltHash = require('password-salt-and-hash');
-let grafana_htpasswd = '/opt/apache2/grafana_htpasswd';
-let htpasswordManager = manager(grafana_htpasswd);
 
 process.env.SECRET = "my test secret";
 
 const makeRes = () => ({ status: jest.fn().mockReturnThis(), send: jest.fn(), sendStatus: jest.fn() });
+const flushPromises = () => new Promise(resolve => setImmediate(resolve));
+const settleAsyncWork = async () => {
+    await flushPromises();
+    await flushPromises();
+};
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+    jest.clearAllMocks();
+    mockHtpasswordManager.upsertUser.mockResolvedValue({});
+    mockHtpasswordManager.removeUser.mockResolvedValue({});
+});
 
 // ── loginUser ─────────────────────────────────────────────────────────────────
 
@@ -56,10 +64,11 @@ describe("loginUser", () => {
             last_seen_at: 0, is_admin: 1, org_id: 1,
             password: hashPassword.password, salt: hashPassword.salt,
         }]);
-        jest.spyOn(htpasswordManager, 'upsertUser').mockResolvedValue({ data: 'data' });
+        mockHtpasswordManager.upsertUser.mockResolvedValue({ data: 'data' });
         org.findAll.mockResolvedValue([{ id: 1, name: "Test Org" }]);
         const res = makeRes();
-        await user_controller.loginUser({ body: { password: 'test', username: 'test' } }, res);
+        user_controller.loginUser({ body: { password: 'test', username: 'test' } }, res);
+        await settleAsyncWork();
         expect(res.status).toHaveBeenCalledWith(200);
     });
 
@@ -70,16 +79,18 @@ describe("loginUser", () => {
             last_seen_at: 0, is_admin: 0, org_id: 1,
             password: hashPassword.password, salt: hashPassword.salt,
         }]);
-        jest.spyOn(htpasswordManager, 'upsertUser').mockRejectedValue(new Error("htpasswd error"));
+        mockHtpasswordManager.upsertUser.mockRejectedValue(new Error("htpasswd error"));
         const res = makeRes();
-        await user_controller.loginUser({ body: { password: 'test', username: 'test' } }, res);
+        user_controller.loginUser({ body: { password: 'test', username: 'test' } }, res);
+        await settleAsyncWork();
         expect(res.status).toHaveBeenCalledWith(500);
     });
 
     test("returns 500 on DB error", async () => {
         user.findAll.mockRejectedValue(new Error("DB down"));
         const res = makeRes();
-        await user_controller.loginUser({ body: { username: "u", password: "p" } }, res);
+        user_controller.loginUser({ body: { username: "u", password: "p" } }, res);
+        await settleAsyncWork();
         expect(res.status).toHaveBeenCalledWith(500);
     });
 });
@@ -92,7 +103,7 @@ describe("registerUser", () => {
     test("returns 400 when body is missing required fields", async () => {
         const res = makeRes();
         await user_controller.registerUser({ body: { username: "u" } }, res);
-        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.sendStatus).toHaveBeenCalledWith(400);
     });
 
     test("rejects restricted administrative fields (is_admin)", async () => {
@@ -129,9 +140,10 @@ describe("registerUser", () => {
         user.create.mockResolvedValue({ id: 5, org_id: 1 });
         org_user.create.mockResolvedValue({});
         const res = makeRes();
-        await user_controller.registerUser({
+        user_controller.registerUser({
             body: { username: "newuser", email: "new@x.com", password: STRONG_PASSWORD, org_id: 1 }
         }, res);
+        await settleAsyncWork();
         expect(res.status).toHaveBeenCalledWith(201);
         expect(res.send).toHaveBeenCalledWith({ message: "Successfully registered user." });
     });
@@ -140,9 +152,10 @@ describe("registerUser", () => {
         user.findAll.mockResolvedValue([]);
         user.create.mockRejectedValue(new Error("create failed"));
         const res = makeRes();
-        await user_controller.registerUser({
+        user_controller.registerUser({
             body: { username: "newuser", email: "new@x.com", password: STRONG_PASSWORD, org_id: 1 }
         }, res);
+        await settleAsyncWork();
         expect(res.status).toHaveBeenCalledWith(500);
     });
 
@@ -151,18 +164,20 @@ describe("registerUser", () => {
         user.create.mockResolvedValue({ id: 5, org_id: 1 });
         org_user.create.mockRejectedValue(new Error("org create failed"));
         const res = makeRes();
-        await user_controller.registerUser({
+        user_controller.registerUser({
             body: { username: "newuser", email: "new@x.com", password: STRONG_PASSWORD, org_id: 1 }
         }, res);
+        await settleAsyncWork();
         expect(res.status).toHaveBeenCalledWith(500);
     });
 
     test("returns 404 when user.findAll throws", async () => {
         user.findAll.mockRejectedValue(new Error("DB error"));
         const res = makeRes();
-        await user_controller.registerUser({
+        user_controller.registerUser({
             body: { username: "u", email: "u@x.com", password: STRONG_PASSWORD, org_id: 1 }
         }, res);
+        await settleAsyncWork();
         expect(res.status).toHaveBeenCalledWith(404);
     });
 });
@@ -209,11 +224,12 @@ describe("forgetPwd", () => {
     test("returns 200 on successful password update", async () => {
         user.findAll.mockResolvedValue([{ id: 1 }]);
         user.update.mockResolvedValue([1]);
-        jest.spyOn(htpasswordManager, 'upsertUser').mockResolvedValue({});
+        mockHtpasswordManager.upsertUser.mockResolvedValue({});
         const res = makeRes();
-        await user_controller.forgetPwd({
+        user_controller.forgetPwd({
             body: { username: "alice", email: "a@x.com", new_password: STRONG_PASSWORD }
         }, res);
+        await settleAsyncWork();
         expect(res.status).toHaveBeenCalledWith(200);
     });
 
@@ -221,29 +237,32 @@ describe("forgetPwd", () => {
         user.findAll.mockResolvedValue([{ id: 1 }]);
         user.update.mockResolvedValue([0]);
         const res = makeRes();
-        await user_controller.forgetPwd({
+        user_controller.forgetPwd({
             body: { username: "alice", email: "a@x.com", new_password: STRONG_PASSWORD }
         }, res);
+        await settleAsyncWork();
         expect(res.status).toHaveBeenCalledWith(500);
     });
 
     test("returns 500 when htpasswd upsert fails", async () => {
         user.findAll.mockResolvedValue([{ id: 1 }]);
         user.update.mockResolvedValue([1]);
-        jest.spyOn(htpasswordManager, 'upsertUser').mockRejectedValue(new Error("htpasswd fail"));
+        mockHtpasswordManager.upsertUser.mockRejectedValue(new Error("htpasswd fail"));
         const res = makeRes();
-        await user_controller.forgetPwd({
+        user_controller.forgetPwd({
             body: { username: "alice", email: "a@x.com", new_password: STRONG_PASSWORD }
         }, res);
+        await settleAsyncWork();
         expect(res.status).toHaveBeenCalledWith(500);
     });
 
     test("returns 500 on DB error", async () => {
         user.findAll.mockRejectedValue(new Error("DB down"));
         const res = makeRes();
-        await user_controller.forgetPwd({
+        user_controller.forgetPwd({
             body: { username: "u", email: "u@x.com", new_password: STRONG_PASSWORD }
         }, res);
+        await settleAsyncWork();
         expect(res.status).toHaveBeenCalledWith(500);
     });
 });
@@ -288,7 +307,8 @@ describe("updateUserServerAdmin", () => {
     test("returns 500 on DB error", async () => {
         user.update.mockRejectedValue(new Error("DB fail"));
         const res = makeRes();
-        await user_controller.updateUserServerAdmin({ body: { user_id: 1, is_admin: 1 } }, res);
+        user_controller.updateUserServerAdmin({ body: { user_id: 1, is_admin: 1 } }, res);
+        await settleAsyncWork();
         expect(res.status).toHaveBeenCalledWith(500);
     });
 });
@@ -363,14 +383,14 @@ describe("deleteUser", () => {
     });
 
     test("returns 200 on successful delete", async () => {
-        jest.spyOn(htpasswordManager, 'removeUser').mockResolvedValue({});
+        mockHtpasswordManager.removeUser.mockResolvedValue({});
         const res = makeRes();
         await user_controller.deleteUser({ query: { username: "alice" } }, res);
         expect(res.sendStatus).toHaveBeenCalledWith(200);
     });
 
     test("returns 501 when removeUser fails", async () => {
-        jest.spyOn(htpasswordManager, 'removeUser').mockRejectedValue(new Error("fail"));
+        mockHtpasswordManager.removeUser.mockRejectedValue(new Error("fail"));
         const res = makeRes();
         await user_controller.deleteUser({ query: { username: "alice" } }, res);
         expect(res.sendStatus).toHaveBeenCalledWith(501);
@@ -432,6 +452,7 @@ describe("findAll", () => {
         await user_controller.findAll({
             authUser: { id: 2, is_admin: 0, org_id: 5 }
         }, res);
+        await settleAsyncWork();
         expect(res.status).toHaveBeenCalledWith(500);
     });
 });
