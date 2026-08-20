@@ -27,6 +27,7 @@ const { verifyToken } = require("../utils/verify_token");
 const orgCtrl = require("../controllers/org.controller");
 
 const makeRes = () => ({ status: jest.fn().mockReturnThis(), send: jest.fn() });
+const flushPromises = () => new Promise(resolve => setImmediate(resolve));
 
 describe("org.controller", () => {
     beforeEach(() => jest.clearAllMocks());
@@ -44,7 +45,8 @@ describe("org.controller", () => {
         test("returns 500 on DB error", async () => {
             org.findAll.mockRejectedValue(new Error("DB error"));
             const res = makeRes();
-            await orgCtrl.findAll({}, res);
+            orgCtrl.findAll({}, res);
+            await flushPromises();
             expect(res.status).toHaveBeenCalledWith(500);
         });
     });
@@ -173,7 +175,8 @@ describe("org.controller", () => {
             ]);
             org_user.destroy.mockResolvedValue(1);
             const res = makeRes();
-            await orgCtrl.delOrgUser({ query: { user_id: "5", org_id: "2" } }, res);
+            orgCtrl.delOrgUser({ query: { user_id: "5", org_id: "2" } }, res);
+            await flushPromises();
             expect(org_user.destroy).toHaveBeenCalled();
             expect(res.status).toHaveBeenCalledWith(200);
         });
@@ -185,7 +188,8 @@ describe("org.controller", () => {
             ]);
             org_user.destroy.mockResolvedValue(0);
             const res = makeRes();
-            await orgCtrl.delOrgUser({ query: { user_id: "5", org_id: "2" } }, res);
+            orgCtrl.delOrgUser({ query: { user_id: "5", org_id: "2" } }, res);
+            await flushPromises();
             expect(res.status).toHaveBeenCalledWith(400);
         });
     });

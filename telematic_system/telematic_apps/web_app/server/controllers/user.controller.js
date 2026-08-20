@@ -349,16 +349,17 @@ exports.loginUser = (req, res) => {
 /***
  * When a user logout, clear the user from the credential file
  */
-exports.deleteUser = (req, res) => {
-    if (req == undefined || req.query == undefined || req.query.username == undefined) {
+exports.deleteUser = async (req, res) => {
+    if (!req?.query?.username){
         res.sendStatus(400);
         return;
     }
-    htpasswordManager.removeUser(req.query.username).then((status) => {
+    try {
+        await htpasswordManager.removeUser(req.query.username);
         res.sendStatus(200);
-    }).catch((err) => {
+    } catch (err) {
         res.sendStatus(501);
-    })
+    }
 }
 
 /***
