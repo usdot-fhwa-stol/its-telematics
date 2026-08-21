@@ -46,16 +46,16 @@ class Config:
         self.upload_destination_path = os.getenv("HPS_UPLOAD_DESTINATION_PATH")
 
         # NATS params
-        self.nats_ip_port = os.getenv("NATS_URL")
+        self.nats_ip_port = os.getenv("HPS_NATS_SERVER_IP_PORT")
         # Nats request topic
-        self.nats_request_topic = os.getenv("FILE_PROCESSING_SUBJECT")
+        self.nats_request_topic = os.getenv("HPS_FILE_PROCESSING_SUBJECT")
 
         # Load Influx params
         self.influx_bucket = os.getenv("HPS_INFLUX_BUCKET")
-        self.influx_org = os.getenv("DOCKER_INFLUXDB_INIT_ORG")
-        self.influx_token = os.getenv("DOCKER_INFLUXDB_INIT_ADMIN_TOKEN")
+        self.influx_org = os.getenv("HPS_INFLUX_ORG")
+        self.influx_token = os.getenv("HPS_INFLUX_TOKEN")
         self.influx_url = (
-            os.getenv("INFLUXDB_HOST") + ":" + os.getenv("INFLUXDB_PORT")
+            os.getenv("HPS_INFLUX_IP") + ":" + os.getenv("HPS_INFLUX_PORT")
         )
 
         # Fields in the ros message to force to string type.
@@ -75,11 +75,11 @@ class Config:
         self.log_handler_type = os.getenv("HPS_LOG_HANDLER_TYPE")
 
         # Mysql parameters
-        self.mysql_host = os.getenv("MYSQL_HOST")
-        self.mysql_port = int(os.getenv("MYSQL_PORT"))
-        self.mysql_db = os.getenv("MYSQL_DATABASE")
-        self.mysql_user = os.getenv("MYSQL_USER")
-        self.mysql_password = os.getenv("MYSQL_PASSWORD")
+        self.mysql_host = os.getenv("HPS_MYSQL_HOST")
+        self.mysql_port = int(os.getenv("HPS_MYSQL_PORT"))
+        self.mysql_db = os.getenv("HPS_MYSQL_DB")
+        self.mysql_user = os.getenv("HPS_MYSQL_USER")
+        self.mysql_password = os.getenv("HPS_MYSQL_PASSWORD")
 
     def set_logger(self):
         # Create logger
