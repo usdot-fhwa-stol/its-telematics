@@ -1,4 +1,11 @@
 version: "3"
+
+# Every service below receives its variables through an explicit `environment:` block
+# instead of `env_file`. The left-hand name is the variable the service's own code /
+# application.properties / application.yaml reads; the ${...} on the right is the shared
+# name defined in telematic.local.env (copied to .env by local.setup.sh).
+# This file is the only remapping layer - the applications are untouched.
+
 services:
 
   influxdb:
@@ -13,8 +20,15 @@ services:
       options:
         max-size: "10m"
         max-file: "1"
-    env_file:
-      - .env
+    environment:
+      - DOCKER_INFLUXDB_INIT_CLI_CONFIG_NAME=${DOCKER_INFLUXDB_INIT_CLI_CONFIG_NAME}
+      - DOCKER_INFLUXDB_INIT_MODE=${DOCKER_INFLUXDB_INIT_MODE}
+      - DOCKER_INFLUXDB_INIT_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${DOCKER_INFLUXDB_INIT_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+      - DOCKER_INFLUXDB_INIT_RETENTION=${DOCKER_INFLUXDB_INIT_RETENTION}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
     volumes:
       - /opt/influxdb2/data:/var/lib/influxdb2 # data directory
       - /opt/influxdb2/:/etc/influxdb2 # config directory
@@ -128,8 +142,39 @@ services:
       depends_on:
         - mysqldb
         - grafana
-      env_file:
-        - .env
+      environment:
+        # Server
+        - PORT=${PORT}
+        - ALLOW_CLIENT_URL=${ALLOW_CLIENT_URL}
+        # Security
+        - GRAFANA_HTPASSWORD=${GRAFANA_HTPASSWORD}
+        - SESSION_TIMEOUT=${SESSION_TIMEOUT}
+        - SECRET=${SECRET}
+        # MySQL (shared) -> web server names
+        - DB_HOST=${MYSQL_HOST}
+        - DB_PORT=${MYSQL_PORT}
+        - DB_USER=${MYSQL_USER}
+        - DB_PASSWORD=${MYSQL_PASSWORD}
+        - GRAFANA_DB=${MYSQL_DATABASE}
+        # NATS (shared) -> web server name
+        - NATS_SERVERS=${NATS_URL}
+        - FILE_PROCESSING_SUBJECT=${FILE_PROCESSING_SUBJECT}
+        # RSU Management Service client
+        - RSU_MANAGEMENT_SERVICE_URL=${RSU_MANAGEMENT_SERVICE_URL}
+        # File upload service
+        - UPLOAD_DESTINATION=${UPLOAD_DESTINATION}
+        - UPLOAD_DESTINATION_PATH=${UPLOAD_DESTINATION_PATH}
+        - UPLOAD_HTTP_PORT=${UPLOAD_HTTP_PORT}
+        - UPLOAD_TIME_OUT=${UPLOAD_TIME_OUT}
+        - UPLOAD_MAX_FILE_SIZE=${UPLOAD_MAX_FILE_SIZE}
+        - CONCURRENT_QUEUE_SIZE=${CONCURRENT_QUEUE_SIZE}
+        - PART_SIZE=${PART_SIZE}
+        - FILE_EXTENSIONS=${FILE_EXTENSIONS}
+        # S3 bucket credentials (only read when UPLOAD_DESTINATION=s3; unset for local)
+        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+        - AWS_SECRET_KEY=${AWS_SECRET_KEY:-}
+        - S3_BUCKET=${S3_BUCKET:-}
+        - S3_REGION=${S3_REGION:-}
       command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:3000 && /app/service.sh'
       volumes:
         - /opt/apache2/grafana_htpasswd:/opt/apache2/grafana_htpasswd
@@ -168,6 +213,7 @@ services:
         max-file: "1"
     network_mode: host
     environment:
+      # Reverse-proxy targets, local only - no counterpart in telematic.local.env.
       - CLIENT_LOCAL_URL=http://127.0.0.1:8082/
       - GRAFANA_LOCAL_URL=http://127.0.0.1:3000/
       - TOPICSERVICE_LOCAL_URL=http://127.0.0.1:8080/
@@ -197,9 +243,46 @@ services:
         max-size: "2g"
         max-file: "1"
     network_mode: host
+    environment:
+      # Logging
+      - MESSAGING_LOGGING_LEVEL=${MESSAGING_LOGGING_LEVEL}
+      # NATS (shared) -> messaging server name
+      - MESSAGING_NATS_URI=${NATS_URL}
+      - MESSAGING_NATS_MAX_RECONNECTS=${MESSAGING_NATS_MAX_RECONNECTS}
+      # InfluxDB v2 (shared) -> messaging server names.
+      # NatsInfluxPush builds the client URL as "http://" + URI + ":" + PORT, so URI is host only.
+      - MESSAGING_INFLUX_URI=${INFLUXDB_HOST}
+      - MESSAGING_INFLUX_PORT=${INFLUXDB_PORT}
+      - MESSAGING_INFLUX_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
+      - MESSAGING_INFLUX_PWD=${DOCKER_INFLUXDB_INIT_PASSWORD}
+      - MESSAGING_INFLUX_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - MESSAGING_INFLUX_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      # Influx buckets and subscription topics
+      - MESSAGING_INFLUX_BUCKET_TYPE=${MESSAGING_INFLUX_BUCKET_TYPE}
+      - MESSAGING_INFLUX_BUCKET_STREETS=${MESSAGING_INFLUX_BUCKET_STREETS}
+      - MESSAGING_STREETS_SUBSCRIPTION_TOPIC=${MESSAGING_STREETS_SUBSCRIPTION_TOPIC}
+      - MESSAGING_INFLUX_BUCKET_PLATFORM=${MESSAGING_INFLUX_BUCKET_PLATFORM}
+      - MESSAGING_PLATFORM_SUBSCRIPTION_TOPIC=${MESSAGING_PLATFORM_SUBSCRIPTION_TOPIC}
+      - MESSAGING_INFLUX_BUCKET_CLOUD=${MESSAGING_INFLUX_BUCKET_CLOUD}
+      - MESSAGING_CLOUD_SUBSCRIPTION_TOPIC=${MESSAGING_CLOUD_SUBSCRIPTION_TOPIC}
+      # Dispatchers and unit id lists
+      - MESSAGING_NUMBER_TOPICS_PER_DISPATCHER=${MESSAGING_NUMBER_TOPICS_PER_DISPATCHER}
+      - MESSAGING_VEHICLE_UNIT_ID_LIST=${MESSAGING_VEHICLE_UNIT_ID_LIST}
+      - MESSAGING_STREETS_UNIT_ID_LIST=${MESSAGING_STREETS_UNIT_ID_LIST}
+      - MESSAGING_CLOUD_UNIT_ID_LIST=${MESSAGING_CLOUD_UNIT_ID_LIST}
+      # Field handling
+      - MESSAGING_TO_STR_FIELDS=${MESSAGING_TO_STR_FIELDS}
+      - MESSAGING_IGNORE_FIELDS=${MESSAGING_IGNORE_FIELDS}
+      # Influx timeouts
+      - MESSAGING_INFLUX_CONNECT_TIMEOUT=${MESSAGING_INFLUX_CONNECT_TIMEOUT}
+      - MESSAGING_INFLUX_WRITE_TIMEOUT=${MESSAGING_INFLUX_WRITE_TIMEOUT}
+      # MySQL (shared) -> messaging server names
+      - MESSAGING_DB_DRIVER=${MESSAGING_DB_DRIVER}
+      - MESSAGING_DB_URL=jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE}
+      - MESSAGING_DB_USERNAME=${MYSQL_USER}
+      - MESSAGING_DB_PASSWORD=${MYSQL_PASSWORD}
+      - MESSAGING_DB_DIALECT=${MESSAGING_DB_DIALECT}
     command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:4222 && wait-for-it localhost:8086 && java -jar /telematic_cloud_messaging/app.jar'
-    env_file:
-      - .env
 
   rsu_management_service:
     build:
@@ -218,11 +301,58 @@ services:
         max-size: "10m"
         max-file: "1"
     network_mode: host
+    environment:
+      # Server and logging
+      - rsu_server_port=${rsu_server_port}
+      - logging_level_com_telematic_telematic_rsu_management_service=${logging_level_com_telematic_telematic_rsu_management_service}
+      # MySQL - the service owns the "rsm" database, so the URL is its own variable;
+      # credentials come from the shared MySQL block.
+      - rsu_spring_datasource_url=${rsu_spring_datasource_url}
+      - rsu_spring_datasource_username=${MYSQL_USER}
+      - rsu_spring_datasource_password=${MYSQL_PASSWORD}
+      - rsu_spring_datasource_driver=${rsu_spring_datasource_driver}
+      - rsu_spring_jpa_hibernate_dialect=${rsu_spring_jpa_hibernate_dialect}
+      # NATS (shared) -> RSU name
+      - rsu_messaging_nats_enabled=${rsu_messaging_nats_enabled}
+      - rsu_messaging_nats_uri=${NATS_URL}
+      # Data ingestion
+      - rsu_data_ingestion_subject_prefix=${rsu_data_ingestion_subject_prefix}
+      - rsu_data_ingestion_influx_remove_fields=${rsu_data_ingestion_influx_remove_fields}
+      - rsu_data_ingestion_workers_per_unit_rsu_pair=${rsu_data_ingestion_workers_per_unit_rsu_pair}
+      - rsu_data_ingestion_refresh_initial_delay_ms=${rsu_data_ingestion_refresh_initial_delay_ms}
+      - rsu_data_ingestion_refresh_interval_ms=${rsu_data_ingestion_refresh_interval_ms}
+      # InfluxDB v3 - separate instance from the shared InfluxDB v2 above, so no remap
+      - rsu_data_ingestion_influx_url=${rsu_data_ingestion_influx_url}
+      - rsu_data_ingestion_influx_token=${rsu_data_ingestion_influx_token}
+      - rsu_data_ingestion_influx_database=${rsu_data_ingestion_influx_database}
+      - rsu_influx_endpoint_configure_database=${rsu_influx_endpoint_configure_database}
+      - rsu_influx_endpoint_query_sql=${rsu_influx_endpoint_query_sql}
+      - rsu_influx_write_batch_size=${rsu_influx_write_batch_size}
+      - rsu_influx_write_flush_interval_ms=${rsu_influx_write_flush_interval_ms}
+      - rsu_influx_write_queue_capacity=${rsu_influx_write_queue_capacity}
+      # Registration API
+      - rsu_registration_tru_autoconfig_subject=${rsu_registration_tru_autoconfig_subject}
+      - rsu_registration_tru_config_subject=${rsu_registration_tru_config_subject}
+      - rsu_registration_tru_config_request_timeout=${rsu_registration_tru_config_request_timeout}
+      # Health monitoring
+      - rsu_monitor_rsu_health_subject=${rsu_monitor_rsu_health_subject}
+      - rsu_monitor_rsu_health_health_timeout_seconds=${rsu_monitor_rsu_health_health_timeout_seconds}
+      - rsu_monitor_plugin_health_subject=${rsu_monitor_plugin_health_subject}
+      - rsu_monitor_plugin_health_health_timeout_seconds=${rsu_monitor_plugin_health_health_timeout_seconds}
+      - rsu_monitor_unit_health_check_enabled=${rsu_monitor_unit_health_check_enabled}
+      - rsu_monitor_unit_health_check_interval_ms=${rsu_monitor_unit_health_check_interval_ms}
+      - rsu_monitor_unit_health_check_max_missed_heartbeats=${rsu_monitor_unit_health_check_max_missed_heartbeats}
+      - rsu_health_check_unit_inactivity_multiplier=${rsu_health_check_unit_inactivity_multiplier}
+      # Data selection
+      - rsu_data_selection_available_topics_subject=${rsu_data_selection_available_topics_subject}
+      - rsu_data_selection_available_topics_request_timeout_seconds=${rsu_data_selection_available_topics_request_timeout_seconds}
+      - rsu_data_selection_confirm_topics_subject=${rsu_data_selection_confirm_topics_subject}
+      - rsu_data_selection_confirm_topics_request_timeout_seconds=${rsu_data_selection_confirm_topics_request_timeout_seconds}
+      # Performance metrics
+      - PERF_METRICS_ENABLED=${PERF_METRICS_ENABLED}
     command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:4222 && wait-for-it localhost:8181 && java -jar /rsu_management_service/app.jar'
     volumes:
       - /opt/telematics/logs:/workspace/logs
-    env_file:
-      - .env
 
   rosbag2_processing_service:
     build:
@@ -247,8 +377,35 @@ services:
     volumes:
            - /opt/telematics/logs:/opt/telematics/logs
            - /opt/telematics/upload:/opt/telematics/upload
-    env_file:
-      - .env
+    environment:
+      # NATS (shared) -> HPS names
+      - HPS_NATS_SERVER_IP_PORT=${NATS_URL}
+      - HPS_FILE_PROCESSING_SUBJECT=${FILE_PROCESSING_SUBJECT}
+      # InfluxDB v2 (shared) -> HPS names.
+      # config.py builds the client URL as HPS_INFLUX_IP + ":" + HPS_INFLUX_PORT, so IP is host only.
+      - HPS_INFLUX_IP=${INFLUXDB_HOST}
+      - HPS_INFLUX_PORT=${INFLUXDB_PORT}
+      - HPS_INFLUX_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - HPS_INFLUX_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      - HPS_INFLUX_BUCKET=${HPS_INFLUX_BUCKET}
+      # MySQL (shared) -> HPS names
+      - HPS_MYSQL_HOST=${MYSQL_HOST}
+      - HPS_MYSQL_PORT=${MYSQL_PORT}
+      - HPS_MYSQL_DB=${MYSQL_DATABASE}
+      - HPS_MYSQL_USER=${MYSQL_USER}
+      - HPS_MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      # File handling
+      - HPS_UPLOAD_DESTINATION_PATH=${HPS_UPLOAD_DESTINATION_PATH}
+      - HPS_ACCEPTED_FILE_EXTENSIONS=${HPS_ACCEPTED_FILE_EXTENSIONS}
+      - HPS_TO_STR_FIELDS=${HPS_TO_STR_FIELDS}
+      - HPS_IGNORE_FIELDS=${HPS_IGNORE_FIELDS}
+      - HPS_TOPIC_EXCLUSION_LIST=${HPS_TOPIC_EXCLUSION_LIST}
+      # Logging
+      - HPS_LOG_LEVEL=${HPS_LOG_LEVEL}
+      - HPS_LOG_NAME=${HPS_LOG_NAME}
+      - HPS_LOG_PATH=${HPS_LOG_PATH}
+      - HPS_LOG_ROTATION_SIZE_BYTES=${HPS_LOG_ROTATION_SIZE_BYTES}
+      - HPS_LOG_HANDLER_TYPE=${HPS_LOG_HANDLER_TYPE}
     command: bash -c 'source /ws/install/setup.bash && wait-for-it 127.0.0.1:3307 -- ros2 run rosbag2_processing_service main'
 
 

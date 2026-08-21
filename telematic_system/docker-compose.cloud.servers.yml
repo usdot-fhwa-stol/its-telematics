@@ -1,4 +1,11 @@
 version: "3"
+
+# Every service below receives its variables through an explicit `environment:` block
+# instead of `env_file`. The left-hand name is the variable the service's own code /
+# application.properties reads; the ${...} on the right is the shared name defined in
+# telematic.env (copied to .env during deployment).
+# This file is the only remapping layer - the applications are untouched.
+
 services:
   nats:
     image: 'nats:2.7.3-alpine3.15'
@@ -25,8 +32,45 @@ services:
         max-file: "1"
     network_mode: host
     command: bash -c 'wait-for-it localhost:4222 && java -jar /telematic_cloud_messaging/app.jar'
-    env_file:
-      - .env
+    environment:
+      # Logging
+      - MESSAGING_LOGGING_LEVEL=${MESSAGING_LOGGING_LEVEL}
+      # NATS (shared) -> messaging server name
+      - MESSAGING_NATS_URI=${NATS_URL}
+      - MESSAGING_NATS_MAX_RECONNECTS=${MESSAGING_NATS_MAX_RECONNECTS}
+      # InfluxDB v2 (shared) -> messaging server names.
+      # NatsInfluxPush builds the client URL as "http://" + URI + ":" + PORT, so URI is host only.
+      - MESSAGING_INFLUX_URI=${INFLUXDB_HOST}
+      - MESSAGING_INFLUX_PORT=${INFLUXDB_PORT}
+      - MESSAGING_INFLUX_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
+      - MESSAGING_INFLUX_PWD=${DOCKER_INFLUXDB_INIT_PASSWORD}
+      - MESSAGING_INFLUX_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - MESSAGING_INFLUX_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      # Influx buckets and subscription topics
+      - MESSAGING_INFLUX_BUCKET_TYPE=${MESSAGING_INFLUX_BUCKET_TYPE}
+      - MESSAGING_INFLUX_BUCKET_STREETS=${MESSAGING_INFLUX_BUCKET_STREETS}
+      - MESSAGING_STREETS_SUBSCRIPTION_TOPIC=${MESSAGING_STREETS_SUBSCRIPTION_TOPIC}
+      - MESSAGING_INFLUX_BUCKET_PLATFORM=${MESSAGING_INFLUX_BUCKET_PLATFORM}
+      - MESSAGING_PLATFORM_SUBSCRIPTION_TOPIC=${MESSAGING_PLATFORM_SUBSCRIPTION_TOPIC}
+      - MESSAGING_INFLUX_BUCKET_CLOUD=${MESSAGING_INFLUX_BUCKET_CLOUD}
+      - MESSAGING_CLOUD_SUBSCRIPTION_TOPIC=${MESSAGING_CLOUD_SUBSCRIPTION_TOPIC}
+      # Dispatchers and unit id lists
+      - MESSAGING_NUMBER_TOPICS_PER_DISPATCHER=${MESSAGING_NUMBER_TOPICS_PER_DISPATCHER}
+      - MESSAGING_VEHICLE_UNIT_ID_LIST=${MESSAGING_VEHICLE_UNIT_ID_LIST}
+      - MESSAGING_STREETS_UNIT_ID_LIST=${MESSAGING_STREETS_UNIT_ID_LIST}
+      - MESSAGING_CLOUD_UNIT_ID_LIST=${MESSAGING_CLOUD_UNIT_ID_LIST}
+      # Field handling
+      - MESSAGING_TO_STR_FIELDS=${MESSAGING_TO_STR_FIELDS}
+      - MESSAGING_IGNORE_FIELDS=${MESSAGING_IGNORE_FIELDS}
+      # Influx timeouts
+      - MESSAGING_INFLUX_CONNECT_TIMEOUT=${MESSAGING_INFLUX_CONNECT_TIMEOUT}
+      - MESSAGING_INFLUX_WRITE_TIMEOUT=${MESSAGING_INFLUX_WRITE_TIMEOUT}
+      # MySQL (shared) -> messaging server names
+      - MESSAGING_DB_DRIVER=${MESSAGING_DB_DRIVER}
+      - MESSAGING_DB_URL=jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE}
+      - MESSAGING_DB_USERNAME=${MYSQL_USER}
+      - MESSAGING_DB_PASSWORD=${MYSQL_PASSWORD}
+      - MESSAGING_DB_DIALECT=${MESSAGING_DB_DIALECT}
 
   rosbag2_processing_service:
     build:
@@ -42,6 +86,33 @@ services:
     container_name: rosbag2_processing_service
     volumes:
            - /opt/telematics:/opt/telematics
-    env_file:
-      - .env
+    environment:
+      # NATS (shared) -> HPS names
+      - HPS_NATS_SERVER_IP_PORT=${NATS_URL}
+      - HPS_FILE_PROCESSING_SUBJECT=${FILE_PROCESSING_SUBJECT}
+      # InfluxDB v2 (shared) -> HPS names.
+      # config.py builds the client URL as HPS_INFLUX_IP + ":" + HPS_INFLUX_PORT, so IP is host only.
+      - HPS_INFLUX_IP=${INFLUXDB_HOST}
+      - HPS_INFLUX_PORT=${INFLUXDB_PORT}
+      - HPS_INFLUX_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - HPS_INFLUX_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      - HPS_INFLUX_BUCKET=${HPS_INFLUX_BUCKET}
+      # MySQL (shared) -> HPS names
+      - HPS_MYSQL_HOST=${MYSQL_HOST}
+      - HPS_MYSQL_PORT=${MYSQL_PORT}
+      - HPS_MYSQL_DB=${MYSQL_DATABASE}
+      - HPS_MYSQL_USER=${MYSQL_USER}
+      - HPS_MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      # File handling
+      - HPS_UPLOAD_DESTINATION_PATH=${HPS_UPLOAD_DESTINATION_PATH}
+      - HPS_ACCEPTED_FILE_EXTENSIONS=${HPS_ACCEPTED_FILE_EXTENSIONS}
+      - HPS_TO_STR_FIELDS=${HPS_TO_STR_FIELDS}
+      - HPS_IGNORE_FIELDS=${HPS_IGNORE_FIELDS}
+      - HPS_TOPIC_EXCLUSION_LIST=${HPS_TOPIC_EXCLUSION_LIST}
+      # Logging
+      - HPS_LOG_LEVEL=${HPS_LOG_LEVEL}
+      - HPS_LOG_NAME=${HPS_LOG_NAME}
+      - HPS_LOG_PATH=${HPS_LOG_PATH}
+      - HPS_LOG_ROTATION_SIZE_BYTES=${HPS_LOG_ROTATION_SIZE_BYTES}
+      - HPS_LOG_HANDLER_TYPE=${HPS_LOG_HANDLER_TYPE}
     command: bash -c 'source /ws/install/setup.bash && ros2 run rosbag2_processing_service main'
