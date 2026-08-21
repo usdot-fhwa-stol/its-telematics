@@ -1,10 +1,5 @@
 version: "3"
 
-# Every service below receives its variables through an explicit `environment:` block.
-# The left-hand name is the variable the service's own code reads; the ${...} on the
-# right is the shared name defined in telematic.env (copied to .env during deployment).
-# This file is the only remapping layer - the applications are untouched.
-
 services:
   web_server:
       build:

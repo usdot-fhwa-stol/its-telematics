@@ -1,12 +1,4 @@
 version: "3.4"
-
-# Every bridge below receives its variables through an explicit `environment:` block.
-# The left-hand name is the variable the bridge's own code reads; the ${...} on the
-# right is the name defined in the "Unit Bridges" section of telematic.env (copied to
-# .env on the unit machine). Variables with a ${VAR:-default} have no counterpart in
-# telematic.env - the default preserves the previous hard-coded value.
-# This file is the only remapping layer - the bridges are untouched.
-
 services:
   ros2_nats_bridge:
     build:

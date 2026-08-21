@@ -1,11 +1,4 @@
 version: "3"
-
-# Every service below receives its variables through an explicit `environment:` block
-# instead of `env_file`. The left-hand name is the variable the service's own code /
-# application.properties / application.yaml reads; the ${...} on the right is the shared
-# name defined in telematic.local.env (copied to .env by local.setup.sh).
-# This file is the only remapping layer - the applications are untouched.
-
 services:
 
   influxdb:
@@ -213,7 +206,6 @@ services:
         max-file: "1"
     network_mode: host
     environment:
-      # Reverse-proxy targets, local only - no counterpart in telematic.local.env.
       - CLIENT_LOCAL_URL=http://127.0.0.1:8082/
       - GRAFANA_LOCAL_URL=http://127.0.0.1:3000/
       - TOPICSERVICE_LOCAL_URL=http://127.0.0.1:8080/
