@@ -32,10 +32,7 @@ ENVIRONMENT="$(prompt environment dev ENVIRONMENT)"
 TARGET="$(prompt targets on-premise TARGET)"
 USE_CASE="$(prompt use_cases core USE_CASE)"
 
-case "${TARGET}" in
-  on-premise) BASE_ENV="${SYSTEM_DIR}/telematic.local.env" ;;
-  *)          BASE_ENV="${SYSTEM_DIR}/telematic.env" ;;
-esac
+BASE_ENV="${SYSTEM_DIR}/sample.env"
 
 LAYERS=(
   "${BASE_ENV}"
@@ -51,11 +48,8 @@ echo
 echo "environment : ${ENVIRONMENT}"
 echo "target      : ${TARGET}"
 echo "use case    : ${USE_CASE}"
-echo "base env    : ${BASE_ENV#"${SYSTEM_DIR}/"}"
 echo
 
-# local.setup.sh ends by copying telematic.local.env over .env, so it has to run
-# before .env is written here.
 if [[ "${TARGET}" == "on-premise" ]]; then
   run_setup="${ASSUME_YES}"
   if [[ "${run_setup}" == false ]] && [[ -t 0 ]]; then

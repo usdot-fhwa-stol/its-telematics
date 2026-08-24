@@ -38,7 +38,7 @@ addresses in `deployment/targets/<target>/.env` before running `initialization.s
 docker compose -f docker-compose.core.yml up -d    # nats, messaging server, rosbag2 processing
 docker compose -f docker-compose.dbs.yml up -d     # mysql, influxdb
 docker compose -f docker-compose.webapp.yml up -d  # web server/client, apache2, grafana
-docker compose -f docker-compose.units.yml up -d   # vehicle, kafka and cloud bridges
+docker compose -f docker-compose.units.yml up -d   # ros2, kafka and cloud bridges
 docker compose -f docker-compose.rsu.yml --profile rsu_integration up -d
 ```
 
