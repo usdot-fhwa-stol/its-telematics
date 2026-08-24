@@ -1,9 +1,8 @@
-version: "3"
-
 services:
   web_server:
       build:
         context: "./telematic_apps/web_app/server"
+        dockerfile: "Dockerfile"
       restart: always
       container_name: web_server
       image: ${DOCKER_ORG}/telematic_web_server:${DOCKER_TAG}
@@ -13,8 +12,6 @@ services:
           max-file: "1"
       network_mode: host
       environment:
-        - NODE_ENV=development
-        - CHOKIDAR_USEPOLLING=true
         # Server
         - PORT=${PORT}
         - ALLOW_CLIENT_URL=${ALLOW_CLIENT_URL}
@@ -47,7 +44,7 @@ services:
         - AWS_SECRET_KEY=${AWS_SECRET_KEY}
         - S3_BUCKET=${S3_BUCKET}
         - S3_REGION=${S3_REGION}
-      command: bash -c '/app/service.sh'
+      command: bash -c 'wait-for-it ${MYSQL_HOST}:${MYSQL_PORT} && wait-for-it 127.0.0.1:3000 && /app/service.sh'
       volumes:
         - /opt/apache2/grafana_htpasswd:/opt/apache2/grafana_htpasswd
         - /opt/telematics/upload:/opt/telematics/upload
@@ -65,14 +62,13 @@ services:
     network_mode: host
     depends_on:
       - web_server
-    volumes:
-      - ./env.js:/usr/share/nginx/html/env.js
 
   apache2:
     build:
       context: "./telematic_apps/apache2"
+      dockerfile: ${APACHE2_DOCKERFILE}
     restart: always
-    image: ${DOCKER_ORG}/telematic_apache2:${DOCKER_TAG}
+    image: ${DOCKER_ORG}/${APACHE2_IMAGE}:${DOCKER_TAG}
     container_name: apache2
     logging:
       options:
@@ -83,7 +79,7 @@ services:
       # Reverse-proxy targets - deployment specific, no counterpart in telematic.env.
       - CLIENT_LOCAL_URL=http://127.0.0.1:8082/
       - GRAFANA_LOCAL_URL=http://127.0.0.1:3000/
-      - TOPICSERVICE_LOCAL_URL=<http://telematic-cloud-messaging-server-private-url:8080/>
+      - TOPICSERVICE_LOCAL_URL=http://127.0.0.1:8080/
       - UISERVICE_LOCAL_URL=http://127.0.0.1:9010/
       - UISERVICE_LOCAL_UPLOAD_URL=http://127.0.0.1:9011/
     depends_on:

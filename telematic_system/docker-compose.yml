@@ -1,0 +1,5 @@
+include:
+- docker-compose.core.yml
+- docker-compose.rsu.yml
+- docker-compose.dbs.yml
+- docker-compose.webapp.yml

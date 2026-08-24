@@ -1,7 +1,28 @@
-version: '3'
 services:
+  mysqldb:
+    image: mysql:9.7.1
+    restart: always
+    container_name: mysqldb
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "1"
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD_FILE=/run/secrets/mysql_password
+      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
+    ports:
+      - '${MYSQL_PORT}:3306'  # Mapping required for CAVe-in-a-box deployment where port 3306 is used by v2xhub
+    secrets:
+      - mysql_password
+      - mysql_root_password
+    volumes:
+      - mysql-datavolume:/var/lib/mysql
+      - ./scripts/database/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+      
   influxdb:
-    image:  influxdb:${INFLUXDB_DEV_TAG} 
+    image:  influxdb:latest
     container_name: influxdb
     ports:
       - '8086:8086'
@@ -15,9 +36,50 @@ services:
       - DOCKER_INFLUXDB_INIT_MODE=${DOCKER_INFLUXDB_INIT_MODE}
       - DOCKER_INFLUXDB_INIT_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
       - DOCKER_INFLUXDB_INIT_PASSWORD=${DOCKER_INFLUXDB_INIT_PASSWORD}
-      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
       - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
       - DOCKER_INFLUXDB_INIT_RETENTION=${DOCKER_INFLUXDB_INIT_RETENTION}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
     volumes:
       - /opt/influxdb2/data:/var/lib/influxdb2 # data directory
+      - /opt/influxdb2/:/etc/influxdb2 # config directory
+
+  influxdb3-core:
+    image: influxdb:3.7.0-core
+    profiles:
+      - rsu_integration
+    container_name: influxdb3-core
+    user: "0:0"
+    ports:
+      - '8181:8181'
+    command:
+      - influxdb3
+      - serve
+      - --node-id=node0
+      - --object-store=file
+      - --data-dir=/var/lib/influxdb3/data
+      - --plugin-dir=/var/lib/influxdb3/plugins
+      - --admin-token-file=/run/secrets/admin.token
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "1"
+    secrets:
+      - source: influx_admin_token
+        target: /run/secrets/admin.token
+    volumes:
+      - influxdb3_data:/var/lib/influxdb3/data
+      - influxdb3_plugins:/var/lib/influxdb3/plugins
+
+secrets:
+  mysql_password:
+      file: ./secrets/mysql_password.txt
+  mysql_root_password:
+      file: ./secrets/mysql_root_password.txt
+  influx_admin_token:
+      file: ./secrets/influx_admin_token.txt
+volumes:
+  mysql-datavolume:
+  influxdb3_data:
+  influxdb3_plugins:

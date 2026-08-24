@@ -1,10 +1,8 @@
-version: "3"
-
 services:
   nats:
     image: 'nats:2.7.3-alpine3.15'
-    container_name: nats
     restart: always
+    container_name: nats
     logging:
       options:
         max-size: "2g"
@@ -17,15 +15,15 @@ services:
     container_name: messaging_server
     #Todo: The cloud messaging service image has incorrect configuration. Please update the application.properties, and build it from source code.
     image: ${DOCKER_ORG}/telematic_cloud_messaging:${DOCKER_TAG}
+    restart: always
     depends_on:
       - nats
-    restart: always
     logging:
       options:
         max-size: "2g"
         max-file: "1"
     network_mode: host
-    command: bash -c 'wait-for-it localhost:4222 && java -jar /telematic_cloud_messaging/app.jar'
+    command: bash -c 'wait-for-it ${MYSQL_HOST}:${MYSQL_PORT} && wait-for-it ${NATS_IP}:${NATS_PORT} && wait-for-it ${INFLUXDB_HOST}:${INFLUXDB_PORT} && java -jar /telematic_cloud_messaging/app.jar'
     environment:
       # Logging
       - MESSAGING_LOGGING_LEVEL=${MESSAGING_LOGGING_LEVEL}
@@ -72,6 +70,9 @@ services:
           dockerfile: Dockerfile
           network: host
     image: ${DOCKER_ORG}/telematic_historical_data_processing:${DOCKER_TAG}
+    restart: always
+    depends_on:
+      - nats
     network_mode: host
     logging:
       options:
@@ -109,4 +110,4 @@ services:
       - HPS_LOG_PATH=${HPS_LOG_PATH}
       - HPS_LOG_ROTATION_SIZE_BYTES=${HPS_LOG_ROTATION_SIZE_BYTES}
       - HPS_LOG_HANDLER_TYPE=${HPS_LOG_HANDLER_TYPE}
-    command: bash -c 'source /ws/install/setup.bash && ros2 run rosbag2_processing_service main'
+    command: bash -c 'wait-for-it ${MYSQL_HOST}:${MYSQL_PORT} && wait-for-it ${NATS_IP}:${NATS_PORT} && source /ws/install/setup.bash && ros2 run rosbag2_processing_service main'
