@@ -48,15 +48,18 @@ docker-compose -f docker-compose.units.yml down
 
 ## Secrets 
 #### influxDB v3
-Sample secrets secrets/influx_admin_token.txt.example
+- Sample secrets secrets/influx_admin_token.txt.example
 
 #### Grafana
-Sample secrets secrets/grafana_secret_key.txt.example
+- Sample secrets secrets/grafana_secret_key.txt.example
+
 Note: Grafana uses MYSQL database and share the same secrets as the MYSQL secrets.
 
 #### MYSQL
-Sample secrets secrets/mysql_root_password.txt.example
-Sample secrets secrets/mysql_password.txt.example
+- Sample secrets secrets/mysql_root_password.txt.example 
+- Sample secrets secrets/mysql_password.txt.example
+
+The above two secrets files are used to set MYSQL root and user password
 
 ## Open a browser to view influxDB UI
 http://<amazone ec2 instance url>:8086/orgs/04cb75631ee68b28
