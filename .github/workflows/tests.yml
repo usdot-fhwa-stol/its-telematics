@@ -199,15 +199,15 @@ jobs:
         run: |
           apt-get update
           apt-get -y install python3-coverage python3-pip python3-pytest python3-pytest-asyncio
-          cd "$GITHUB_WORKSPACE/src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/docker"
+          cd src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/docker
           chmod 777 checkout.sh install.sh
           ./checkout.sh
-          cp -R "$GITHUB_WORKSPACE/src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/." /ws/src/
+          cp -R $GITHUB_WORKSPACE/src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/** /ws/src/
           ./install.sh
       - name: Run tests
         shell: bash
         run: |
-          cd "$GITHUB_WORKSPACE/src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service"
+          cd $GITHUB_WORKSPACE/src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service
           source /ws/install/setup.bash
           pip3 install pytest==8.0.2
           python3 -m coverage run -m pytest
@@ -278,12 +278,10 @@ jobs:
       - name: Rewrite workspace path in coverage.xml
         shell: python
         run: |
-          import os
-
           for coverage_file in [
-            os.path.join(os.environ["GITHUB_WORKSPACE"], "carma_cloud_bridge", "coverage.xml"),
-            os.path.join(os.environ["GITHUB_WORKSPACE"], "carma_vehicle_bridge", "coverage.xml"),
-            os.path.join(os.environ["GITHUB_WORKSPACE"], "telematic_system", "telematic_units", "kafka_bridge", "kafka_nats_bridge", "test", "coverage.xml"),
+            "${{ github.workspace }}/carma_cloud_bridge/coverage.xml",
+            "${{ github.workspace }}/carma_vehicle_bridge/coverage.xml",
+            "${{ github.workspace }}/telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test/coverage.xml",
           ]:
             with open(coverage_file, 'r') as coverage :
               coverage_content = coverage.read()

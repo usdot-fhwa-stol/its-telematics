@@ -20,7 +20,7 @@ Welcome to the ITS Telematics contributing guide. There are a few guidelines tha
 * Make sure you have a [GitHub account](https://github.com/signup/free).
 * Ensure the issue was not already reported by searching ITS Telematics [Issues](https://github.com/usdot-fhwa-stol/its-telematics/issues)
 * If you're unable to find an open issue addressing the problem, open a new one.
-* Submit a [ITS Telematics issue](<docs/ISSUE_TEMPLATE.md>).
+* Submit an [ITS Telematics issue](<docs/ISSUE_TEMPLATE.md>).
   * Clearly describing the issue
     * Provide a descriptive summary
     * Explain the expected behavior
