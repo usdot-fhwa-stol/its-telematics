@@ -287,7 +287,7 @@ describe("updateUserServerAdmin", () => {
         const res = makeRes();
         await user_controller.updateUserServerAdmin({ body: { user_id: 1, is_admin: 2 } }, res);
         expect(res.status).toHaveBeenCalledWith(400);
-        expect(res.send).toHaveBeenCalledWith({ message: "is_admin must be either 0 or 1." });
+        expect(res.send).toHaveBeenCalledWith({ message: "Not administrator." });
     });
 
     test("returns 200 on successful update", async () => {

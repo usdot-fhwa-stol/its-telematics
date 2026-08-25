@@ -293,7 +293,6 @@ jobs:
       - name: Verify web app server code coverage results
         run: |
           cd $GITHUB_WORKSPACE/telematic_system/telematic_apps/web_app/server/coverage
-          ls -la
           head -n 20 lcov.info
       - name: Run SonarScanner
         uses: usdot-fhwa-stol/actions/sonar-scanner@main

@@ -78,7 +78,7 @@ exports.updateUserServerAdmin = (req, res) => {
     const isAdmin = normalizeAdminFlag(req.body.is_admin);
     if (isAdmin === undefined) {
         res.status(400).send({
-            message: "is_admin must be either 0 or 1."
+            message: "Not administrator."
         });
         return;
     }
