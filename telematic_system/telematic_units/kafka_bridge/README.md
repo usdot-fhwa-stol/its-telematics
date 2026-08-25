@@ -6,7 +6,7 @@
 
 3. Telematics cloud server docker-compose up everything (nats uri environment variables needs to be VM ethernet interface IP address)
 
-4. In cda-telematics/telematic_system/telematic_units, run "sudo docker-compose up -d kafka-nats-bridge"
+4. In its-telematics/telematic_system/telematic_units, run "sudo docker-compose up -d kafka-nats-bridge"
 
 5. Check the status of the telematic cloud worker with "sudo docker logs -f telematic_cloud_server_worker_1"
 
