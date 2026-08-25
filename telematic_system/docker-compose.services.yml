@@ -64,3 +64,60 @@ services:
     command: bash -c 'wait-for-it ${MYSQL_HOST}:${MYSQL_PORT} && wait-for-it ${NATS_IP}:${NATS_PORT} && wait-for-it ${INFLUXDB3_IP}:8181 && java -jar /rsu_management_service/app.jar'
     volumes:
       - /opt/telematics/logs:/workspace/logs
+
+  messaging_server:
+    build:
+      context: "./telematic_cloud_messaging"
+    container_name: messaging_server
+    #Todo: The cloud messaging service image has incorrect configuration. Please update the application.properties, and build it from source code.
+    image: ${DOCKER_ORG}/telematic_cloud_messaging:${DOCKER_TAG}
+    profiles:
+      - messaging
+    restart: always
+    depends_on:
+      - nats
+    logging:
+      options:
+        max-size: "2g"
+        max-file: "1"
+    network_mode: host
+    command: bash -c 'wait-for-it ${MYSQL_HOST}:${MYSQL_PORT} && wait-for-it ${NATS_IP}:${NATS_PORT} && wait-for-it ${INFLUXDB_HOST}:${INFLUXDB_PORT} && java -jar /telematic_cloud_messaging/app.jar'
+    environment:
+      # Logging
+      - MESSAGING_LOGGING_LEVEL=${MESSAGING_LOGGING_LEVEL}
+      # NATS (shared) -> messaging server name
+      - MESSAGING_NATS_URI=${NATS_URL}
+      - MESSAGING_NATS_MAX_RECONNECTS=${MESSAGING_NATS_MAX_RECONNECTS}
+      # InfluxDB v2 (shared) -> messaging server names.
+      # NatsInfluxPush builds the client URL as "http://" + URI + ":" + PORT, so URI is host only.
+      - MESSAGING_INFLUX_URI=${INFLUXDB_HOST}
+      - MESSAGING_INFLUX_PORT=${INFLUXDB_PORT}
+      - MESSAGING_INFLUX_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
+      - MESSAGING_INFLUX_PWD=${DOCKER_INFLUXDB_INIT_PASSWORD}
+      - MESSAGING_INFLUX_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - MESSAGING_INFLUX_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      # Influx buckets and subscription topics
+      - MESSAGING_INFLUX_BUCKET_TYPE=${MESSAGING_INFLUX_BUCKET_TYPE}
+      - MESSAGING_INFLUX_BUCKET_STREETS=${MESSAGING_INFLUX_BUCKET_STREETS}
+      - MESSAGING_STREETS_SUBSCRIPTION_TOPIC=${MESSAGING_STREETS_SUBSCRIPTION_TOPIC}
+      - MESSAGING_INFLUX_BUCKET_PLATFORM=${MESSAGING_INFLUX_BUCKET_PLATFORM}
+      - MESSAGING_PLATFORM_SUBSCRIPTION_TOPIC=${MESSAGING_PLATFORM_SUBSCRIPTION_TOPIC}
+      - MESSAGING_INFLUX_BUCKET_CLOUD=${MESSAGING_INFLUX_BUCKET_CLOUD}
+      - MESSAGING_CLOUD_SUBSCRIPTION_TOPIC=${MESSAGING_CLOUD_SUBSCRIPTION_TOPIC}
+      # Dispatchers and unit id lists
+      - MESSAGING_NUMBER_TOPICS_PER_DISPATCHER=${MESSAGING_NUMBER_TOPICS_PER_DISPATCHER}
+      - MESSAGING_VEHICLE_UNIT_ID_LIST=${MESSAGING_VEHICLE_UNIT_ID_LIST}
+      - MESSAGING_STREETS_UNIT_ID_LIST=${MESSAGING_STREETS_UNIT_ID_LIST}
+      - MESSAGING_CLOUD_UNIT_ID_LIST=${MESSAGING_CLOUD_UNIT_ID_LIST}
+      # Field handling
+      - MESSAGING_TO_STR_FIELDS=${MESSAGING_TO_STR_FIELDS}
+      - MESSAGING_IGNORE_FIELDS=${MESSAGING_IGNORE_FIELDS}
+      # Influx timeouts
+      - MESSAGING_INFLUX_CONNECT_TIMEOUT=${MESSAGING_INFLUX_CONNECT_TIMEOUT}
+      - MESSAGING_INFLUX_WRITE_TIMEOUT=${MESSAGING_INFLUX_WRITE_TIMEOUT}
+      # MySQL (shared) -> messaging server names
+      - MESSAGING_DB_DRIVER=${MESSAGING_DB_DRIVER}
+      - MESSAGING_DB_URL=jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE}
+      - MESSAGING_DB_USERNAME=${MYSQL_USER}
+      - MESSAGING_DB_PASSWORD=${MYSQL_PASSWORD}
+      - MESSAGING_DB_DIALECT=${MESSAGING_DB_DIALECT}
