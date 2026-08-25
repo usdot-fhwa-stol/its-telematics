@@ -11,6 +11,8 @@ This project will create an open-source Module that can be installed on any vehi
 ## Release Notes
 The current version and release history of ITS Telematics can be found in the [ITS Telematics Release Notes](docs/Release_notes.md).
 
+**Note:** Previous WFD/CDA Telematics releases were maintained as part of CARMA Platform. Refer to the [CARMA Platform Release Notes](https://github.com/usdot-fhwa-stol/carma-platform/blob/master/docs/Release_notes.md) for historical releases.
+
 ## Documentation
 Documentation of the setup, operation, and design of ITS Telematics can be found on the project [Confluence](https://usdot-carma.atlassian.net/wiki/spaces/WFD2/overview) pages.
 
