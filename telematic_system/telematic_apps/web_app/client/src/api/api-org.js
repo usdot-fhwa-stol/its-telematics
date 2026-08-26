@@ -1,6 +1,13 @@
 import axios from 'axios';
 import {env} from "../env"
 import { constructError } from './api-utils';
+
+const createOrgUserPayload = (reqData = {}) => ({
+    org_id: reqData.org_id,
+    user_id: reqData.user_id,
+    role: reqData.role
+});
+
 const listOrgs = async () => {
     const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/org/all`
     try {
@@ -30,7 +37,7 @@ const addOrgUser = async (reqData) => {
 
     try {
         const { data } = await axios.post(URL, {
-            data: reqData
+            data: createOrgUserPayload(reqData)
         }, { withCredentials: true });
         return data;
     } catch (err) {
@@ -75,7 +82,7 @@ const updateOrgUser = async (reqData) => {
 
     try {
         const { data } = await axios.post(URL, {
-            data: reqData
+            data: createOrgUserPayload(reqData)
         }, { withCredentials: true });
         return data;
     } catch (err) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2023 LEIDOS.
+ * Copyright (C) 2019-2026 LEIDOS.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -20,9 +20,42 @@ const { Op } = require("sequelize");
 const { addOrgUser } = require('./org.controller');
 const getUuid = require('uuid-by-string');
 const jwt = require("jsonwebtoken");
+const { hasServerAdminAccess, isOrgAdmin, loadAuthenticatedUser } = require('../utils/authorization');
+const { validatePassword } = require('../utils/password_policy');
 require('dotenv').config();
 var grafana_htpasswd = process.env.GRAFANA_HTPASSWORD!=undefined && process.env.GRAFANA_HTPASSWORD.length > 0 ? process.env.GRAFANA_HTPASSWORD : '/opt/apache2/grafana_htpasswd';
 var htpasswordManager = manager(grafana_htpasswd)
+
+const RESTRICTED_PRIVILEGE_FIELDS = ["is_admin", "role", "permissions"];
+
+const findUnexpectedFields = (payload, allowedFields) => Object.keys(payload || {}).filter((field) => !allowedFields.includes(field));
+
+const findRestrictedPrivilegeFields = (payload) => RESTRICTED_PRIVILEGE_FIELDS.filter((field) =>
+    Object.prototype.hasOwnProperty.call(payload || {}, field)
+);
+
+const normalizeAdminFlag = (value) => {
+    const normalizedValue = Number(value);
+    if (normalizedValue !== 0 && normalizedValue !== 1) {
+        return undefined;
+    }
+    return normalizedValue;
+};
+
+const getCurrentOrgRole = async (userId, orgId) => {
+    const orgUsers = await org_user.findAll({
+        where: {
+            user_id: userId,
+            org_id: orgId
+        }
+    });
+
+    if (!Array.isArray(orgUsers) || orgUsers.length === 0) {
+        return "";
+    }
+
+    return orgUsers[0].role || "";
+};
 /**
  * Update user server admin role by using the user identifier and their server admin role to update
  */
@@ -33,7 +66,24 @@ exports.updateUserServerAdmin = (req, res) => {
         });
         return;
     }
-    user.update({ is_admin: req.body.is_admin }, {
+
+    const unexpectedFields = findUnexpectedFields(req.body, ["user_id", "is_admin"]);
+    if (unexpectedFields.length > 0) {
+        res.status(400).send({
+            message: `Unexpected update fields: ${unexpectedFields.join(", ")}.`
+        });
+        return;
+    }
+
+    const isAdmin = normalizeAdminFlag(req.body.is_admin);
+    if (isAdmin === undefined) {
+        res.status(400).send({
+            message: "Not administrator."
+        });
+        return;
+    }
+
+    user.update({ is_admin: isAdmin }, {
         where: {
             id: req.body.user_id
         }
@@ -62,6 +112,21 @@ exports.registerUser = (req, res) => {
     if (req == undefined || req.body == undefined || req.body.username == undefined
         || req.body.org_id == undefined || req.body.email == undefined || req.body.password == undefined) {
         res.sendStatus(400);
+        return;
+    }
+
+    const restrictedPrivilegeFields = findRestrictedPrivilegeFields(req.body);
+    if (restrictedPrivilegeFields.length > 0) {
+        res.status(400).send({
+            message: `Request cannot include restricted administrative fields: ${restrictedPrivilegeFields.join(", ")}.`
+        });
+        return;
+    }
+
+    //Reject weak passwords or passwords that match identity fields (username/email)
+    const passwordCheck = validatePassword(req.body.password, req.body.username, req.body.email);
+    if (!passwordCheck.valid) {
+        res.status(400).send({ message: passwordCheck.message });
         return;
     }
 
@@ -135,6 +200,22 @@ exports.forgetPwd = (req, res) => {
         res.sendStatus(400);
         return;
     }
+
+    const restrictedPrivilegeFields = findRestrictedPrivilegeFields(req.body);
+    if (restrictedPrivilegeFields.length > 0) {
+        res.status(400).send({
+            message: `Request cannot include restricted administrative fields: ${restrictedPrivilegeFields.join(", ")}.`
+        });
+        return;
+    }
+
+    //Reject weak passwords or passwords that match identity fields (username/email)
+    const passwordCheck = validatePassword(req.body.new_password, req.body.username, req.body.email);
+    if (!passwordCheck.valid) {
+        res.status(400).send({ message: passwordCheck.message });
+        return;
+    }
+
     user.findAll({
         where: {
             [Op.and]: [
@@ -172,6 +253,33 @@ exports.forgetPwd = (req, res) => {
         console.log(err)
         res.status(500).send({ message: "Server error while checking user existence." });
     });
+}
+
+exports.getCurrentUserAccess = async (req, res) => {
+    try {
+        const authUser = req.authUser || await loadAuthenticatedUser(req);
+        if (!authUser) {
+            res.status(401).send({ message: "User session is expired", reason: "expire" });
+            return;
+        }
+
+        const role = await getCurrentOrgRole(authUser.id, authUser.org_id);
+        const isServerAdmin = hasServerAdminAccess(authUser);
+        const canAccessUserList = isServerAdmin || role === "Admin";
+
+        res.status(200).send({
+            user_id: authUser.id,
+            org_id: authUser.org_id,
+            role: role,
+            is_admin: isServerAdmin ? "yes" : "no",
+            can_access_user_list: canAccessUserList
+        });
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({
+            message: err.message || "Error while retrieving current user access."
+        });
+    }
 }
 
 /***
@@ -241,45 +349,72 @@ exports.loginUser = (req, res) => {
 /***
  * When a user logout, clear the user from the credential file
  */
-exports.deleteUser = (req, res) => {
-    if (req == undefined || req.query == undefined || req.query.username == undefined) {
+exports.deleteUser = async (req, res) => {
+    if (!req?.query?.username){
         res.sendStatus(400);
         return;
     }
-    htpasswordManager.removeUser(req.query.username).then((status) => {
+    try {
+        await htpasswordManager.removeUser(req.query.username);
         res.sendStatus(200);
-    }).catch((err) => {
+    } catch (err) {
+        console.error('User %s logout error:', req?.query?.username, err);
         res.sendStatus(501);
-    })
+    }
 }
 
 /***
  * Retrieve all existing users in the database
  */
-exports.findAll = (req, res) => {
-    var condition = {};
-    user.findAll({
-        where: condition
-    })
-        .then(data => {
-            if (data !== undefined && Array.isArray(data) && data.length > 0) {
-                let response = [];
-                data.forEach(user => {
-                    response.push({
-                        id: user.id,
-                        last_seen_at: user.last_seen_at,
-                        is_admin: user.is_admin === 1 ? "yes" : "no",
-                        login: user.login,
-                        org_id: user.org_id,
-                        email: user.email
-                    });
-                });
-                res.status(200).send(response);
+exports.findAll = async (req, res) => {
+    try {
+        const authUser = req.authUser || await loadAuthenticatedUser(req);
+        if (!authUser) {
+            res.status(401).send({ message: "User session is expired", reason: "expire" });
+            return;
+        }
+
+        var condition = {};
+        if (!hasServerAdminAccess(authUser)) {
+            const isCurrentOrgAdmin = await isOrgAdmin(authUser.id, authUser.org_id);
+            if (!isCurrentOrgAdmin) {
+                res.status(403).send({ message: "Administrative privileges are required." });
+                return;
             }
-        }).catch(err => {
-            console.log(err)
-            res.status(500).send({
-                message: err.message || "Error while findAll users."
+
+            condition = {
+                org_id: authUser.org_id
+            };
+        }
+
+        user.findAll({
+            where: condition
+        })
+            .then(data => {
+                if (data !== undefined && Array.isArray(data) && data.length > 0) {
+                    let response = [];
+                    data.forEach(user => {
+                        response.push({
+                            id: user.id,
+                            last_seen_at: user.last_seen_at,
+                            is_admin: user.is_admin === 1 ? "yes" : "no",
+                            login: user.login,
+                            org_id: user.org_id,
+                            email: user.email
+                        });
+                    });
+                    res.status(200).send(response);
+                }
+            }).catch(err => {
+                console.log(err)
+                res.status(500).send({
+                    message: err.message || "Error while findAll users."
+                });
             });
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({
+            message: err.message || "Error while authorizing users list."
         });
+    }
 };

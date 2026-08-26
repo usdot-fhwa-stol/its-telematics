@@ -1,6 +1,10 @@
 .github/workflows/influx_admin_token.txt
 **/*.pptx
-secrets/
+# Ignore everything inside secrets/
+**/secrets/*
+# EXCEPT .example.txt files
+!**/secrets/*.example*
+!**/secrets/*example*
 
 *.log
 *.csv

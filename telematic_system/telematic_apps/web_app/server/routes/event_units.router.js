@@ -15,14 +15,14 @@
  */
 module.exports = app => {
     const event_unit = require("../controllers/event_units.controller");
-    const events = require("../controllers/events.controller");
+    const { requireEditorOrAbove } = require("../utils/authorization");
     var router = require('express').Router();
 
-    //Assign unit to an event
-    router.post('/create', event_unit.create)
+    //Assign unit to an event — requires Editor or Admin role
+    router.post('/create', requireEditorOrAbove, event_unit.create)
 
-    //Unassign unit to an event
-    router.delete('/delete', event_unit.delete)
+    //Unassign unit from an event — requires Editor or Admin role
+    router.delete('/delete', requireEditorOrAbove, event_unit.delete)
 
     app.use('/api/event_units', router);
 

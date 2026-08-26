@@ -16,8 +16,8 @@ services:
     env_file:
       - .env
     volumes:
-      - /opt/influxdb2/data:/var/lib/influxdb2 # data directory
-      - /opt/influxdb2/:/etc/influxdb2 # config directory
+      - influxdb2_data:/var/lib/influxdb2 # data directory
+      - influxdb2_config:/etc/influxdb2 # config directory
 
   influxdb3-core:
     image: influxdb:3.7.0-core
@@ -100,14 +100,25 @@ services:
           max-file: "1"
       network_mode: host
       depends_on:
-        - mysqldb
-
+        - mysqldb      
+      environment:
+        - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+        - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+        - GF_SECURITY_SECRET_KEY__FILE=/run/secrets/grafana_secret_key
+        - GF_DATABASE_TYPE=mysql
+        - GF_DATABASE_HOST=${MYSQL_HOST}:${MYSQL_PORT}
+        - GF_DATABASE_NAME=${MYSQL_DATABASE}
+        - GF_DATABASE_USER=${MYSQL_USER}
+        - GF_DATABASE_PASSWORD__FILE=/run/secrets/mysql_password
+      secrets:
+          - mysql_password
+          - grafana_secret_key
       volumes:
-        - /opt/grafana/logs:/var/log/grafana
+        - grafana_logs:/var/log/grafana
         - ./telematic_apps/grafana/grafana.ini:/etc/grafana/grafana.ini
-        - /opt/grafana/data:/var/lib/grafana
-        - /opt/grafana/provisioning:/home/grafana/conf/provisioning
-        - /home/ubuntu/.aws/credentials:/usr/share/grafana/.aws/credentials
+        - grafana_data:/var/lib/grafana
+        - grafana_provisioning:/home/grafana/conf/provisioning
+        - ./.aws/credentials:/usr/share/grafana/.aws/credentials
       user: "472" #grafana user id
 
   web_server:
@@ -128,12 +139,42 @@ services:
       depends_on:
         - mysqldb
         - grafana
-      env_file:
-        - .env
+      environment:
+        - NODE_ENV=development
+        - CHOKIDAR_USEPOLLING=true
+        - ALLOW_CLIENT_URL=${ALLOW_CLIENT_URL}
+        - GRAFANA_HTPASSWORD=${GRAFANA_HTPASSWORD}
+        - SESSION_TIMEOUT=${SESSION_TIMEOUT}
+        - SECRET=${SECRET}
+        # Server port
+        - PORT=${PORT}
+        # MYSQL DB credentials. Need to be replaced with actual MYSQL DB during deployment
+        - DB_HOST=${MYSQL_HOST}
+        - DB_USER=${MYSQL_USER}
+        - DB_PORT=3307
+        - DB_PASSWORD_FILE=/run/secrets/mysql_password
+        - GRAFANA_DB=${MYSQL_DATABASE}
+        # File upload service settings
+        - UPLOAD_DESTINATION=${UPLOAD_DESTINATION}
+        - UPLOAD_DESTINATION_PATH=${UPLOAD_DESTINATION_PATH}
+        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+        - AWS_SECRET_KEY=${AWS_SECRET_KEY}
+        - S3_BUCKET=${S3_BUCKET}
+        - S3_REGION=${S3_REGION}
+        - UPLOAD_HTTP_PORT=${UPLOAD_HTTP_PORT}
+        - UPLOAD_TIME_OUT=${UPLOAD_TIME_OUT} # Milliseconds
+        - UPLOAD_MAX_FILE_SIZE=${UPLOAD_MAX_FILE_SIZE} #20 GB
+        - CONCURRENT_QUEUE_SIZE=${CONCURRENT_QUEUE_SIZE}
+        - PART_SIZE=${PART_SIZE}
+        - NATS_SERVERS=${NATS_IP}:4222
+        - FILE_PROCESSING_SUBJECT=${FILE_PROCESSING_SUBJECT}
+        - FILE_EXTENSIONS=${FILE_EXTENSIONS}
       command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:3000 && /app/service.sh'
       volumes:
-        - /opt/apache2/grafana_htpasswd:/opt/apache2/grafana_htpasswd
-        - /opt/telematics/upload:/opt/telematics/upload
+        - ./secrets/grafana_htpasswd:/opt/apache2/grafana_htpasswd
+        - telematics_upload:/opt/telematics/upload
+      secrets:
+      - mysql_password
 
   web_client:
     build:
@@ -178,7 +219,7 @@ services:
       - web_client
       - web_server
     volumes:
-      - /opt/apache2/grafana_htpasswd:/etc/apache2/grafana_htpasswd
+      - ./secrets/grafana_htpasswd:/etc/apache2/grafana_htpasswd
 
   messaging_server:
     build:
@@ -220,7 +261,7 @@ services:
     network_mode: host
     command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:4222 && wait-for-it localhost:8181 && java -jar /rsu_management_service/app.jar'
     volumes:
-      - /opt/telematics/logs:/workspace/logs
+      - telematics_logs:/workspace/logs
     env_file:
       - .env
 
@@ -245,8 +286,8 @@ services:
         max-file: "1"
     network_mode: host
     volumes:
-           - /opt/telematics/logs:/opt/telematics/logs
-           - /opt/telematics/upload:/opt/telematics/upload
+           - telematics_logs:/opt/telematics/logs
+           - telematics_upload:/opt/telematics/upload
     env_file:
       - .env
     command: bash -c 'source /ws/install/setup.bash && wait-for-it 127.0.0.1:3307 -- ros2 run rosbag2_processing_service main'
@@ -257,9 +298,18 @@ secrets:
       file: ./secrets/mysql_password.txt
   mysql_root_password:
       file: ./secrets/mysql_root_password.txt
+  grafana_secret_key:
+    file: ./secrets/grafana_secret_key.txt
   influx_admin_token:
       file: ./secrets/influx_admin_token.txt
 volumes:
   mysql-datavolume:
   influxdb3_data:
   influxdb3_plugins:
+  influxdb2_data:
+  influxdb2_config:
+  grafana_logs:
+  grafana_data:
+  grafana_provisioning:
+  telematics_upload:
+  telematics_logs:
