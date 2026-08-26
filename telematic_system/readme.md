@@ -13,53 +13,58 @@ sudo yum install docker-ce docker-ce-cli containerd.io docker-compose-plugin
 docker -v
 ```
 
-## Install docker-compose 
+
+## Launch
+`initialization.sh` prompts for environment (dev/test/prod), target (on-premise/cloud)
+and use case (core/rsu_integration), then writes `.env` from the matching layers under
+`deployment/`. On on-premise it also offers to run `local.setup.sh`.
 ```
-# get latest docker compose released tag
-COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d\" -f4)
-
-# Install docker-compose
-sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
-
-# Output compose version
-docker-compose -v
-
-```
-
-## Launch influxDB container with docker-compose
-```
-# navigate to a folder where the docker-compose file is located, and check the influxDB service is located in this docker-compose file
 cd <directory name>/telematic_system
+./initialization.sh
 
-# rename the telematic.env file to .env
-mv telematic.env .env
-
-# Docker compose up to launch container
- docker-compose -f docker-compose.cloud.servers.yml up -d
- docker-compose -f docker-compose.dbs.yml up -d
- docker-compose -f docker-compose.units.yml up -d
-
-# Shutdown container
-docker-compose -f docker-compose.cloud.servers.yml down
-docker-compose -f docker-compose.dbs.yml down
-docker-compose -f docker-compose.units.yml down
+# All services on one host
+docker compose up -d
+docker compose down
 ```
 
-## Secrets 
-#### influxDB v3
-- Sample secrets secrets/influx_admin_token.txt.example
+Add the RSU Management Service and InfluxDB v3:
+```
+docker compose --profile rsu_integration up -d
+```
 
-#### Grafana
-- Sample secrets secrets/grafana_secret_key.txt.example
+Across separate hosts, run only the tier each host needs. Set the other hosts'
+addresses in `deployment/targets/<target>/.env` before running `initialization.sh`.
+```
+docker compose -f docker-compose.core.yml up -d    # nats, messaging server, rosbag2 processing
+docker compose -f docker-compose.dbs.yml up -d     # mysql, influxdb
+docker compose -f docker-compose.webapp.yml up -d  # web server/client, apache2, grafana
+docker compose -f docker-compose.units.yml up -d   # ros2, kafka and cloud bridges
+docker compose -f docker-compose.rsu.yml --profile rsu_integration up -d
+```
 
-Note: Grafana uses MYSQL database and share the same secrets as the MYSQL secrets.
+## Secrets
+Everything in `secrets/` is gitignored except the `*.example` files. Copy each one
+and replace the placeholder before starting the stack:
+```
+cd telematic_system/secrets
+cp mysql_password.txt.example mysql_password.txt            # password for MYSQL_USER
+cp mysql_root_password.txt.example mysql_root_password.txt  # MySQL root password
+cp grafana_secret_key.txt.example grafana_secret_key.txt    # Grafana GF_SECURITY_SECRET_KEY
+cp influx_admin_token.txt.example influx_admin_token.txt    # rsu_integration profile only
+```
 
 #### MYSQL
-- Sample secrets secrets/mysql_root_password.txt.example 
-- Sample secrets secrets/mysql_password.txt.example
+`mysql_password.txt` and `mysql_root_password.txt` set the user and root passwords
+on the mysqldb container's first start. Grafana connects to the same database with
+`mysql_password`, so keep it in sync with `MYSQL_PASSWORD` in the generated `.env`.
 
-The above two secrets files are used to set MYSQL root and user password
+#### influxDB v3
+`influx_admin_token.txt` is required by the `rsu_integration` profile and holds the
+admin token as JSON:
+```
+{"name":"dev-admin","token":"apiv3_YOUR_ADMIN_TOKEN_VALUE","hashed":false,"description":"dev-admin"}
+```
+The token value must match `rsu_data_ingestion_influx_token` in the generated `.env`.
 
 ## Open a browser to view influxDB UI
 http://<amazone ec2 instance url>:8086/orgs/04cb75631ee68b28
