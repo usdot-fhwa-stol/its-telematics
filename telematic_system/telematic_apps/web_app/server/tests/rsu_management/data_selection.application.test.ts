@@ -43,14 +43,13 @@ describe('Data selection application services', () => {
     expect(result.unitId).toBe('Unit001');
   });
 
-  test('ConfirmDataSelection throws when rsuTopics is empty', async () => {
-    const repo = { confirmDataSelection: jest.fn() } as any;
+  test('ConfirmDataSelection allows empty rsuTopics to stop broadcast', async () => {
+    const msg = new TRUTopicsMessage('Unit001', [], Date.now());
+    const repo = { confirmDataSelection: jest.fn().mockResolvedValue(msg) } as any;
     const app = new ConfirmDataSelection(repo);
 
-    const msg = new TRUTopicsMessage('Unit001', [], Date.now());
-
-    await expect(app.execute(msg)).rejects.toThrow(
-      'At least one RSU topic configuration is required'
-    );
+    const result = await app.execute(msg);
+    expect(repo.confirmDataSelection).toHaveBeenCalledWith(msg);
+    expect(result).toBe(msg);
   });
 });

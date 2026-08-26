@@ -15,6 +15,10 @@ services:
       environment:
         - NODE_ENV=development
         - CHOKIDAR_USEPOLLING=true
+        - ALLOW_CLIENT_URL=https://cav-telematics.com,http://localhost
+        - GRAFANA_HTPASSWORD=/opt/apache2/grafana_htpasswd
+        - SESSION_TIMEOUT=3600
+        - SECRET=my_secret_telematic_ui
         # Server
         - PORT=${PORT}
         - ALLOW_CLIENT_URL=${ALLOW_CLIENT_URL}
@@ -48,6 +52,8 @@ services:
         - S3_BUCKET=${S3_BUCKET}
         - S3_REGION=${S3_REGION}
       command: bash -c '/app/service.sh'
+      secrets:
+        - mysql_password
       volumes:
         - /opt/apache2/grafana_htpasswd:/opt/apache2/grafana_htpasswd
         - /opt/telematics/upload:/opt/telematics/upload
@@ -104,6 +110,18 @@ services:
         max-size: "10m"
         max-file: "1"
     network_mode: host
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SECURITY_SECRET_KEY__FILE=/run/secrets/grafana_secret_key
+      - GF_DATABASE_TYPE=mysql
+      - GF_DATABASE_HOST=${MYSQL_HOST}:${MYSQL_PORT}
+      - GF_DATABASE_NAME=${MYSQL_DATABASE}
+      - GF_DATABASE_USER=${MYSQL_USER}
+      - GF_DATABASE_PASSWORD__FILE=/run/secrets/mysql_password
+    secrets:
+        - mysql_password
+        - grafana_secret_key
     volumes:
       - /opt/grafana/logs:/var/log/grafana
       - ./telematic_apps/grafana/grafana.ini:/etc/grafana/grafana.ini
@@ -111,3 +129,10 @@ services:
       - /opt/grafana/provisioning:/home/grafana/conf/provisioning
       - /home/ubuntu/.aws/credentials:/usr/share/grafana/.aws/credentials
     user: "472" #grafana user id
+
+
+secrets:
+  mysql_password:
+      file: ./secrets/mysql_password.txt
+  grafana_secret_key:
+    file: ./secrets/grafana_secret_key.txt

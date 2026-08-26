@@ -20,6 +20,7 @@ import { RemoveRSU } from '../../application/rsu_management/remove_rsu';
 import { UpdateRSUConfig } from '../../application/rsu_management/update_rsu_config';
 import { AllRsuRegistrationStatus } from '../../application/rsu_management/all_rsu_registration_status';
 import { RegistrationApiRepository } from '../../repository/rsu_management/registration.api.repository';
+import { requireEditorOrAbove } from '../../utils/authorization';
 
 export = (app: Application) => {
     const router = Router();
@@ -41,10 +42,10 @@ export = (app: Application) => {
         allRsuRegistrationStatusApp
     );
 
-    // Define routes
-    router.post('/assign-rsu', registrationController.assignRSU);
-    router.post('/remove-rsu', registrationController.removeRSUAssignment);
-    router.post('/update-rsu-config', registrationController.updateRSUConfig);
+    // Define routes — mutations require Editor or Admin role
+    router.post('/assign-rsu', requireEditorOrAbove, registrationController.assignRSU);
+    router.post('/remove-rsu', requireEditorOrAbove, registrationController.removeRSUAssignment);
+    router.post('/update-rsu-config', requireEditorOrAbove, registrationController.updateRSUConfig);
     router.get('/all-tru-config', registrationController.getAllTruConfig);
 
     app.use('/api/rsu-registration', router);

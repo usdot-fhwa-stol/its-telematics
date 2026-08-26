@@ -15,6 +15,37 @@
  */
 
 const { user, org_user, org, Sequelize } = require("../models");
+const { hasServerAdminAccess, isOrgAdmin, loadAuthenticatedUser } = require("../utils/authorization");
+
+const ALLOWED_ORG_USER_UPDATE_FIELDS = new Set(["org_id", "user_id", "role"]);
+const ALLOWED_ORG_ROLES = new Set(["Admin", "Editor", "Viewer"]);
+
+const sanitizeOrgUserPayload = (payload) => {
+    const source = payload || {};
+    const unexpectedFields = Object.keys(source).filter((field) => !ALLOWED_ORG_USER_UPDATE_FIELDS.has(field));
+    if (unexpectedFields.length > 0) {
+        return {
+            valid: false,
+            message: `Unexpected organization-user fields: ${unexpectedFields.join(", ")}.`
+        };
+    }
+
+    if (!ALLOWED_ORG_ROLES.has(source.role)) {
+        return {
+            valid: false,
+            message: `Invalid organization role: ${source.role}.`
+        };
+    }
+
+    return {
+        valid: true,
+        data: {
+            org_id: source.org_id,
+            user_id: source.user_id,
+            role: source.role
+        }
+    };
+};
 /**
  *@brief Find all organizations
  * @Return Response status and a list of organizations
@@ -30,15 +61,42 @@ exports.findAll = (req, res) => {
         });
 }
 
-exports.findAllOrgUsers = (req, res) => {
-    org_user.findAll()
-        .then(data => {
-            res.status(200).send(data);
-        }).catch(err => {
-            res.status(500).send({
-                message: err.message || "Error while findAll organizations."
+exports.findAllOrgUsers = async (req, res) => {
+    try {
+        const authUser = req.authUser || await loadAuthenticatedUser(req);
+        if (!authUser) {
+            res.status(401).send({ message: "User session is expired", reason: "expire" });
+            return;
+        }
+
+        let condition = {};
+        if (!hasServerAdminAccess(authUser)) {
+            const isCurrentOrgAdmin = await isOrgAdmin(authUser.id, authUser.org_id);
+            if (!isCurrentOrgAdmin) {
+                res.status(403).send({ message: "Administrative privileges are required." });
+                return;
+            }
+
+            condition = {
+                org_id: authUser.org_id
+            };
+        }
+
+        org_user.findAll({
+            where: condition
+        })
+            .then(data => {
+                res.status(200).send(data);
+            }).catch(err => {
+                res.status(500).send({
+                    message: err.message || "Error while findAll organizations."
+                });
             });
+    } catch (err) {
+        res.status(500).send({
+            message: err.message || "Error while authorizing organization users."
         });
+    }
 }
 
 
@@ -93,12 +151,16 @@ exports.addOrgUser = (req, res) => {
         });
         return;
     }
-    var user = {
-        org_id: req.body.data.org_id,
-        user_id: req.body.data.user_id,
-        role: req.body.data.role
+
+    const sanitizedUser = sanitizeOrgUserPayload(req.body.data);
+    if (!sanitizedUser.valid) {
+        res.status(400).send({
+            message: sanitizedUser.message
+        });
+        return;
     }
-    org_user.create(user)
+
+    org_user.create(sanitizedUser.data)
         .then(data => {
             res.status(200).send(data);
         }).catch(err => {
@@ -115,20 +177,31 @@ exports.updateOrgUser = (req, res) => {
         });
         return;
     }
-    var user = req.body.data;
-    user.updated = Sequelize.literal('CURRENT_TIMESTAMP');
-    org_user.update(user, {
+
+    const sanitizedUser = sanitizeOrgUserPayload(req.body.data);
+    if (!sanitizedUser.valid) {
+        res.status(400).send({
+            message: sanitizedUser.message
+        });
+        return;
+    }
+
+    const updatedOrgUser = {
+        role: sanitizedUser.data.role,
+        updated: Sequelize.literal('CURRENT_TIMESTAMP')
+    };
+    org_user.update(updatedOrgUser, {
         where: {
-            org_id: user.org_id,
-            user_id: user.user_id
+            org_id: sanitizedUser.data.org_id,
+            user_id: sanitizedUser.data.user_id
         }
     })
         .then(data => {
             //Find the updated user
             org_user.findAll({
                 where: {
-                    org_id: user.org_id,
-                    user_id: user.user_id
+                    org_id: sanitizedUser.data.org_id,
+                    user_id: sanitizedUser.data.user_id
                 }
             })
                 .then(result => {
@@ -206,4 +279,3 @@ exports.delOrgUser = (req, res) => {
         }
     });
 }
-

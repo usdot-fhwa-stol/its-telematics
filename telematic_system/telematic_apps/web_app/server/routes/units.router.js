@@ -15,10 +15,11 @@
  */
 module.exports = app => {
     const units = require("../controllers/units.controller");
+    const { requireEditorOrAbove } = require("../utils/authorization");
     var router = require('express').Router();
 
-    //Create a unit
-    router.post("/create", units.create);
+    //Create a unit — requires Editor or Admin role
+    router.post("/create", requireEditorOrAbove, units.create);
 
     //Retrieve all units
     router.get("/all", units.findAll);

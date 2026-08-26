@@ -13,10 +13,11 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-import React, { useContext } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { Box, CircularProgress } from '@mui/material';
+import { getVerifiedAdminAccess } from '../../api/api-admin-access';
 import AuthContext from '../../context/auth-context';
 import ServerContext from '../../context/server-context';
 import AdminPage from '../../pages/AdminPage';
@@ -29,14 +30,46 @@ import ROS2RosbagPage from '../../pages/ROS2RosbagPage';
 import RSUManagementPage from '../../pages/RSUManagementPage';
 import TopicPage from '../../pages/TopicPage';
 import ServerConfigPage from '../../pages/ServerConfigPage';
-import { USER_ROLES } from '../users/UserMetadata';
 
 const MainRouter = React.memo(() => {
   const authContext = useContext(AuthContext);
   const serverContext = useContext(ServerContext);
   const isMobile = Capacitor.isNativePlatform();
+  const [hasAdminAccess, setHasAdminAccess] = useState(null);
+  const adminAccessRequestIdRef = useRef(0);
 
   const postLoginRoute = isMobile ? "/dashboard" : "/telematic/events";
+
+  useEffect(() => {
+    if (authContext.sessionToken === null) {
+      setHasAdminAccess(false);
+      return;
+    }
+
+    const requestId = adminAccessRequestIdRef.current + 1;
+    adminAccessRequestIdRef.current = requestId;
+    setHasAdminAccess(null);
+
+    getVerifiedAdminAccess(authContext.user_id, authContext.org_id).then((isAdmin) => {
+      if (adminAccessRequestIdRef.current === requestId) {
+        setHasAdminAccess(isAdmin);
+      }
+    }).catch(() => {
+      if (adminAccessRequestIdRef.current === requestId) {
+        setHasAdminAccess(false);
+      }
+    });
+  }, [authContext.org_id, authContext.sessionToken, authContext.user_id]);
+  
+  const renderConditionalAdminPage = hasAdminAccess ? <AdminPage /> : <Navigate to={postLoginRoute} replace></Navigate>;
+  
+  const adminRouteElement = hasAdminAccess === null
+    ? (
+      <Box sx={{ display: 'flex', width: '100%', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Box>
+    )
+    : (renderConditionalAdminPage);
 
   if (isMobile && !serverContext.isInitialized) {
     return (
@@ -63,13 +96,14 @@ const MainRouter = React.memo(() => {
         {authContext.sessionToken !== null && <Route path="/telematic/rsu-management" element={<RSUManagementPage />} />}
         {authContext.sessionToken !== null && <Route path="/historical/data/ros2/rosbag" element={<ROS2RosbagPage />} />}
         {authContext.sessionToken !== null && <Route path="/historical/data"  element={<Navigate to="/historical/data/ros2/rosbag" replace></Navigate>}/>}
-        {authContext.sessionToken !== null && (parseInt(authContext.is_admin) === 1 || authContext.role === USER_ROLES.ADMIN) && <Route path="/telematic/admin" element={<AdminPage />} />}
+        {authContext.sessionToken !== null && <Route path="/telematic/admin" element={adminRouteElement} />}
         {authContext.sessionToken !== null && <Route path="/dashboard" element={<Dashboard />} />}
         {authContext.sessionToken === null && <Route path="/telematic/login" element={<Login />} />}
         {authContext.sessionToken !== null && <Route path="/telematic/login" element={<Navigate to={postLoginRoute} replace></Navigate>}></Route>}
         {authContext.sessionToken === null && <Route path="/telematic/forget/password" element={<ForgetPasswordPage />} />}
         {authContext.sessionToken === null && <Route path="/telematic/register/user" element={<RegisterUserPage />} />}
         {authContext.sessionToken === null && <Route path="*" element={<Navigate to="/telematic/login" replace></Navigate>}></Route>}
+        {!isMobile && authContext.sessionToken !== null && <Route path="*" element={<Navigate to={postLoginRoute} replace></Navigate>}></Route>}
         {isMobile && authContext.sessionToken !== null && <Route path="*" element={<Navigate to="/dashboard" replace></Navigate>}></Route>}
       </Routes>
     </React.Fragment>

@@ -7,6 +7,11 @@ const isMobile = Capacitor.isNativePlatform();
 
 const REQUEST_TIMEOUT_MS = isMobile ? 60000 : 0;
 
+const createServerAdminUpdatePayload = (req = {}) => ({
+    user_id: req.user_id,
+    is_admin: req.is_admin
+});
+
 
 const registerNewUser = async (username, email, password, org_id) => {
     const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/register`
@@ -85,13 +90,25 @@ const listUsers = async () => {
     } catch (err) {
         
           return constructError(err)
-  
+   
+    }
+}
+const getCurrentUserAccess = async () => {
+    const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/access`
+
+    try {
+        const { data } = await axios.get(URL, { withCredentials: true });
+        return data;
+    } catch (err) {
+
+          return constructError(err)
+
     }
 }
 const updateUserServerAdmin = async (req) => {
     const URL = `${env.REACT_APP_WEB_SERVER_URI}/api/users/update/server/admin`
     try {
-        const { data } = await axios.post(URL, req, { withCredentials: true });
+        const { data } = await axios.post(URL, createServerAdminUpdatePayload(req), { withCredentials: true });
         return data;
     } catch (err) {
         
@@ -115,4 +132,4 @@ const checkServerSession = async (token) => {
     }
 }
 
-export { loginUser, deleteUser, updatePassword, registerNewUser, listUsers, updateUserServerAdmin, checkServerSession }
+export { loginUser, deleteUser, updatePassword, registerNewUser, listUsers, getCurrentUserAccess, updateUserServerAdmin, checkServerSession }
