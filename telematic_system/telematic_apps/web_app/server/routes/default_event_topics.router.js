@@ -15,10 +15,11 @@
  */
 module.exports = app => {
     const default_event_topics = require("../controllers/default_event_topics.controller");
+    const { requireEditorOrAbove } = require("../utils/authorization");
     var router = require('express').Router();
 
-    //Create a default_event_topics
-    router.post("/create", default_event_topics.create);
+    //Create a default_event_topics — requires Editor or Admin role
+    router.post("/create", requireEditorOrAbove, default_event_topics.create);
 
     //Retrieve default_event_topics by criteria: event_id and unit_identifier
     router.get("/all", default_event_topics.findAll);

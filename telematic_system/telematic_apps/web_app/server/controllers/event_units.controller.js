@@ -78,7 +78,7 @@ exports.delete = (req, res) => {
       res.status(404).send({ message: `Cannot delete event unit id =${unit_id}. Maybe event unit was not found or request body was empty.` });
     }
   }).catch(err => {
-    res.status(500).send({ message: `Error deleting event unit with id =${id}` })
+    res.status(500).send({ message: `Error deleting event unit with id =${unit_id}` })
   });
 
 };

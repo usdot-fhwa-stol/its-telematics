@@ -42,11 +42,30 @@ docker compose -f docker-compose.units.yml up -d   # ros2, kafka and cloud bridg
 docker compose -f docker-compose.rsu.yml --profile rsu_integration up -d
 ```
 
-## Secrets for influxDB v3
-Required by the rsu_integration profile. Create `secrets/influx_admin_token.txt` (gitignored):
+## Secrets
+Everything in `secrets/` is gitignored except the `*.example` files. Copy each one
+and replace the placeholder before starting the stack:
+```
+cd telematic_system/secrets
+cp mysql_password.txt.example mysql_password.txt            # password for MYSQL_USER
+cp mysql_root_password.txt.example mysql_root_password.txt  # MySQL root password
+cp grafana_secret_key.txt.example grafana_secret_key.txt    # Grafana GF_SECURITY_SECRET_KEY
+cp influx_admin_token.txt.example influx_admin_token.txt    # rsu_integration profile only
+```
+
+#### MYSQL
+`mysql_password.txt` and `mysql_root_password.txt` set the user and root passwords
+on the mysqldb container's first start. Grafana connects to the same database with
+`mysql_password`, so keep it in sync with `MYSQL_PASSWORD` in the generated `.env`.
+
+#### influxDB v3
+`influx_admin_token.txt` is required by the `rsu_integration` profile and holds the
+admin token as JSON:
 ```
 {"name":"dev-admin","token":"apiv3_YOUR_ADMIN_TOKEN_VALUE","hashed":false,"description":"dev-admin"}
 ```
+The token value must match `rsu_data_ingestion_influx_token` in the generated `.env`.
+
 ## Open a browser to view influxDB UI
 http://<amazone ec2 instance url>:8086/orgs/04cb75631ee68b28
 

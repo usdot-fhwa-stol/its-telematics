@@ -28,6 +28,19 @@ test('List all organization users not throw', async () => {
 test('Add a user to an organization not throw', async () => {
     await addOrgUser({})
         .then(data => expect(data).toEqual({ status: 'success' }));
+    expect(axios.post).toHaveBeenCalledWith(
+        expect.any(String),
+        { data: { org_id: undefined, user_id: undefined, role: undefined } },
+        expect.any(Object)
+    );
+    jest.resetAllMocks();
+    axios.post.mockResolvedValue({ data: { status: 'success' } });
+    await addOrgUser({ org_id: 1, user_id: 2, role: 'Admin', is_admin: 'yes', login: 'test' });
+    expect(axios.post).toHaveBeenCalledWith(
+        expect.any(String),
+        { data: { org_id: 1, user_id: 2, role: 'Admin' } },
+        expect.any(Object)
+    );
     jest.resetAllMocks();
     await expect(() => addOrgUser({})).not.toThrow();
 });
@@ -35,6 +48,19 @@ test('Add a user to an organization not throw', async () => {
 test('Update an organization user', async () => {
     await updateOrgUser({})
         .then(data => expect(data).toEqual({ status: 'success' }));
+    expect(axios.post).toHaveBeenCalledWith(
+        expect.any(String),
+        { data: { org_id: undefined, user_id: undefined, role: undefined } },
+        expect.any(Object)
+    );
+    jest.resetAllMocks();
+    axios.post.mockResolvedValue({ data: { status: 'success' } });
+    await updateOrgUser({ org_id: 1, user_id: 2, role: 'Viewer', org_name: 'Org', login: 'test', is_admin: 'no' });
+    expect(axios.post).toHaveBeenCalledWith(
+        expect.any(String),
+        { data: { org_id: 1, user_id: 2, role: 'Viewer' } },
+        expect.any(Object)
+    );
     jest.resetAllMocks();
     await expect(() => updateOrgUser({})).not.toThrowError();
 })
