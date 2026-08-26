@@ -214,6 +214,8 @@ jobs:
           ignore-unchanged: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
+          dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           keep-previous-comments: true
       - name: Docker Scout Policy Evaluation telematic-carma-vehicle-bridge
