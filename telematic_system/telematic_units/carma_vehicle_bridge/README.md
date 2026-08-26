@@ -4,11 +4,11 @@
 
 This is a ros2 nats bridge. this package is meant to create conection between ros nodes and nats server and allow for tranmition of data from both ends.
 
-**Keywords:** ros2, nats, cda-telematics
+**Keywords:** ros2, nats, its-telematics
 
 ### License
 
-The source code is released under a [Apache-2.0 license](cda-telematics/LICENSE).
+The source code is released under a [Apache-2.0 license](../../../LICENSE).
 
 The PACKAGE NAME package has been tested under [ROS] foxy on respectively Ubuntu 18.04.
 This code, expect that it changes often and any fitness for a particular purpose is disclaimed.
@@ -31,7 +31,7 @@ To build from source, clone the latest version from this repository into your ca
 
 	cd ws/src
 	git clone --depth=1 https://github.com/usdot-fhwa-stol/carma-msgs.git --branch  $BRANCH
-    git clone --depth=1 https://github.com/usdot-fhwa-stol/cda-telematics.git --branch  $BRANCH
+    git clone --depth=1 https://github.com/usdot-fhwa-stol/its-telematics.git --branch  $BRANCH
 	cd ../
 	colcon build
 
@@ -101,7 +101,7 @@ This node creates a bridge between nats and ros and enables the software to publ
 
 ## Bugs & Feature Requests
 
-Please report bugs and request features using the [Issue Tracker](https://github.com/usdot-fhwa-stol/cda-telematics/issues).
+Please report bugs and request features using the [Issue Tracker](https://github.com/usdot-fhwa-stol/its-telematics/issues).
 
 
 [ROS]: http://www.ros.org

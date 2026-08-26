@@ -1,4 +1,4 @@
-#### The following people have made direct and substantial contributions to the design and code in the CDA Telematics system, listed in alphabetical order:
+#### The following people have made direct and substantial contributions to the design and code in the ITS Telematics system, listed in alphabetical order:
 * Du, Dan - Software Engineer (Leidos)
 * Tabriz, Samir M. - Software Engineer (Leidos)
 
