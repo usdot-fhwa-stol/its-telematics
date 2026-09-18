@@ -197,6 +197,13 @@ class ForwardingLoopService:
                     int(str(metadata["timestamp"]).lstrip("0"))
                     * milli_to_micro
                 )
+            elif isinstance(metadata, dict) and metadata.get("odeReceivedAt"):
+                timestamp = (
+                    datetime.fromisoformat(
+                        str(metadata["odeReceivedAt"]).replace("Z", "+00:00")
+                    ).timestamp()
+                    * second_to_micro
+                )
             elif isinstance(payload, dict) and "timestamp" in payload:
                 timestamp = (
                     int(str(payload["timestamp"]).lstrip("0"))
