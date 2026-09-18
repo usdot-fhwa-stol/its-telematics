@@ -26,6 +26,16 @@ if TYPE_CHECKING:
     from kafka_nats_bridge import KafkaNatsBridge
 
 
+def _safe_json_deserialize(raw):
+    """Deserialize a Kafka message value, tolerating tombstones and non-JSON payloads."""
+    if not raw:
+        return None
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+
 class ForwardingLoopService:
     """Start Kafka consumption and run steady-state Kafka-to-NATS forwarding."""
 
@@ -64,7 +74,7 @@ class ForwardingLoopService:
                 auto_offset_reset=self.bridge.kafka_offset_reset,
                 enable_auto_commit=True,
                 group_id=None,
-                value_deserializer=lambda raw: json.loads(raw.decode("utf-8")),
+                value_deserializer=_safe_json_deserialize,
             )
 
             await self.bridge.kafka_consumer.start()
@@ -180,23 +190,27 @@ class ForwardingLoopService:
 
         timestamp = None
 
-        if "metadata" in payload:
-            timestamp = (
-                int(str(payload["metadata"]["timestamp"]).lstrip("0"))
-                * milli_to_micro
-            )
-        elif "timestamp" in payload:
-            timestamp = (
-                int(str(payload["timestamp"]).lstrip("0"))
-                * milli_to_micro
-            )
-        elif topic == "modified_spat":
-            time_stamp = int(payload["intersections"][0]["time_stamp"])
-            moy = int(payload["intersections"][0]["moy"])
-            timestamp = (
-                int((moy * minute_to_milli) + time_stamp + first_day_epoch)
-                * milli_to_micro
-            )
+        metadata = payload.get("metadata") if isinstance(payload, dict) else None
+        try:
+            if isinstance(metadata, dict) and "timestamp" in metadata:
+                timestamp = (
+                    int(str(metadata["timestamp"]).lstrip("0"))
+                    * milli_to_micro
+                )
+            elif isinstance(payload, dict) and "timestamp" in payload:
+                timestamp = (
+                    int(str(payload["timestamp"]).lstrip("0"))
+                    * milli_to_micro
+                )
+            elif topic == "modified_spat":
+                time_stamp = int(payload["intersections"][0]["time_stamp"])
+                moy = int(payload["intersections"][0]["moy"])
+                timestamp = (
+                    int((moy * minute_to_milli) + time_stamp + first_day_epoch)
+                    * milli_to_micro
+                )
+        except (KeyError, TypeError, ValueError, IndexError):
+            timestamp = None
 
         if timestamp is None or len(str(timestamp)) < 16:
             timestamp = datetime.now(timezone.utc).timestamp() * second_to_micro

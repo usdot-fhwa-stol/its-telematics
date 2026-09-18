@@ -2,5 +2,5 @@ pip
 nats-py
 kafka-python
 pyyaml
-aiokafka
+aiokafka[zstd,lz4,snappy]
 pydantic-settings>=2.0
