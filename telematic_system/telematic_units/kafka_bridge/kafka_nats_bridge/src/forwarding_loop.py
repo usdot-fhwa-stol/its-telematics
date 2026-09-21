@@ -26,21 +26,23 @@ if TYPE_CHECKING:
     from kafka_nats_bridge import KafkaNatsBridge
 
 
-def _safe_json_deserialize(raw):
-    """Deserialize a Kafka message value, tolerating tombstones and non-JSON payloads."""
-    if not raw:
-        return None
-    try:
-        return json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return None
-
-
 class ForwardingLoopService:
     """Start Kafka consumption and run steady-state Kafka-to-NATS forwarding."""
 
     def __init__(self, bridge: "KafkaNatsBridge"):
         self.bridge = bridge
+
+    def _safe_json_deserialize(self, raw):
+        """Deserialize a Kafka message value, tolerating tombstones and non-JSON payloads."""
+        if not raw:
+            return None
+        try:
+            return json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            self.bridge.logger.error(
+                "In _safe_json_deserialize: Unable to process Kafka payload: %s", exc
+            )
+            return None
 
     async def start_kafka_consumer_with_retry(self):
         """Start Kafka consumer with bounded retries and exponential backoff."""
@@ -74,7 +76,7 @@ class ForwardingLoopService:
                 auto_offset_reset=self.bridge.kafka_offset_reset,
                 enable_auto_commit=True,
                 group_id=None,
-                value_deserializer=_safe_json_deserialize,
+                value_deserializer=self._safe_json_deserialize,
             )
 
             await self.bridge.kafka_consumer.start()
@@ -190,7 +192,10 @@ class ForwardingLoopService:
 
         timestamp = None
 
-        metadata = payload.get("metadata") if isinstance(payload, dict) else None
+        metadata = None
+        if isinstance(payload, dict) and "metadata" in payload:
+            metadata = payload["metadata"]
+
         try:
             if isinstance(metadata, dict) and "timestamp" in metadata:
                 timestamp = (
