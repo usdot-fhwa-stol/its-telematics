@@ -32,6 +32,18 @@ class ForwardingLoopService:
     def __init__(self, bridge: "KafkaNatsBridge"):
         self.bridge = bridge
 
+    def _safe_json_deserialize(self, raw):
+        """Deserialize a Kafka message value, tolerating tombstones and non-JSON payloads."""
+        if not raw:
+            return None
+        try:
+            return json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            self.bridge.logger.error(
+                "In _safe_json_deserialize: Unable to process Kafka payload: %s", exc
+            )
+            return None
+
     async def start_kafka_consumer_with_retry(self):
         """Start Kafka consumer with bounded retries and exponential backoff."""
         attempt = 0
@@ -64,7 +76,7 @@ class ForwardingLoopService:
                 auto_offset_reset=self.bridge.kafka_offset_reset,
                 enable_auto_commit=True,
                 group_id=None,
-                value_deserializer=lambda raw: json.loads(raw.decode("utf-8")),
+                value_deserializer=self._safe_json_deserialize,
             )
 
             await self.bridge.kafka_consumer.start()
@@ -180,23 +192,38 @@ class ForwardingLoopService:
 
         timestamp = None
 
-        if "metadata" in payload:
-            timestamp = (
-                int(str(payload["metadata"]["timestamp"]).lstrip("0"))
-                * milli_to_micro
-            )
-        elif "timestamp" in payload:
-            timestamp = (
-                int(str(payload["timestamp"]).lstrip("0"))
-                * milli_to_micro
-            )
-        elif topic == "modified_spat":
-            time_stamp = int(payload["intersections"][0]["time_stamp"])
-            moy = int(payload["intersections"][0]["moy"])
-            timestamp = (
-                int((moy * minute_to_milli) + time_stamp + first_day_epoch)
-                * milli_to_micro
-            )
+        metadata = None
+        if isinstance(payload, dict) and "metadata" in payload:
+            metadata = payload["metadata"]
+
+        try:
+            if metadata:
+                if "timestamp" in metadata:
+                    timestamp = (
+                        int(str(metadata["timestamp"]).lstrip("0"))
+                        * milli_to_micro
+                    )
+                elif metadata.get("odeReceivedAt"):
+                    timestamp = (
+                        datetime.fromisoformat(
+                            str(metadata["odeReceivedAt"]).replace("Z", "+00:00")
+                        ).timestamp()
+                        * second_to_micro
+                    )
+            elif isinstance(payload, dict) and "timestamp" in payload:
+                timestamp = (
+                    int(str(payload["timestamp"]).lstrip("0"))
+                    * milli_to_micro
+                )
+            elif topic == "modified_spat":
+                time_stamp = int(payload["intersections"][0]["time_stamp"])
+                moy = int(payload["intersections"][0]["moy"])
+                timestamp = (
+                    int((moy * minute_to_milli) + time_stamp + first_day_epoch)
+                    * milli_to_micro
+                )
+        except (KeyError, TypeError, ValueError, IndexError):
+            timestamp = None
 
         if timestamp is None or len(str(timestamp)) < 16:
             timestamp = datetime.now(timezone.utc).timestamp() * second_to_micro
