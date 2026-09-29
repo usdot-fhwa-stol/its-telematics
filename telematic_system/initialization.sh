@@ -79,8 +79,4 @@ fi
 
 echo "Wrote ${ENV_OUT}"
 echo
-if [[ "${USE_CASE}" == "rsu_integration" ]]; then
-  echo "Next: docker compose --profile rsu_integration up -d"
-else
-  echo "Next: docker compose up -d"
-fi
+echo "Next: docker compose up -d"
