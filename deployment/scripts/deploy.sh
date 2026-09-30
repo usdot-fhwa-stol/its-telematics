@@ -133,11 +133,7 @@ validate_host_prerequisites() {
     echo "Host prerequisites validation: PASS"
 }
 
-main() {
-    parse_input_parameters "$@"
-    validate_input_parameters
-    validate_host_prerequisites
-
+execute_deployment_pipeline() {
     echo "Deployment configuration:"
     echo "  environment : ${ENVIRONMENT}"
     echo "  target      : ${TARGET}"
@@ -148,6 +144,13 @@ main() {
     TARGET="${TARGET}" \
     USE_CASE="${USE_CASE}" \
     "${SCRIPT_DIR}/configuration_service.sh"
+}
+
+main() {
+    parse_input_parameters "$@"
+    validate_input_parameters
+    validate_host_prerequisites
+    execute_deployment_pipeline
 }
 
 main "$@"
