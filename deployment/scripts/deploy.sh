@@ -96,9 +96,47 @@ validate_input_parameters() {
     fi
 }
 
+validate_host_prerequisites() {
+    local failed=false
+
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "error: Docker is not installed or not available in PATH." >&2
+        failed=true
+    elif ! docker info >/dev/null 2>&1; then
+        echo "error: Docker is installed but the Docker daemon is not accessible." >&2
+        failed=true
+    fi
+
+    if command -v docker >/dev/null 2>&1; then
+        if ! docker compose version >/dev/null 2>&1; then
+            echo "error: Docker Compose plugin is not available." >&2
+            failed=true
+        fi
+    fi
+
+    if [[ "${TARGET}" == "on-premise" ]]; then
+        local setup_script="${DEPLOYMENT_DIR}/../telematic_system/local.setup.sh"
+
+        if [[ ! -f "${setup_script}" ]]; then
+            echo "error: required local setup script is missing: ${setup_script}" >&2
+            failed=true
+        elif [[ ! -x "${setup_script}" ]]; then
+            echo "error: local setup script is not executable: ${setup_script}" >&2
+            failed=true
+        fi
+    fi
+
+    if [[ "${failed}" == true ]]; then
+        exit 2
+    fi
+
+    echo "Host prerequisites validation: PASS"
+}
+
 main() {
     parse_input_parameters "$@"
     validate_input_parameters
+    validate_host_prerequisites
 
     echo "Deployment configuration:"
     echo "  environment : ${ENVIRONMENT}"
