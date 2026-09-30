@@ -7,6 +7,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DEPLOYMENT_DIR="${REPO_ROOT}/deployment"
 SYSTEM_DIR="${REPO_ROOT}/telematic_system"
 ENV_OUT="${ENV_OUT:-${SYSTEM_DIR}/.env}"
+MANIFEST_OUT="${MANIFEST_OUT:-${DEPLOYMENT_DIR}/generated/deployment_manifest.yml}"
 
 require_variable() {
     local name="$1"
@@ -104,10 +105,60 @@ generate_runtime_configuration() {
     echo "Generated runtime configuration: ${ENV_OUT}"
 }
 
+generate_ansible_manifest() {
+    local compose_profiles
+    local manifest_dir
+    local temp_file
+    local runtime_env_path="${ENV_OUT#"${REPO_ROOT}/"}"
+
+    compose_profiles="$(
+        grep '^COMPOSE_PROFILES=' "${ENV_OUT}" \
+            | tail -n 1 \
+            | cut -d= -f2-
+    )"
+
+    if [[ -z "${compose_profiles}" ]]; then
+        echo "error: COMPOSE_PROFILES is not defined in generated runtime configuration." >&2
+        exit 2
+    fi
+
+    manifest_dir="$(dirname "${MANIFEST_OUT}")"
+    mkdir -p "${manifest_dir}"
+
+    temp_file="$(mktemp "${manifest_dir}/deployment_manifest.yml.tmp.XXXXXX")"
+    trap 'rm -f "${temp_file}"' EXIT
+
+    {
+        echo "---"
+        echo "environment: \"${ENVIRONMENT}\""
+        echo "target: \"${TARGET}\""
+        echo "use_case: \"${USE_CASE}\""
+        echo "runtime_env_path: \"${runtime_env_path}\""
+        echo "compose_manifest_paths:"
+        echo "  - \"telematic_system/docker-compose.yml\""
+        echo "compose_profiles:"
+
+        IFS=',' read -ra profiles <<< "${compose_profiles}"
+
+        local profile
+        for profile in "${profiles[@]}"; do
+            profile="${profile#"${profile%%[![:space:]]*}"}"
+            profile="${profile%"${profile##*[![:space:]]}"}"
+            echo "  - \"${profile}\""
+        done
+    } > "${temp_file}"
+
+    mv "${temp_file}" "${MANIFEST_OUT}"
+    trap - EXIT
+
+    echo "Generated Ansible-compatible manifest: ${MANIFEST_OUT}"
+}
+
 main() {
     validate_configuration
     validate_required_secrets
     generate_runtime_configuration
+    generate_ansible_manifest
 }
 
 main "$@"
