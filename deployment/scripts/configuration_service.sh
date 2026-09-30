@@ -39,6 +39,39 @@ validate_configuration() {
     done
 }
 
+validate_required_secrets() {
+    local secrets_dir="${SYSTEM_DIR}/secrets"
+    local required_secrets=(
+        "mysql_password.txt"
+        "mysql_root_password.txt"
+    )
+
+    if [[ "${USE_CASE}" == "rsu_integration" ]]; then
+        required_secrets+=("influx_admin_token.txt")
+    fi
+
+    local secret
+    local failed=false
+
+    for secret in "${required_secrets[@]}"; do
+        if [[ ! -s "${secrets_dir}/${secret}" ]]; then
+            echo "error: required secret file is missing or empty: ${secrets_dir}/${secret}" >&2
+
+            if [[ -f "${secrets_dir}/${secret}.example" ]]; then
+                echo "       create it from: ${secrets_dir}/${secret}.example" >&2
+            fi
+
+            failed=true
+        fi
+    done
+
+    if [[ "${failed}" == true ]]; then
+        exit 2
+    fi
+
+    echo "Required secrets validation: PASS"
+}
+
 generate_runtime_configuration() {
     local layers=(
         "${SYSTEM_DIR}/sample.env"
@@ -73,6 +106,7 @@ generate_runtime_configuration() {
 
 main() {
     validate_configuration
+    validate_required_secrets
     generate_runtime_configuration
 }
 
