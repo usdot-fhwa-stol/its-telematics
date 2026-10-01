@@ -14,34 +14,25 @@ docker -v
 ```
 
 
-## Launch
-`initialization.sh` prompts for environment (dev/test/prod), target (on-premise/cloud)
-and use case (core/rsu_integration), then writes `.env` from the matching layers under
-`deployment/`. On on-premise it also offers to run `local.setup.sh`.
-```
-cd <directory name>/telematic_system
-./initialization.sh
+## Deployment initialization
 
-# All services on one host
-docker compose up -d
-docker compose down
-```
+Run the deployment initialization from the repository root by selecting the
+environment, target, and use case.
 
-Add the RSU Management Service and InfluxDB v3:
-```
-docker compose --profile rsu_integration up -d
-```
+For the core use case:
 
-Across separate hosts, run only the tier each host needs. Set the other hosts'
-addresses in `deployment/targets/<target>/.env` before running `initialization.sh`.
-```
-docker compose -f docker-compose.core.yml up -d    # nats, messaging server, rosbag2 processing
-docker compose -f docker-compose.dbs.yml up -d     # mysql, influxdb
-docker compose -f docker-compose.webapp.yml up -d  # web server/client, apache2, grafana
-docker compose -f docker-compose.units.yml up -d   # ros2, kafka and cloud bridges
-docker compose -f docker-compose.rsu.yml --profile rsu_integration up -d
-```
+```bash
+./deployment/scripts/deploy.sh \
+  --environment dev \
+  --target on-premise \
+  --use-case core
+For the RSU integration use case:
 
+./deployment/scripts/deploy.sh \
+  --environment dev \
+  --target on-premise \
+  --use-case rsu_integration
+```
 ## Secrets
 Everything in `secrets/` is gitignored except the `*.example` files. Copy each one
 and replace the placeholder before starting the stack:
