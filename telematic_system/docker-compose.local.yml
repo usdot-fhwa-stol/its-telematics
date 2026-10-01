@@ -1,4 +1,4 @@
-version: "3"
+# version: "3"
 services:
 
   influxdb:
@@ -6,9 +6,9 @@ services:
     profiles:
       - default
     container_name: influxdb
-    ports:
-      - '8086:8086'
-    restart: always
+    restart: always    
+    networks:
+      - telematic_network
     logging:
       options:
         max-size: "10m"
@@ -25,8 +25,6 @@ services:
       - rsu_integration
     container_name: influxdb3-core
     user: "0:0"
-    ports:
-      - '8181:8181'
     command:
       - influxdb3
       - serve
@@ -36,6 +34,8 @@ services:
       - --plugin-dir=/var/lib/influxdb3/plugins
       - --admin-token-file=/run/secrets/admin.token
     restart: unless-stopped
+    networks:
+      - telematic_network
     logging:
       options:
         max-size: "10m"
@@ -54,6 +54,8 @@ services:
       - rsu_integration
     restart: always
     container_name: mysqldb
+    networks:
+      - telematic_network
     logging:
       options:
         max-size: "10m"
@@ -63,14 +65,20 @@ services:
       - MYSQL_USER=${MYSQL_USER}
       - MYSQL_PASSWORD_FILE=/run/secrets/mysql_password
       - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
-    ports:
-      - '3307:3306'  # Mapping required for CAVe-in-a-box deployment where port 3306 is used by v2xhub
     secrets:
       - mysql_password
       - mysql_root_password
     volumes:
       - mysql-datavolume:/var/lib/mysql
       - ./scripts/database/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+    entrypoint: 
+      - /bin/bash
+      - -c
+      - |
+        sed -i 's/\r$$//' /docker-entrypoint-initdb.d/init-databases.sh
+        chmod +x /docker-entrypoint-initdb.d/init-databases.sh
+        /usr/local/bin/docker-entrypoint.sh mysqld
+    
 
   nats:
     image: 'nats:2.7.3-alpine3.15'
@@ -83,7 +91,9 @@ services:
       options:
         max-size: "2g"
         max-file: "1"
-    network_mode: host
+    # network_mode: host
+    networks:
+      - telematic_network
 
   grafana:
       build:
@@ -98,7 +108,8 @@ services:
         options:
           max-size: "10m"
           max-file: "1"
-      network_mode: host
+      networks:
+        - telematic_network
       depends_on:
         - mysqldb      
       environment:
@@ -135,7 +146,9 @@ services:
         options:
           max-size: "10m"
           max-file: "1"
-      network_mode: host
+      # network_mode: host
+      networks:
+        - telematic_network
       depends_on:
         - mysqldb
         - grafana
@@ -151,7 +164,7 @@ services:
         # MYSQL DB credentials. Need to be replaced with actual MYSQL DB during deployment
         - DB_HOST=${MYSQL_HOST}
         - DB_USER=${MYSQL_USER}
-        - DB_PORT=3307
+        - DB_PORT=3306
         - DB_PASSWORD_FILE=/run/secrets/mysql_password
         - GRAFANA_DB=${MYSQL_DATABASE}
         # File upload service settings
@@ -169,7 +182,7 @@ services:
         - NATS_SERVERS=${NATS_IP}:4222
         - FILE_PROCESSING_SUBJECT=${FILE_PROCESSING_SUBJECT}
         - FILE_EXTENSIONS=${FILE_EXTENSIONS}
-      command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:3000 && /app/service.sh'
+      command: bash -c 'wait-for-it mysqldb:3306 && wait-for-it grafana:3000 && /app/service.sh'
       volumes:
         - ./secrets/grafana_htpasswd:/opt/apache2/grafana_htpasswd
         - telematics_upload:/opt/telematics/upload
@@ -189,7 +202,9 @@ services:
       options:
         max-size: "10m"
         max-file: "1"
-    network_mode: host
+    # network_mode: host
+    networks:
+      - telematic_network
     depends_on:
       - web_server
 
@@ -207,13 +222,16 @@ services:
       options:
         max-size: "10m"
         max-file: "1"
-    network_mode: host
+    networks:
+      - telematic_network
+    ports:
+      - "8888:8888"
     environment:
-      - CLIENT_LOCAL_URL=http://127.0.0.1:8082/
-      - GRAFANA_LOCAL_URL=http://127.0.0.1:3000/
-      - TOPICSERVICE_LOCAL_URL=http://127.0.0.1:8080/
-      - UISERVICE_LOCAL_URL=http://127.0.0.1:9010/
-      - UISERVICE_LOCAL_UPLOAD_URL=http://127.0.0.1:9011/
+      - CLIENT_LOCAL_URL=http://web_client:8082/
+      - GRAFANA_LOCAL_URL=http://grafana:3000/
+      - TOPICSERVICE_LOCAL_URL=http://topic_service:8080/
+      - UISERVICE_LOCAL_URL=http://web_server:9010/
+      - UISERVICE_LOCAL_UPLOAD_URL=http://web_server:9011/
     depends_on:
       - grafana
       - web_client
@@ -237,8 +255,10 @@ services:
       options:
         max-size: "2g"
         max-file: "1"
-    network_mode: host
-    command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:4222 && wait-for-it localhost:8086 && java -jar /telematic_cloud_messaging/app.jar'
+    # network_mode: host
+    networks:
+      - telematic_network
+    command: bash -c 'wait-for-it mysqldb:3306 && wait-for-it nats:4222 && wait-for-it influxdb:8086 && java -jar /telematic_cloud_messaging/app.jar'
     env_file:
       - .env
 
@@ -258,8 +278,10 @@ services:
       options:
         max-size: "10m"
         max-file: "1"
-    network_mode: host
-    command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:4222 && wait-for-it localhost:8181 && java -jar /rsu_management_service/app.jar'
+    # network_mode: host
+    networks:
+      - telematic_network
+    command: bash -c 'wait-for-it mysqldb:3306 && wait-for-it nats:4222 && wait-for-it influxdb3-core:8181 && java -jar /rsu_management_service/app.jar'
     volumes:
       - telematics_logs:/workspace/logs
     env_file:
@@ -280,19 +302,22 @@ services:
       - mysqldb
       - influxdb
       - apache2
+    networks:
+      - telematic_network
     logging:
       options:
         max-size: "2g"
         max-file: "1"
-    network_mode: host
     volumes:
            - telematics_logs:/opt/telematics/logs
            - telematics_upload:/opt/telematics/upload
     env_file:
       - .env
-    command: bash -c 'source /ws/install/setup.bash && wait-for-it 127.0.0.1:3307 -- ros2 run rosbag2_processing_service main'
+    command: bash -c 'source /ws/install/setup.bash && wait-for-it  mysqldb:3306 -- ros2 run rosbag2_processing_service main'
 
-
+networks:
+  telematic_network:
+    driver: bridge
 secrets:
   mysql_password:
       file: ./secrets/mysql_password.txt

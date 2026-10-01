@@ -56,18 +56,21 @@ const HTTP_URLS = {
 const uploadDestPath = process.env.UPLOAD_DESTINATION_PATH;
 
 const setResponseHeaders = (req, res) => {
-  const origin = req.headers.origin;
+  const origin = req.headers?.origin || ""; 
+  console.log("Received Origin:", origin);
+  console.log("Allowed Origins:", allowedOrigins);
   if (allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
+  }else{
+    res.setHeader("Access-Control-Allow-Origin", "*");
   }
-  res.setHeader("Access-Control-Request-Headers", "*");
-  res.setHeader("Access-Control-Request-Method", "*");
-  res.setHeader("Access-Control-Allow-Headers", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
   res.setHeader("Access-Control-Allow-Credentials", true);
 };
 
 const requestListener = function (req, res) {
-  setResponseHeaders(res);
+  setResponseHeaders(req,res);
 
   if (req.method === HTTP_METHODS.POST) {
     if (!verifyToken(req)) {
