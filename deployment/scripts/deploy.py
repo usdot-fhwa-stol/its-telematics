@@ -12,7 +12,6 @@ import sys
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
-INSTALLER = SCRIPT_DIR / "install_dependencies.sh"
 LOCAL_SETUP = REPO_ROOT / "telematic_system" / "local.setup.sh"
 CONFIGURATION_SERVICE = SCRIPT_DIR / "configuration_service.py"
 SECRET_KEYS = (
@@ -25,18 +24,21 @@ SECRET_KEYS = (
 
 class DeploymentError(Exception):
     def __init__(self, message, exit_code=2):
+        """Store an operator-safe error message and its process exit code."""
         super().__init__(message)
         self.exit_code = exit_code
 
 
 class DeploymentArgumentParser(argparse.ArgumentParser):
     def error(self, message):
+        """Reject invalid CLI input without echoing potentially secret argument values."""
         # argparse's original message can contain raw arguments, including secrets.
         self.print_usage(sys.stderr)
         self.exit(2, "error: invalid command-line input; review --help and supported values.\n")
 
 
 def parse_input_parameters():
+    """Parse bounded CLI options and collect supported secret overrides without logging values."""
     parser = DeploymentArgumentParser(
         description="Run the ITS Telematics deployment workflow.",
         allow_abbrev=False,
@@ -50,8 +52,8 @@ def parse_input_parameters():
                         help="Deployment environment (default: prod)")
     parser.add_argument("--target", choices=("localhost", "remote", "cloud"),
                         help="Deployment target (default: localhost)")
-    parser.add_argument("--use-case", choices=("messaging", "rsu_management"),
-                        help="Optional use case; omitted enables all services")
+    parser.add_argument("--use-case", choices=("all", "core", "rsu_integration"), default="all",
+                        help="Optional use case (default: all); all enables every service")
     parser.add_argument("--remote-io", default="", help="Remote host address or endpoint")
     parser.add_argument("--remote-user", default="", help="Remote connection user")
     parser.add_argument("--key-path", default="", help="Existing readable credential key file")
@@ -74,6 +76,7 @@ def parse_input_parameters():
 
 
 def validate_input_parameters(parameters):
+    """Apply omitted defaults and validate required remote inputs and optional key-file access."""
     if parameters.environment is None:
         parameters.environment = "prod"
         print("No environment specified. Defaulting to 'prod'.", flush=True)
@@ -96,8 +99,9 @@ def validate_input_parameters(parameters):
 
 
 def validate_host_prerequisites():
+    """Check local scripts, supported OS, and privilege availability without changing the host."""
     errors = []
-    for script in (INSTALLER, LOCAL_SETUP):
+    for script in (LOCAL_SETUP,):
         if not script.is_file():
             errors.append(f"Required host preparation script is missing: {script}")
         elif not os.access(script, os.X_OK):
@@ -124,6 +128,7 @@ def validate_host_prerequisites():
 
 
 def run_command(command, env=None):
+    """Run a child process and preserve failure codes without exposing commands or environment."""
     try:
         result = subprocess.run(command, env=env, check=False)
     except FileNotFoundError:
@@ -138,7 +143,7 @@ def run_command(command, env=None):
 
 
 def prepare_local_host():
-    run_command([str(INSTALLER)])
+    """Run local setup with the required privileges; dependency provisioning is external."""
     if os.geteuid() == 0:
         run_command([str(LOCAL_SETUP)])
     else:
@@ -147,6 +152,7 @@ def prepare_local_host():
 
 
 def verify_runtime_dependencies():
+    """Verify Docker command, daemon access, and Compose availability without starting containers."""
     if shutil.which("docker") is None:
         raise DeploymentError("Docker is not installed or not available in PATH.")
     errors = []
@@ -168,17 +174,18 @@ def verify_runtime_dependencies():
 
 
 def execute_deployment_pipeline(parameters):
+    """Display non-secret context and pass resolved inputs to the Python configuration service."""
     print("Deployment configuration:")
     print(f"  environment : {parameters.environment}")
     print(f"  target      : {parameters.target}")
-    print(f"  use case    : {parameters.use_case or 'all services'}")
+    print(f"  use case    : {parameters.use_case}")
     print(flush=True)
 
     environment = os.environ.copy()
     environment.update({
         "ENVIRONMENT": parameters.environment,
         "TARGET": parameters.target,
-        "USE_CASE": parameters.use_case or "",
+        "USE_CASE": parameters.use_case,
         "REMOTE_IO": parameters.remote_io,
         "REMOTE_USER": parameters.remote_user,
         "KEY_PATH": parameters.key_path,
@@ -192,6 +199,7 @@ def execute_deployment_pipeline(parameters):
 
 
 def display_troubleshooting_hints(failed_step, exit_code):
+    """Print the failed stage, original exit code, and a stage-specific remediation hint."""
     hints = {
         "Parse input parameters": "Review --help, option names, and required option values.",
         "Validate input parameters": (
@@ -199,8 +207,8 @@ def display_troubleshooting_hints(failed_step, exit_code):
             "and key-file access."
         ),
         "Validate host prerequisites": "Verify the supported OS, script permissions, and sudo availability.",
-        "Prepare local host": "Review Docker package installation or local.setup.sh output and sudo permissions.",
-        "Verify runtime dependencies": "Verify Docker daemon access and Docker Compose availability.",
+        "Prepare local host": "Review local.setup.sh output and sudo permissions.",
+        "Verify runtime dependencies": "Verify Docker daemon access and Docker Compose availability; dependency installation belongs to Ansible Host Provisioning.",
         "Generate deployment configuration": "Review configuration layers, secret defaults/overrides, and file paths.",
     }
     print(f"Deployment failed at step: {failed_step}", file=sys.stderr)
@@ -209,6 +217,7 @@ def display_troubleshooting_hints(failed_step, exit_code):
 
 
 def run_step(name, function, *args):
+    """Execute a named stage and supplement failures with diagnostics; allow normal help exits."""
     try:
         return function(*args)
     except DeploymentError as error:
@@ -222,6 +231,7 @@ def run_step(name, function, *args):
 
 
 def main():
+    """Validate inputs, prepare localhost only when selected, and generate deployment configuration."""
     parameters = run_step("Parse input parameters", parse_input_parameters)
     run_step("Validate input parameters", validate_input_parameters, parameters)
     if parameters.target == "localhost":

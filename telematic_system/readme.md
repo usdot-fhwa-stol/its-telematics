@@ -25,7 +25,7 @@ Supported CLI values:
 | --- | --- | --- |
 | `--environment` | `dev`, `test`, `prod` | `prod` |
 | `--target` | `localhost`, `remote`, `cloud` | `localhost` |
-| `--use-case` | `messaging`, `rsu_management` | Optional; omitted enables all services |
+| `--use-case` | `all`, `core`, `rsu_integration` | `all`; omitted enables all services |
 
 Environment selection:
 
@@ -48,22 +48,22 @@ Default localhost initialization with all services enabled:
 ./deployment/scripts/deploy.py
 ```
 
-Messaging:
+Core services:
 
 ```bash
 ./deployment/scripts/deploy.py \
   --environment dev \
   --target localhost \
-  --use-case messaging
+  --use-case core
 ```
 
-RSU management:
+RSU integration:
 
 ```bash
 ./deployment/scripts/deploy.py \
   --environment dev \
   --target localhost \
-  --use-case rsu_management
+  --use-case rsu_integration
 ```
 
 Remote configuration preparation (replace the placeholders):
@@ -84,21 +84,26 @@ story prepares configuration and connection metadata only. These targets do
 not install dependencies or run local setup on the operator's machine. The current
 `cloud` configuration represents the AWS-oriented deployment path in the design.
 
+Deployment targets select existing configuration profiles: `localhost` and
+`remote` use `on-premise`; `cloud` uses `cloud`.
+
 For `localhost`, initialization checks supported host prerequisites (Ubuntu or
-Debian, required executable scripts, and root or sudo availability), then uses
-`deployment/scripts/install_dependencies.sh` to install missing Docker Engine
-and Docker Compose dependencies. It runs `telematic_system/local.setup.sh` with
-root privileges, verifies Docker daemon access and Compose availability, and
-generates `telematic_system/.env`.
+Debian, the executable local setup script, and root or sudo availability), runs
+`telematic_system/local.setup.sh` with root privileges, verifies Docker daemon
+access and Docker Compose availability, and generates `telematic_system/.env`.
+Missing or unavailable runtime dependencies cause initialization to fail with
+diagnostics. Dependency installation belongs to the follow-up Ansible/Host
+Provisioning flow; initialization does not install Docker or Docker Compose.
 
 `telematic_system/sample.env` is the base runtime configuration layer.
 Environment, target, and selected use-case layers are applied afterward to
 produce the consolidated `telematic_system/.env`, the Docker Compose runtime
-environment file. When the use case is omitted, both use-case layers are loaded
-and `COMPOSE_PROFILES=messaging,rsu_integration` enables all services.
-The `messaging` use case uses the existing `core` configuration layer. The
-`rsu_management` use case uses the existing `rsu_integration` configuration layer
-and activates its Docker Compose profile.
+environment file. Omitting `--use-case` defaults to `all`, which loads both
+`core` and `rsu_integration` layers and sets
+`COMPOSE_PROFILES=messaging,rsu_integration` to enable all services. The `core`
+use case uses the `core` layer and existing `messaging` Compose profile;
+`rsu_integration` uses the matching layer and Compose profile. Compose profile
+names are unchanged.
 Initialization prepares the runtime configuration; it does not start the stack.
 `ManifestReference` is temporary, in-memory metadata describing the runtime
 `.env` and Compose paths. It is printed as JSON; no deployment YAML manifest is
