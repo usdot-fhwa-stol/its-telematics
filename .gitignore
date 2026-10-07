@@ -18,6 +18,3 @@ output/
 .gitconfig
 
 .env
-
-# Generated deployment runtime artifacts
-deployment/generated/
