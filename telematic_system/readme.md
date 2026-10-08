@@ -16,25 +16,14 @@ docker -v
 
 ## Deployment initialization
 
-Run `./deployment/scripts/deploy.py` from the repository root for input selection,
-local setup, configuration layering, and runtime `.env` generation.
-
-Supported CLI values:
+Run `./deployment/scripts/deploy.py` from the repository root to validate
+deployment inputs and generate the runtime configuration.
 
 | Option | Supported values | Default |
 | --- | --- | --- |
 | `--environment` | `dev`, `test`, `prod` | `prod` |
 | `--target` | `localhost`, `remote`, `cloud` | `localhost` |
-| `--use-case` | `all`, `core`, `rsu_integration` | `all`; omitted enables all services |
-
-Environment selection:
-
-- `dev`: development images.
-- `test`: test/release-validation images.
-- `prod`: production deployment profile.
-
-The environment profile files under `deployment/environment/` remain the source
-of truth for Docker organization and image tag selection.
+| `--use-case` | `all`, `core`, `rsu_integration` | `all` |
 
 Before running localhost initialization, understand that `local.setup.sh`
 modifies `/etc/hosts` and deletes and recreates `/opt/grafana`, `/opt/apache2`,
@@ -42,109 +31,73 @@ and `/opt/influxdb2`, discarding existing data in those directories. It also
 creates `/opt/telematics/upload` as needed and changes permissions under
 `/opt/telematics`. Localhost initialization runs this setup automatically.
 
-Default localhost initialization with all services enabled:
-
 ```bash
 ./deployment/scripts/deploy.py
 ```
 
 Core services:
-
 ```bash
-./deployment/scripts/deploy.py \
-  --environment dev \
-  --target localhost \
-  --use-case core
+./deployment/scripts/deploy.py --use-case core
 ```
 
 RSU integration:
-
 ```bash
-./deployment/scripts/deploy.py \
-  --environment dev \
-  --target localhost \
-  --use-case rsu_integration
+./deployment/scripts/deploy.py --use-case rsu_integration
 ```
 
-Remote configuration preparation (replace the placeholders):
+For `localhost`, initialization requires Ubuntu or Debian and root or sudo,
+runs `telematic_system/local.setup.sh`, and verifies Docker daemon access and
+Docker Compose availability. Docker Engine and Docker Compose must already be
+available on the host.
 
-```bash
-./deployment/scripts/deploy.py \
-  --environment dev \
-  --target remote \
-  --remote-io '<host>' \
-  --remote-user '<user>' \
-  --key-path '<path>'
+Initialization generates `telematic_system/.env` from `sample.env` and the
+selected environment, target, and use-case layers under `deployment/`.
+Omitting `--use-case` or using `--use-case all` loads both `core` and
+`rsu_integration` layers and sets `COMPOSE_PROFILES=messaging,rsu_integration`.
+It does not start the stack or provision remote/cloud hosts. The `remote` target
+requires `--remote-io` and `--remote-user`; optional `--key-path` must identify
+an existing readable file.
+
+```
+cd <directory name>/telematic_system
+
+# All services on one host
+docker compose up -d
+docker compose down
 ```
 
-The remote target requires `--remote-io` and `--remote-user`. An optional
-`--key-path` must name an existing readable file. Remote/cloud execution and
-provisioning will be completed by the follow-up automation/Ansible work; this
-story prepares configuration and connection metadata only. These targets do
-not install dependencies or run local setup on the operator's machine. The current
-`cloud` configuration represents the AWS-oriented deployment path in the design.
+Add the RSU Management Service and InfluxDB v3:
+```
+docker compose --profile rsu_integration up -d
+```
 
-Deployment targets select existing configuration profiles: `localhost` and
-`remote` use `on-premise`; `cloud` uses `cloud`.
-
-For `localhost`, initialization checks supported host prerequisites (Ubuntu or
-Debian, the executable local setup script, and root or sudo availability), runs
-`telematic_system/local.setup.sh` with root privileges, verifies Docker daemon
-access and Docker Compose availability, and generates `telematic_system/.env`.
-Missing or unavailable runtime dependencies cause initialization to fail with
-diagnostics. Dependency installation belongs to the follow-up Ansible/Host
-Provisioning flow; initialization does not install Docker or Docker Compose.
-
-`telematic_system/sample.env` is the base runtime configuration layer.
-Environment, target, and selected use-case layers are applied afterward to
-produce the consolidated `telematic_system/.env`, the Docker Compose runtime
-environment file. Omitting `--use-case` defaults to `all`, which loads both
-`core` and `rsu_integration` layers and sets
-`COMPOSE_PROFILES=messaging,rsu_integration` to enable all services. The `core`
-use case uses the `core` layer and existing `messaging` Compose profile;
-`rsu_integration` uses the matching layer and Compose profile. Compose profile
-names are unchanged.
-Initialization prepares the runtime configuration; it does not start the stack.
-`ManifestReference` is temporary, in-memory metadata describing the runtime
-`.env` and Compose paths. It is printed as JSON; no deployment YAML manifest is
-generated.
+Across separate hosts, run only the tier each host needs. Set the other hosts'
+addresses in the applicable configuration under `deployment/targets/` before
+running `deploy.py`.
+```
+docker compose -f docker-compose.core.yml up -d    # nats, messaging server, rosbag2 processing
+docker compose -f docker-compose.dbs.yml up -d     # mysql, influxdb
+docker compose -f docker-compose.webapp.yml up -d  # web server/client, apache2, grafana
+docker compose -f docker-compose.units.yml up -d   # ros2, kafka and cloud bridges
+docker compose -f docker-compose.rsu.yml --profile rsu_integration up -d
+```
 
 ## Secrets
-
-Deployment initialization prepares all four mandatory secret artifacts,
-regardless of the selected use case:
-
-| Secret key | Generated file | Example default |
-| --- | --- | --- |
-| `mysql_password` | `secrets/mysql_password.txt` | `secrets/mysql_password.txt.example` |
-| `mysql_root_password` | `secrets/mysql_root_password.txt` | `secrets/mysql_root_password.txt.example` |
-| `grafana_secret_key` | `secrets/grafana_secret_key.txt` | `secrets/grafana_secret_key.txt.example` |
-| `influx_admin_token` | `secrets/influx_admin_token.txt` | `secrets/influx_admin_token.txt.example` |
-
-These paths are relative to `telematic_system/`. Each initialization creates or
-refreshes each secret file using a non-empty `--secret-override` value first,
-then the corresponding non-empty `.example` file. If neither is available,
-initialization fails with a diagnostic identifying the expected example file
-and override option. Existing generated secret files are not a fallback.
-
-For example, from the repository root:
-
+Everything in `secrets/` is gitignored except the `*.example` files.
+Initialization creates or overwrites `mysql_password.txt`, `mysql_root_password.txt`,
+`grafana_secret_key.txt`, and `influx_admin_token.txt` for every use case, using
+non-empty `--secret-override key=value` values or the corresponding `.example`
+files. Existing secret files are not used as defaults; missing or empty sources
+cause initialization to fail. Replace example placeholders before initialization
+or supply overrides (repeat the option for multiple secrets):
 ```bash
-./deployment/scripts/deploy.py \
-  --secret-override mysql_password='<value>'
+./deployment/scripts/deploy.py --secret-override mysql_password='<value>'
 ```
-
-`--secret-override` may be repeated for multiple secrets; repeated keys use the
-last supplied value. Secret values are not printed in deployment logs. Generated
-secret files have permissions `600` and are gitignored; example files remain
-tracked.
 
 #### MYSQL
 `mysql_password.txt` and `mysql_root_password.txt` set the user and root passwords
-on the mysqldb container's first start. The resolved `mysql_password` credential
-is used for both the MySQL secret artifact and the runtime `MYSQL_PASSWORD` value.
-This initialization process does not rotate credentials already stored in an
-initialized or running database.
+on the mysqldb container's first start. Initialization uses the resolved `mysql_password` value for both
+`mysql_password.txt` and `MYSQL_PASSWORD` in the generated `.env`.
 
 #### influxDB v3
 `influx_admin_token.txt` is required by the `rsu_integration` profile and holds the
@@ -153,14 +106,6 @@ admin token as JSON:
 {"name":"dev-admin","token":"apiv3_YOUR_ADMIN_TOKEN_VALUE","hashed":false,"description":"dev-admin"}
 ```
 The token value must match `rsu_data_ingestion_influx_token` in the generated `.env`.
-An Influx override is written verbatim and must supply the expected JSON document;
-the configuration service does not validate that format or synchronize the RSU
-ingestion token.
-
-#### Grafana secret key
-
-`grafana_secret_key.txt` is generated, but the current Compose configuration does
-not mount or reference it in Grafana.
 
 ## Open a browser to view influxDB UI
 http://<amazone ec2 instance url>:8086/orgs/04cb75631ee68b28
