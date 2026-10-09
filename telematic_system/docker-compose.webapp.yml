@@ -43,9 +43,10 @@ services:
       command: bash -c '/app/service.sh'
       secrets:
         - mysql_password
+        - source: grafana_htpasswd
+          target: /opt/apache2/grafana_htpasswd
       volumes:
-        - /opt/apache2/grafana_htpasswd:/opt/apache2/grafana_htpasswd
-        - /opt/telematics/upload:/opt/telematics/upload
+        - telematics_upload:/opt/telematics/upload
 
   web_client:
     build:
@@ -84,8 +85,9 @@ services:
       - grafana
       - web_client
       - web_server
-    volumes:
-      - /opt/apache2/grafana_htpasswd:/etc/apache2/grafana_htpasswd
+    secrets:
+      - source: grafana_htpasswd
+        target: /etc/apache2/grafana_htpasswd
 
   grafana:
     build:
@@ -111,10 +113,10 @@ services:
         - mysql_password
         - grafana_secret_key
     volumes:
-      - /opt/grafana/logs:/var/log/grafana
+      - grafana_logs:/var/log/grafana
       - ./telematic_apps/grafana/grafana.ini:/etc/grafana/grafana.ini
-      - /opt/grafana/data:/var/lib/grafana
-      - /opt/grafana/provisioning:/home/grafana/conf/provisioning
+      - grafana_data:/var/lib/grafana
+      - grafana_provisioning:/home/grafana/conf/provisioning
       - /home/ubuntu/.aws/credentials:/usr/share/grafana/.aws/credentials
     user: "472" #grafana user id
 
@@ -124,3 +126,11 @@ secrets:
       file: ./secrets/mysql_password.txt
   grafana_secret_key:
     file: ./secrets/grafana_secret_key.txt
+  grafana_htpasswd:
+      file: ./secrets/grafana_htpasswd
+
+volumes:
+  telematics_upload:
+  grafana_logs:
+  grafana_data:
+  grafana_provisioning:
