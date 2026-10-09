@@ -16,7 +16,7 @@ docker -v
 
 ## Deployment initialization
 
-Run `./deployment/scripts/deploy.py` from the repository root to validate
+Run `./deployment/scripts/setup.py` from the repository root to validate
 deployment inputs and generate the runtime configuration.
 
 | Option | Supported values | Default |
@@ -32,21 +32,21 @@ creates `/opt/telematics/upload` as needed and changes permissions under
 `/opt/telematics`. Localhost initialization runs this setup automatically.
 
 ```bash
-./deployment/scripts/deploy.py
+./deployment/scripts/setup.py
 ```
 
 Core services:
 ```bash
-./deployment/scripts/deploy.py --use-case core
+./deployment/scripts/setup.py --use-case core
 ```
 
 RSU integration:
 ```bash
-./deployment/scripts/deploy.py --use-case rsu_integration
+./deployment/scripts/setup.py --use-case rsu_integration
 ```
 
 For `localhost`, initialization requires Ubuntu or Debian and root or sudo,
-runs `telematic_system/local.setup.sh`, and verifies Docker daemon access and
+runs `deployment/scripts/local.setup.sh`, and verifies Docker daemon access and
 Docker Compose availability. Docker Engine and Docker Compose must already be
 available on the host.
 
@@ -73,7 +73,7 @@ docker compose --profile rsu_integration up -d
 
 Across separate hosts, run only the tier each host needs. Set the other hosts'
 addresses in the applicable configuration under `deployment/targets/` before
-running `deploy.py`.
+running `setup.py`.
 ```
 docker compose -f docker-compose.core.yml up -d    # nats, messaging server, rosbag2 processing
 docker compose -f docker-compose.dbs.yml up -d     # mysql, influxdb
@@ -91,8 +91,11 @@ files. Existing secret files are not used as defaults; missing or empty sources
 cause initialization to fail. Replace example placeholders before initialization
 or supply overrides (repeat the option for multiple secrets):
 ```bash
-./deployment/scripts/deploy.py --secret-override mysql_password='<value>'
+./deployment/scripts/setup.py --secret-override mysql_password='<value>'
 ```
+
+Generated secret files use mode `644` so container users can read them; they are
+also readable by other host users. The generated `.env` keeps mode `600`.
 
 #### MYSQL
 `mysql_password.txt` and `mysql_root_password.txt` set the user and root passwords

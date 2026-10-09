@@ -119,15 +119,15 @@ def apply_parameter_overrides(parameters):
     }
 
 
-def write_atomic(path, contents):
-    """Replace an artifact atomically with mode 600 and clean up its temporary file."""
+def write_atomic(path, contents, mode=0o600):
+    """Replace an artifact atomically with the requested permissions and clean up its temporary file."""
     temporary_path = None
     try:
         with tempfile.NamedTemporaryFile(
             mode="wb", dir=path.parent, prefix=f"{path.name}.tmp.", delete=False
         ) as temporary_file:
             temporary_path = Path(temporary_file.name)
-            os.fchmod(temporary_file.fileno(), 0o600)
+            os.fchmod(temporary_file.fileno(), mode)
             temporary_file.write(contents)
         os.replace(temporary_path, path)
     except OSError:
@@ -169,7 +169,7 @@ def rotate_secret_artifacts(config_map, parameters):
 
     secrets_dir.mkdir(parents=True, exist_ok=True)
     for secret, (contents, source) in prepared_secrets.items():
-        write_atomic(secrets_dir / f"{secret}.txt", contents)
+        write_atomic(secrets_dir / f"{secret}.txt", contents, mode=0o644)
         print(f"Configured {secret} from {source}.", flush=True)
 
     config_map["MYSQL_PASSWORD"] = mysql_password

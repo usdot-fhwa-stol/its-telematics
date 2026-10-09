@@ -12,7 +12,7 @@ import sys
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
-LOCAL_SETUP = REPO_ROOT / "telematic_system" / "local.setup.sh"
+LOCAL_SETUP = SCRIPT_DIR / "local.setup.sh"
 CONFIGURATION_SERVICE = SCRIPT_DIR / "configuration_service.py"
 SECRET_KEYS = (
     "mysql_password",
