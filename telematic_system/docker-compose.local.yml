@@ -145,7 +145,7 @@ services:
         - ALLOW_CLIENT_URL=${ALLOW_CLIENT_URL}
         - GRAFANA_HTPASSWORD=${GRAFANA_HTPASSWORD}
         - SESSION_TIMEOUT=${SESSION_TIMEOUT}
-        - SECRET=${SECRET}
+        - SECRET=${SECRET:?SECRET must be set}
         # Server port
         - PORT=${PORT}
         # MYSQL DB credentials. Need to be replaced with actual MYSQL DB during deployment
@@ -171,10 +171,11 @@ services:
         - FILE_EXTENSIONS=${FILE_EXTENSIONS}
       command: bash -c 'wait-for-it localhost:3307 && wait-for-it localhost:3000 && /app/service.sh'
       volumes:
-        - ./secrets/grafana_htpasswd:/opt/apache2/grafana_htpasswd
         - telematics_upload:/opt/telematics/upload
       secrets:
-      - mysql_password
+        - mysql_password
+        - source: grafana_htpasswd
+          target: /opt/apache2/grafana_htpasswd
 
   web_client:
     build:
@@ -218,8 +219,9 @@ services:
       - grafana
       - web_client
       - web_server
-    volumes:
-      - ./secrets/grafana_htpasswd:/etc/apache2/grafana_htpasswd
+    secrets:
+      - source: grafana_htpasswd
+        target: /etc/apache2/grafana_htpasswd
 
   messaging_server:
     build:
@@ -302,6 +304,8 @@ secrets:
     file: ./secrets/grafana_secret_key.txt
   influx_admin_token:
       file: ./secrets/influx_admin_token.txt
+  grafana_htpasswd:
+      file: ./secrets/grafana_htpasswd
 volumes:
   mysql-datavolume:
   influxdb3_data:
