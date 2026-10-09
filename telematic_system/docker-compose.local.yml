@@ -145,7 +145,7 @@ services:
         - ALLOW_CLIENT_URL=${ALLOW_CLIENT_URL}
         - GRAFANA_HTPASSWORD=${GRAFANA_HTPASSWORD}
         - SESSION_TIMEOUT=${SESSION_TIMEOUT}
-        - SECRET=${SECRET}
+        - SECRET=${SECRET:?SECRET must be set}
         # Server port
         - PORT=${PORT}
         # MYSQL DB credentials. Need to be replaced with actual MYSQL DB during deployment

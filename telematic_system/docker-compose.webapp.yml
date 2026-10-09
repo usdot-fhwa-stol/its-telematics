@@ -17,7 +17,7 @@ services:
         - ALLOW_CLIENT_URL=https://cav-telematics.com,http://localhost
         - GRAFANA_HTPASSWORD=/opt/apache2/grafana_htpasswd
         - SESSION_TIMEOUT=3600
-        - SECRET=my_secret_telematic_ui
+        - SECRET=${SECRET:?SECRET must be set}
         # Server port
         - PORT=9010
         # MYSQL DB credentials. Need to be replaced with actual MYSQL DB during deployment
