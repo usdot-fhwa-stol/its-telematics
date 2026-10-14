@@ -11,7 +11,7 @@
         python3 --version
         ```
         Recommended version is `3.10`
-    3. Create a virtual environment. Navigate to `cda-telematics/telematic_system/scripts/log_analysis` directory, and run below command:
+    3. Create a virtual environment. Navigate to `its-telematics/telematic_system/scripts/log_analysis` directory, and run below command:
         ```
         python3 -m venv .venv
         ```
@@ -31,17 +31,17 @@
         pip install -r requirements.txt
         ```
 - Clone repos:
-    - Clone cda-telematics GitHub repos
+    - Clone its-telematics GitHub repos
     ```
-    git clone https://github.com/usdot-fhwa-stol/cda-telematics.git
-    cd cda-telematics
+    git clone https://github.com/usdot-fhwa-stol/its-telematics.git
+    cd its-telematics
     ```
 - Download `log_timesheet.csv`
 Most of the python analysis scripts refer to `log_timesheet.csv` for test runs and their duration. Since this `log_timesheet.csv` is generated during the verification/validation testing, ensure download the `log_timesheet.csv` file to this `log_analysis`  folder before executing any python scripts.
 
 
 # Process V2xHub bridge log
-1. Navigate to `cda-telematics/telematic_system/scripts/log_analysis` directory
+1. Navigate to `its-telematics/telematic_system/scripts/log_analysis` directory
 2. Download v2xhub logs to the current folder.
 3. Run command to generate data publishing metrics.
     ```
@@ -53,7 +53,7 @@ Most of the python analysis scripts refer to `log_timesheet.csv` for test runs a
     It will generate parsed bridge log in csv files.
 
 # Process Streets bridge log
-1. Navigate to `cda-telematics/telematic_system/scripts/log_analysis` directory
+1. Navigate to `its-telematics/telematic_system/scripts/log_analysis` directory
 2. Download streets bridge logs to the current folder.
 3. Run command to generate data publishing metrics.
     ```
@@ -62,7 +62,7 @@ Most of the python analysis scripts refer to `log_timesheet.csv` for test runs a
     It will generate parsed bridge log in csv files.
 
 # Process Cloud bridge log
-1. Navigate to `cda-telematics/telematic_system/scripts/log_analysis` directory
+1. Navigate to `its-telematics/telematic_system/scripts/log_analysis` directory
 2. Download streets bridge logs to the current folder.
 3. Run command to generate data publishing metrics.
     ```
@@ -75,7 +75,7 @@ Most of the python analysis scripts refer to `log_timesheet.csv` for test runs a
     It will generate parsed bridge log in csv files.
 
 # Process Vehicle bridge log
-1. Navigate to `cda-telematics/telematic_system/scripts/log_analysis` directory
+1. Navigate to `its-telematics/telematic_system/scripts/log_analysis` directory
 2. Download vehicle bridge logs to the current folder.
 3. Run command to generate data publishing metrics.
     ```
@@ -87,7 +87,7 @@ Most of the python analysis scripts refer to `log_timesheet.csv` for test runs a
     It will generate parsed bridge log in csv files.
 
 # Process Messaging Server log
-1. Navigate to `cda-telematics/telematic_system/scripts/log_analysis` directory
+1. Navigate to `its-telematics/telematic_system/scripts/log_analysis` directory
 2. Download messaging server logs to the current folder.
 3. Run command to generate data publishing metrics.
     ```
@@ -135,7 +135,7 @@ Generated result is similar to below:
 ![Message_loss_result](https://github.com/user-attachments/assets/15fefacb-e929-4340-a0e3-6d7f6441ba8e)
 
 ## Rosbag Processing time
-1. Navigate to `cda-telematics/telematic_system/scripts/log_analysis` directory
+1. Navigate to `its-telematics/telematic_system/scripts/log_analysis` directory
 2. Download historical data processing service logs to the current folder.
 3. Run command to generate data publishing metrics.
     ```

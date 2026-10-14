@@ -15,22 +15,27 @@
  */
 module.exports = app => {
   const org = require("../controllers/org.controller");
+  const {
+    requireCurrentOrgAdminOrServerAdmin,
+    requireOrgAdminOrServerAdmin,
+    requireSelfOrServerAdmin,
+  } = require("../utils/authorization");
   var router = require('express').Router();
 
   /* GET all organizations. */
   router.get('/all', org.findAll);
   //POST retrieve user role
-  router.post('/role/get',org.getUserRole);
+  router.post('/role/get', requireSelfOrServerAdmin((req) => req.body && req.body.data && req.body.data.user_id), org.getUserRole);
   /***POST add user to organization */
-  router.post('/user/add', org.addOrgUser);
+  router.post('/user/add', requireOrgAdminOrServerAdmin((req) => req.body && req.body.data && req.body.data.org_id), org.addOrgUser);
   /***POST update user for organization */
-  router.post('/user/update', org.updateOrgUser);
+  router.post('/user/update', requireOrgAdminOrServerAdmin((req) => req.body && req.body.data && req.body.data.org_id), org.updateOrgUser);
   /***POST update user for organization */
-  router.post('/user/find', org.findAllOrgsByUser);
+  router.post('/user/find', requireSelfOrServerAdmin((req) => req.body && req.body.data && req.body.data.user_id), org.findAllOrgsByUser);
   /***DELETE delete user from organization */
-  router.delete('/user/delete', org.delOrgUser);
+  router.delete('/user/delete', requireOrgAdminOrServerAdmin((req) => req.query && req.query.org_id), org.delOrgUser);
   /***Get all organization users */
-  router.get('/all/users', org.findAllOrgUsers);
+  router.get('/all/users', requireCurrentOrgAdminOrServerAdmin, org.findAllOrgUsers);
   app.use('/api/org', router);
 
   module.exports = router;

@@ -26,9 +26,26 @@ const AdminPage = React.memo(() => {
             message: ''
         });
     }
+
+    const showRequestError = (response_data) => {
+        if (response_data !== undefined && response_data.errCode !== undefined && response_data.errMsg !== undefined) {
+            setAlertStatus({
+                open: true,
+                severity: NOTIFICATION_STATUS.ERROR,
+                title: 'Error',
+                message: response_data.errMsg
+            });
+            return true;
+        }
+        return false;
+    }
+
     const handleAddUserToOrg = (data) => {
         const response = addOrgUser(data);
         response.then(response_data => {
+            if (showRequestError(response_data)) {
+                return;
+            }
             if (response_data.errCode === undefined) {
                 setOrgsUsers(prev => [...prev, response_data])
             }
@@ -40,6 +57,9 @@ const AdminPage = React.memo(() => {
     const handleUserOrgRoleChange = (data) => {
         const response = updateOrgUser(data);
         response.then(response_data => {
+            if (showRequestError(response_data)) {
+                return;
+            }
             if (response_data.errCode === undefined && Array.isArray(response_data) && response_data.length > 0) {
                 setOrgsUsers(prev => [...prev.filter(item => item.id !== response_data[0].id), response_data[0]])
             }
@@ -51,6 +71,9 @@ const AdminPage = React.memo(() => {
     const handleUserOrgRoleDelete = (data) => {
         const response = deleteOrgUser(data);
         response.then(response_data => {
+            if (showRequestError(response_data)) {
+                return;
+            }
             if (response_data.errCode === undefined && response_data.message === undefined && Array.isArray(response_data) && response_data.length > 0) {
                 let defaultUserOrg = {
                     user_id: data.user_id,
@@ -70,6 +93,9 @@ const AdminPage = React.memo(() => {
         let filteredUser = users.filter(item => item.id === userData.user_id)
         filteredUser[0].is_admin = userData.is_admin === 1 ? "yes" : "no";
         response.then(response_data => {
+            if (showRequestError(response_data)) {
+                return;
+            }
             if (response_data.errCode === undefined) {
                 setUsers(prev => [...prev.filter(item => item.id !== userData.user_id), filteredUser[0]])
             }
@@ -81,6 +107,9 @@ const AdminPage = React.memo(() => {
     useEffect(() => {
         const user_response = listUsers();
         user_response.then(data => {
+            if (showRequestError(data)) {
+                return;
+            }
             if (data !== undefined && Array.isArray(data) && data.length !== 0) {
                 let userList = [];
                 data.forEach(user => {
@@ -104,6 +133,9 @@ const AdminPage = React.memo(() => {
 
         const org_response = listOrgs();
         org_response.then(data => {
+            if (showRequestError(data)) {
+                return;
+            }
             if (data !== undefined && Array.isArray(data) && data.length !== 0) {
                 setOrgs(data);
             }
@@ -120,6 +152,9 @@ const AdminPage = React.memo(() => {
 
         const org_users_response = listOrgUsers();
         org_users_response.then(data => {
+            if (showRequestError(data)) {
+                return;
+            }
             if (data !== undefined && Array.isArray(data) && data.length !== 0) {
                 setOrgsUsers(data);
             }

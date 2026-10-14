@@ -4,7 +4,7 @@ services:
     build:
           context: ./telematic_units/carma_vehicle_bridge
           dockerfile: Dockerfile
-    image: usdotfhwastoldev/carma_vehicle_nats_bridge:develop
+    image: ${DOCKER_ORG}/carma_vehicle_nats_bridge:${DOCKER_TAG}
     logging:
       options:
         max-size: "2g"
@@ -32,7 +32,7 @@ services:
     build:
           context: ./telematic_units/kafka_bridge
           dockerfile: Dockerfile
-    image: usdotfhwastoldev/telematics-kafka-nats-bridge:develop
+    image: ${DOCKER_ORG}/telematics-kafka-nats-bridge:${DOCKER_TAG}
     logging:
       options:
         max-size: "2g"
@@ -69,7 +69,7 @@ services:
     build:
           context: ./telematic_units/carma_cloud_bridge
           dockerfile: Dockerfile
-    image: usdotfhwastoldev/carma_cloud_nats_bridge:develop
+    image: ${DOCKER_ORG}/carma_cloud_nats_bridge:${DOCKER_TAG}
     logging:
       options:
         max-size: "2g"

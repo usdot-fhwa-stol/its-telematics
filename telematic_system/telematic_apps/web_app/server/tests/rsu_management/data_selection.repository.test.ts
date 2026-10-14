@@ -32,7 +32,7 @@ describe('DataSelectionApiRepository', () => {
     process.env.RSU_MANAGEMENT_SERVICE_URL = originalEnv;
   });
 
-  test('falls back to localhost default when env var is not set', async () => {
+  test('falls back to localhost:8083 default when env var is not set', async () => {
     const originalEnv = process.env.RSU_MANAGEMENT_SERVICE_URL;
     delete process.env.RSU_MANAGEMENT_SERVICE_URL;
 
@@ -44,7 +44,7 @@ describe('DataSelectionApiRepository', () => {
     await defaultRepo.getAvailableTopics(request);
 
     expect(axios.get).toHaveBeenCalledWith(
-      'http://localhost:8082/api/data-selection/available-topics',
+      'http://localhost:8083/api/data-selection/available-topics',
       { data: request }
     );
 

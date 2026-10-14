@@ -16,14 +16,16 @@
 
 module.exports = app => {
     const dashboards = require("../controllers/dashboards.controller");
+    const { requireEditorOrAbove } = require("../utils/authorization");
     var router = require('express').Router();
   
     /* GET all dashboards belong to an organization. */
     router.post('/org/all', dashboards.findDashboardsByOrg);
     router.post('/org/search', dashboards.searchDashboardsByOrg);
-    router.post('/event/update',dashboards.updateEventDashboards);
-    router.delete('/event/delete',dashboards.deleteEventDashboards);
-    router.post('/event/list',dashboards.listEventDashboards);
+    /* Modify event dashboards — requires Editor or Admin role */
+    router.post('/event/update', requireEditorOrAbove, dashboards.updateEventDashboards);
+    router.delete('/event/delete', requireEditorOrAbove, dashboards.deleteEventDashboards);
+    router.post('/event/list', dashboards.listEventDashboards);
     app.use('/api/dashboards', router);
   
     module.exports = router;

@@ -15,10 +15,11 @@
  */
 module.exports = app => {
     const locations = require("../controllers/locations.controller");
+    const { requireEditorOrAbove } = require("../utils/authorization");
     var router = require('express').Router();
 
-    //Create a location
-    router.post("/create", locations.create);
+    //Create a location — requires Editor or Admin role
+    router.post("/create", requireEditorOrAbove, locations.create);
 
     //Retrieve all locations 
     router.get("/all", locations.findAll);

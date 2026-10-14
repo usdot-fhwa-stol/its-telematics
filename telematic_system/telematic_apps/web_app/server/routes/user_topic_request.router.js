@@ -15,10 +15,11 @@
  */
 module.exports = app => {
     const user_topic_request = require("../controllers/user_topic_request.controller");
+    const { requireEditorOrAbove } = require("../utils/authorization");
     var router = require('express').Router();
 
-    //Create or update a user_topic_request
-    router.post("/upsert", user_topic_request.createOrUpdate);
+    //Create or update a user_topic_request — requires Editor or Admin role
+    router.post("/upsert", requireEditorOrAbove, user_topic_request.createOrUpdate);
 
     //Retrieve user_topic_request by criteria: event_id and unit_identifier
     router.get("/all", user_topic_request.findAllUserRequestByEventUnit);
