@@ -2,7 +2,7 @@ version: "3.4"
 services:
   ros2_nats_bridge:
     build:
-          context: ./telematic_units/carma_vehicle_bridge
+          context: ./telematic_units/ros2_bridge
           dockerfile: Dockerfile
     image: ${DOCKER_ORG}/carma_vehicle_nats_bridge:${DOCKER_TAG}
     logging:

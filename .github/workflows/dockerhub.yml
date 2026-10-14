@@ -154,7 +154,7 @@ jobs:
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v7
         with:
-          context: ./telematic_system/telematic_units/carma_vehicle_bridge/
+          context: ./telematic_system/telematic_units/ros2_bridge/
           push: true
           sbom: true
           provenance: mode=max
