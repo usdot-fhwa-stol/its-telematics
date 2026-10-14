@@ -185,7 +185,7 @@ jobs:
   rosbag2_processing_service_coverage:
     runs-on: ubuntu-latest
     container:
-      image: ros:foxy
+      image: ros:humble
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}

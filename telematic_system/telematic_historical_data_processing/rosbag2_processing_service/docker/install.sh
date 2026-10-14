@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#  Copyright (C) 2024 LEIDOS.
+#  Copyright (C) 2024-2026 LEIDOS.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License"); you may not
 #  use this file except in compliance with the License. You may obtain a copy of
@@ -20,19 +20,18 @@ sudo python3 -m pip install nats-py \
     influxdb \
     influxdb_client \
     mcap-ros2-support \
-    pathlib \
     pytest-env \
     pytest-asyncio \
     aiounittest \
     mysql-connector-python
 
-source /opt/ros/foxy/setup.bash
+source /opt/ros/humble/setup.bash
 sudo apt update
 sudo apt install -y apt-utils \
                 python3-pybind11 \
-                ros-foxy-test-msgs \
+                ros-humble-test-msgs \
                 python3-colcon-common-extensions \
                 wait-for-it
 
-# Build rosbag2
+# Build processing service
 colcon build --packages-up-to rosbag2_processing_service
