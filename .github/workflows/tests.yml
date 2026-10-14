@@ -65,7 +65,7 @@ jobs:
           path: telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test/coverage.xml
           if-no-files-found: error
 
-  carma_vehicle_bridge_coverage:
+  ros2_bridge_coverage:
     runs-on: ubuntu-latest
     container:
       image: ros:foxy-ros1-bridge
@@ -78,17 +78,17 @@ jobs:
         run: |
           apt-get update
           apt-get -y install python3-coverage python3-pip python3-pytest python3-pytest-asyncio ros-foxy-rclpy unzip
-          cd $GITHUB_WORKSPACE/telematic_system/telematic_units/carma_vehicle_bridge/ros2_nats_bridge
+          cd $GITHUB_WORKSPACE/telematic_system/telematic_units/ros2_bridge/ros2_nats_bridge
           source /opt/ros/foxy/setup.bash
           rosdep update
-          rosdep install --from-paths $GITHUB_WORKSPACE/telematic_system/telematic_units/carma_vehicle_bridge/ros2_nats_bridge --ignore-src -r -y
+          rosdep install --from-paths $GITHUB_WORKSPACE/telematic_system/telematic_units/ros2_bridge/ros2_nats_bridge --ignore-src -r -y
       - name: Install requirements
         run: python3 -m pip install nats-py
       - name: Run tests
         shell: bash
         run: |
           export PYTHONPATH=$PYTHONPATH:/usr/lib/python3/dist-packages
-          cd $GITHUB_WORKSPACE/telematic_system/telematic_units/carma_vehicle_bridge/ros2_nats_bridge/test/
+          cd $GITHUB_WORKSPACE/telematic_system/telematic_units/ros2_bridge/ros2_nats_bridge/test/
           source /opt/ros/foxy/setup.bash
           # Delete connection test
           rm -f test_prep257.py
@@ -98,7 +98,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: carma-vehicle-bridge-coverage
-          path: telematic_system/telematic_units/carma_vehicle_bridge/ros2_nats_bridge/test/coverage.xml
+          path: telematic_system/telematic_units/ros2_bridge/ros2_nats_bridge/test/coverage.xml
           if-no-files-found: error
   telematic_cloud_messaging_coverage:
     runs-on: ubuntu-latest
@@ -185,7 +185,7 @@ jobs:
   rosbag2_processing_service_coverage:
     runs-on: ubuntu-latest
     container:
-      image: ros:foxy
+      image: ros:humble
       options: --user root
     steps:
       - name: Checkout ${{ github.event.repository.name }}
@@ -200,8 +200,8 @@ jobs:
           apt-get update
           apt-get -y install python3-coverage python3-pip python3-pytest python3-pytest-asyncio
           cd src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/docker
-          chmod 777 checkout.sh install.sh
-          ./checkout.sh
+          chmod 777 install.sh
+          mkdir -p /ws/src
           cp -R $GITHUB_WORKSPACE/src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/** /ws/src/
           ./install.sh
       - name: Run tests
@@ -224,7 +224,7 @@ jobs:
           if-no-files-found: error
   sonar:
     # Remove cloud bridge, vehicle bridge, and telematic_cloud_messaging coverage temporarily as test build failed
-    needs: [telematic_rsu_management_service_coverage, web_app_client_coverage, web_app_server_coverage, rosbag2_processing_service_coverage, telematic_cloud_messaging_coverage, carma_vehicle_bridge_coverage, carma_cloud_bridge_coverage, kafka_nats_bridge_coverage]
+    needs: [telematic_rsu_management_service_coverage, web_app_client_coverage, web_app_server_coverage, rosbag2_processing_service_coverage, telematic_cloud_messaging_coverage, ros2_bridge_coverage, carma_cloud_bridge_coverage, kafka_nats_bridge_coverage]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ${{ github.event.repository.name }}
@@ -240,7 +240,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: carma-vehicle-bridge-coverage
-          path: carma_vehicle_bridge
+          path: ros2_bridge
       - name: Download kafka-nats-bridge code coverage results
         uses: actions/download-artifact@v8
         with:
@@ -280,7 +280,7 @@ jobs:
         run: |
           for coverage_file in [
             "${{ github.workspace }}/carma_cloud_bridge/coverage.xml",
-            "${{ github.workspace }}/carma_vehicle_bridge/coverage.xml",
+            "${{ github.workspace }}/ros2_bridge/coverage.xml",
             "${{ github.workspace }}/telematic_system/telematic_units/kafka_bridge/kafka_nats_bridge/test/coverage.xml",
           ]:
             with open(coverage_file, 'r') as coverage :
