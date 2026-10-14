@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2022 LEIDOS.
+# Copyright (C) 2022-2026 LEIDOS.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License. You may obtain a copy of
@@ -64,20 +64,20 @@ class Ros2NatsBridgeNode(Node):
         self.is_sim = os.getenv("IS_SIM", 'False').lower() in ('true', '1')
 
         self.vehicle_info = {
-            UnitKeys.UNIT_ID.value: os.getenv("VEHICLE_BRIDGE_UNIT_ID"),
-            UnitKeys.UNIT_TYPE.value: os.getenv("VEHICLE_BRIDGE_UNIT_TYPE"),
-            UnitKeys.UNIT_NAME.value: os.getenv("VEHICLE_BRIDGE_UNIT_NAME"),
+            UnitKeys.UNIT_ID.value: os.getenv("ROS2_BRIDGE_UNIT_ID"),
+            UnitKeys.UNIT_TYPE.value: os.getenv("ROS2_BRIDGE_UNIT_TYPE"),
+            UnitKeys.UNIT_NAME.value: os.getenv("ROS2_BRIDGE_UNIT_NAME"),
             "timestamp": ""}
 
         self.nats_ip_port = os.getenv("NATS_SERVER_IP_PORT")
         
         #Logging configuration parameters
-        self.log_level = os.getenv("VEHICLE_BRIDGE_LOG_LEVEL")
-        self.log_name = os.getenv("VEHICLE_BRIDGE_LOG_NAME")
-        self.log_path = os.getenv("VEHICLE_BRIDGE_LOG_PATH")       
-        self.log_rotation = int(os.getenv("VEHICLE_BRIDGE_LOG_ROTATION_SIZE_BYTES"))
+        self.log_level = os.getenv("ROS2_BRIDGE_LOG_LEVEL")
+        self.log_name = os.getenv("ROS2_BRIDGE_LOG_NAME")
+        self.log_path = os.getenv("ROS2_BRIDGE_LOG_PATH")       
+        self.log_rotation = int(os.getenv("ROS2_BRIDGE_LOG_ROTATION_SIZE_BYTES"))
         
-        self.log_handler_type = os.getenv('VEHICLE_BRIDGE_LOG_HANDLER_TYPE')
+        self.log_handler_type = os.getenv('ROS2_BRIDGE_LOG_HANDLER_TYPE')
 
         # Create ROS2NatsBridge logger
         if self.log_handler_type == LogType.ALL.value:
@@ -91,7 +91,7 @@ class Ros2NatsBridgeNode(Node):
             self.logger.warn("Incorrect Log type defined, defaulting to console")
 
         #Get the topics that should be excluded
-        self.excludedTopics = os.getenv("VEHICLE_BRIDGE_EXCLUSION_LIST")
+        self.excludedTopics = os.getenv("ROS2_TOPIC_EXCLUSION_LIST")
 
         #Add excluded topics and their type to class member variables
         if self.excludedTopics != "":

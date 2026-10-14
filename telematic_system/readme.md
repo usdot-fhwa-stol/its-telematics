@@ -103,7 +103,7 @@ http://<amazone ec2 instance url>:8086/orgs/04cb75631ee68b28
     </Domain>
 </CycloneDDS>
 ```
-Update the NetworkInterfaceAddress to the machine that used to run carma_vehicle_bridge
+Update the NetworkInterfaceAddress to the machine that used to run ros2_bridge
 
 
 - Request data for a list of selected topics (Java version)
