@@ -21,6 +21,6 @@ OS name: "linux", version: "5.15.0-46-generic", arch: "amd64", family: "unix"
 
 ## Running unit tests
 ```
-$ cd **/cda-telematics/telematic_system/telematic_cloud_messaging
+$ cd **/its-telematics/telematic_system/telematic_cloud_messaging
 $ mvn test
 ```

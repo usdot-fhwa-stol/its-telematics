@@ -30,6 +30,11 @@ RUN sudo bash /ws/src/rosbag2_processing_service/docker/checkout.sh
 RUN sudo bash /ws/src/rosbag2_processing_service/docker/install.sh
 
 
-RUN echo "source /ws/install/setup.bash" >> ~/.bashrc
+RUN useradd --create-home --shell /bin/bash app && \
+    chown -R app:app /ws && \
+    echo "source /ws/install/setup.bash" >> /home/app/.bashrc && \
+    chown app:app /home/app/.bashrc
+
+USER app
 
 CMD ["ros2 run rosbag2_processing_service main"]

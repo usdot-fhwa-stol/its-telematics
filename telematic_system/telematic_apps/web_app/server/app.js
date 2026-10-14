@@ -23,12 +23,21 @@ const jwt = require("jsonwebtoken");
 const data = require("./config/data");
 
 var app = express();
+
+// Trust the first hop proxy (e.g. reverse proxy/load balancer) so that
+// express-rate-limit and other middleware can correctly resolve client IPs
+// from the 'X-Forwarded-For' header instead of throwing a validation error.
+app.set("trust proxy", process.env.TRUST_PROXY_HOPS ? Number(process.env.TRUST_PROXY_HOPS) : 1);
+
 const cors = require("cors");
 
 require("dotenv").config();
-const allowedOrigins = process.env.ALLOW_CLIENT_URL.split(",");
+const allowedOrigins = (process.env.ALLOW_CLIENT_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
 var corsOptions = {
-  origin: allowedOrigins,
+  origin: allowedOrigins.length > 0 ? allowedOrigins : true,
   credentials: true,
   optionsSuccessStatus: 200,
 };

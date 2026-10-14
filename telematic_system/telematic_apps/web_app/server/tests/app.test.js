@@ -72,5 +72,3 @@ describe("POST /update/server/admin", () => {
         expect(res.statusCode).toBe(401);
       });
   });
-
-

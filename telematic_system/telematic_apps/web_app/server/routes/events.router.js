@@ -15,19 +15,20 @@
  */
 module.exports = app => {
     const events = require("../controllers/events.controller");
+    const { requireEditorOrAbove } = require("../utils/authorization");
     var router = require('express').Router();
 
-    //Create an event
-    router.post("/create", events.create);
+    //Create an event — requires Editor or Admin role
+    router.post("/create", requireEditorOrAbove, events.create);
 
     //Retrieve events by criteria: location, testing type, event name
     router.get("/all", events.findAll);
 
-    //Update an event by id
-    router.put('/update/:id', events.update);
+    //Update an event by id — requires Editor or Admin role
+    router.put('/update/:id', requireEditorOrAbove, events.update);
 
-    //Delete an event by id
-    router.delete('/delete/:id', events.delete);
+    //Delete an event by id — requires Editor or Admin role
+    router.delete('/delete/:id', requireEditorOrAbove, events.delete);
 
     app.use('/api/events', router);
 

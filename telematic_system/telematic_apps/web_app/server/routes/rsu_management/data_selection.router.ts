@@ -18,6 +18,7 @@ import { ConfirmDataSelection } from '../../application/rsu_management/confirm_d
 import { GetAvailableTopics } from '../../application/rsu_management/get_available_topics';
 import { DataSelectionController } from '../../controllers/rsu_management/data_selection.controller';
 import { DataSelectionApiRepository } from '../../repository/rsu_management/data_selection.api.repository';
+import { requireEditorOrAbove } from '../../utils/authorization';
 
 export = (app: Application) => {
     const router = Router();
@@ -35,9 +36,9 @@ export = (app: Application) => {
         confirmDataSelectionApp
     );
 
-    // Define routes
+    // Define routes — confirming topic selection requires Editor or Admin role
     router.post('/available-topics', dataSelectionController.getAvailableTopics);
-    router.post('/confirm-topics', dataSelectionController.confirmDataSelection);
+    router.post('/confirm-topics', requireEditorOrAbove, dataSelectionController.confirmDataSelection);
 
     app.use('/api/data-selection', router);
 };
