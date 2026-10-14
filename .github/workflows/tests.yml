@@ -200,8 +200,8 @@ jobs:
           apt-get update
           apt-get -y install python3-coverage python3-pip python3-pytest python3-pytest-asyncio
           cd src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/docker
-          chmod 777 checkout.sh install.sh
-          ./checkout.sh
+          chmod 777 install.sh
+          mkdir -p /ws/src
           cp -R $GITHUB_WORKSPACE/src/${{ github.event.repository.name }}/telematic_system/telematic_historical_data_processing/rosbag2_processing_service/** /ws/src/
           ./install.sh
       - name: Run tests
