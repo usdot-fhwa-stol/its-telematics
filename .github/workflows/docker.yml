@@ -245,7 +245,7 @@ jobs:
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_historical_data_processing:pr-${{ github.event.pull_request.number }}
       - name: Docker Scout Compare telematic-historical-data-processing
-        uses: docker/scout-action@v1.12.0
+        uses: docker/scout-action@v1
         with:
           command: compare
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematic_historical_data_processing:pr-${{ github.event.pull_request.number }}
