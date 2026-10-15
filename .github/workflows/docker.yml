@@ -184,7 +184,7 @@ jobs:
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/telematics-kafka-nats-bridge:pr-${{ github.event.pull_request.number }}
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
 
-  telematic-carma-vehicle-bridge:
+  telematic-ros2-bridge:
     needs: [determine_docker_org_and_tag, changes]
     if: ${{ github.event.pull_request.base.ref == 'master' || needs.changes.outputs.carma_vehicle_bridge == 'true' }}
     runs-on: ubuntu-latest
@@ -205,17 +205,28 @@ jobs:
           file: ./telematic_system/telematic_units/carma_vehicle_bridge/Dockerfile
           load: true
           tags: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
-      - name: Docker Scout Compare telematic-carma-vehicle-bridge
-        uses: docker/scout-action@v1.12.0
+      - name: Docker Scout Compare telematic-vehicle-nats-bridge
+        uses: docker/scout-action@v1
         with:
           command: compare
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
           to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           ignore-unchanged: true
+          only-cisa-kev: true
+          only-fixed: true
           only-severities: critical,high
+          write-comment: false
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           keep-previous-comments: true
+          output: scout-report.txt            # write the compare report to a file for upload
+      - name: Upload Docker Scout report telematic-ros2-bridge
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-report-telematic-ros2-bridge
+          path: scout-report.txt
+          if-no-files-found: warn
       - name: Docker Scout Policy Evaluation telematic-carma-vehicle-bridge
         uses: docker/scout-action@v1.24.0
         with:
