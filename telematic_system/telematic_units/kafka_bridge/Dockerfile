@@ -1,6 +1,6 @@
 FROM python:3.12.13-alpine
 
-RUN apk add --no-cache build-base zlib-dev
+RUN apk add --no-cache build-base zlib-dev snappy-dev
     
 COPY requirements.txt /tmp
 WORKDIR /tmp
