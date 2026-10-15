@@ -213,6 +213,7 @@ jobs:
           image: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}/carma_vehicle_nats_bridge:pr-${{ github.event.pull_request.number }}
           to-env: ${{ needs.determine_docker_org_and_tag.outputs.docker_image_tag }}
           ignore-unchanged: true
+          only-cisa-kev: true
           only-fixed: true
           only-severities: critical,high
           organization: ${{ needs.determine_docker_org_and_tag.outputs.docker_organization }}
