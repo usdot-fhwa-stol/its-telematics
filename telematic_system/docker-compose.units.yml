@@ -14,9 +14,9 @@ services:
     volumes:
            - ./logs:/var/logs
     environment:
-    - ROS2_BRIDGE_UNIT_ID={ROS2_BRIDGE_UNIT_ID}
-    - NATS_SERVER_IP_PORT={NATS_URL} #REQUIRED variable, replace IP with IP address of NATS server
-    - ROS2_BRIDGE_UNIT_TYPE={ROS2_BRIDGE_UNIT_TYPE}
+    - ROS2_BRIDGE_UNIT_ID=${ROS2_BRIDGE_UNIT_ID}
+    - NATS_SERVER_IP_PORT=${NATS_URL} #REQUIRED variable, replace IP with IP address of NATS server
+    - ROS2_BRIDGE_UNIT_TYPE=${ROS2_BRIDGE_UNIT_TYPE}
     - ROS2_BRIDGE_UNIT_NAME=${ROS2_BRIDGE_UNIT_NAME}
     - ROS2_BRIDGE_LOG_LEVEL=${ROS2_BRIDGE_LOG_LEVEL}
     - ROS2_BRIDGE_LOG_NAME=${ROS2_BRIDGE_LOG_NAME}

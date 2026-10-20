@@ -7,8 +7,6 @@
   <maintainer email="carma@carma.com">carma</maintainer>
   <license>BSD</license>
 
-  <depend>rosbag2_py</depend>
-
   <test_depend>python3-pytest</test_depend>
 
   <export>
