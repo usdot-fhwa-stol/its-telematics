@@ -563,3 +563,11 @@ def test_ode_received_at_normalize_timestamp(bridge_env):
         ("modified_spat", {"intersections": []}),
     ],
 )
+def test_revert_invalid_timestamp_to_now(bridge_env, topic, payload):
+    bridge = KafkaNatsBridge()
+
+    before = datetime.now(timezone.utc).timestamp() * 1_000_000
+    timestamp = bridge.forwarding_loop_service._normalize_timestamp(topic, payload)
+    after = datetime.now(timezone.utc).timestamp() * 1_000_000
+
+    assert before <= timestamp <= after
