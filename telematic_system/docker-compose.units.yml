@@ -21,7 +21,7 @@ services:
     - ROS2_BRIDGE_LOG_LEVEL=${ROS2_BRIDGE_LOG_LEVEL}
     - ROS2_BRIDGE_LOG_NAME=${ROS2_BRIDGE_LOG_NAME}
     - ROS2_BRIDGE_LOG_PATH=${ROS2_BRIDGE_LOG_PATH}
-    - CYCLONE_URL==${CYCLONE_URL:-./telematic_units/cyclone_config.xml}
+    - CYCLONE_URL=${CYCLONE_URL:-./telematic_units/cyclone_config.xml}
     - ROS2_BRIDGE_LOG_ROTATION_SIZE_BYTES=${ROS2_BRIDGE_LOG_ROTATION_SIZE_BYTES} #2 gigabytes
     - ROS2_BRIDGE_LOG_HANDLER_TYPE=${ROS2_BRIDGE_LOG_HANDLER_TYPE} #console: Print logs on console; file: Save logs to file; all: Prints logs on console and file
     - ROS2_TOPIC_EXCLUSION_LIST= ${ROS2_TOPIC_EXCLUSION_LIST} #OPTIONAL variable to set a comma separated list of topics not available to publish, leave empty if none

@@ -91,7 +91,7 @@ class Ros2NatsBridgeNode(Node):
             self.logger.warn("Incorrect Log type defined, defaulting to console")
 
         #Get the topics that should be excluded
-        self.excludedTopics = os.getenv("ROS2_TOPIC_EXCLUSION_LIST")
+        self.excludedTopics = os.getenv("ROS2_TOPIC_EXCLUSION_LIST", "")
 
         #Add excluded topics and their type to class member variables
         if self.excludedTopics != "":
