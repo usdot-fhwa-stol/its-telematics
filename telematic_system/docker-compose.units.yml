@@ -1,7 +1,7 @@
 services:
   ros2_nats_bridge:
     build:
-          context: ./telematic_units/carma_vehicle_bridge
+          context: ./telematic_units/ros2_bridge
           dockerfile: Dockerfile
     image: ${DOCKER_ORG}/carma_vehicle_nats_bridge:${DOCKER_TAG}
     logging:
@@ -14,22 +14,17 @@ services:
     volumes:
            - ./logs:/var/logs
     environment:
-    # NATS (shared) -> vehicle bridge name
-    - NATS_SERVER_IP_PORT=${NATS_URL}
-    # Unit identity
-    - VEHICLE_BRIDGE_UNIT_ID=${VEHICLE_BRIDGE_UNIT_ID}
-    - VEHICLE_BRIDGE_UNIT_TYPE=${VEHICLE_BRIDGE_UNIT_TYPE}
-    - VEHICLE_BRIDGE_UNIT_NAME=${VEHICLE_BRIDGE_UNIT_NAME}
-    # Logging
-    - VEHICLE_BRIDGE_LOG_LEVEL=${VEHICLE_BRIDGE_LOG_LEVEL}
-    - VEHICLE_BRIDGE_LOG_NAME=${VEHICLE_BRIDGE_LOG_NAME}
-    - VEHICLE_BRIDGE_LOG_PATH=${VEHICLE_BRIDGE_LOG_PATH}
-    - VEHICLE_BRIDGE_LOG_ROTATION_SIZE_BYTES=${VEHICLE_BRIDGE_LOG_ROTATION_SIZE_BYTES}
-    - VEHICLE_BRIDGE_LOG_HANDLER_TYPE=${VEHICLE_BRIDGE_LOG_HANDLER_TYPE} #console: Print logs on console; file: Save logs to file; all: Prints logs on console and file
-    # Topic exclusion list -> vehicle bridge name
-    - VEHICLE_BRIDGE_EXCLUSION_LIST=${ROS2_TOPIC_EXCLUSION_LIST} #OPTIONAL variable to set a comma separated list of topics not available to publish, leave empty if none
-    # No counterpart in telematic.env
+    - ROS2_BRIDGE_UNIT_ID=${ROS2_BRIDGE_UNIT_ID}
+    - NATS_SERVER_IP_PORT=${NATS_URL} #REQUIRED variable, replace IP with IP address of NATS server
+    - ROS2_BRIDGE_UNIT_TYPE=${ROS2_BRIDGE_UNIT_TYPE}
+    - ROS2_BRIDGE_UNIT_NAME=${ROS2_BRIDGE_UNIT_NAME}
+    - ROS2_BRIDGE_LOG_LEVEL=${ROS2_BRIDGE_LOG_LEVEL}
+    - ROS2_BRIDGE_LOG_NAME=${ROS2_BRIDGE_LOG_NAME}
+    - ROS2_BRIDGE_LOG_PATH=${ROS2_BRIDGE_LOG_PATH}
     - CYCLONE_URL=${CYCLONE_URL:-./telematic_units/cyclone_config.xml}
+    - ROS2_BRIDGE_LOG_ROTATION_SIZE_BYTES=${ROS2_BRIDGE_LOG_ROTATION_SIZE_BYTES} #2 gigabytes
+    - ROS2_BRIDGE_LOG_HANDLER_TYPE=${ROS2_BRIDGE_LOG_HANDLER_TYPE} #console: Print logs on console; file: Save logs to file; all: Prints logs on console and file
+    - ROS2_TOPIC_EXCLUSION_LIST= ${ROS2_TOPIC_EXCLUSION_LIST} #OPTIONAL variable to set a comma separated list of topics not available to publish, leave empty if none
     - IS_SIM=${IS_SIM:-False} #OPTIONAL variable to treat incoming messages as coming from simulation env.  In this case the bridge will use system time as message timestamp. Defaults to False.
 
   kafka_nats_bridge:
