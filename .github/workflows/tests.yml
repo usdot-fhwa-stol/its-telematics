@@ -88,17 +88,18 @@ jobs:
         shell: bash
         run: |
           export PYTHONPATH=$PYTHONPATH:/usr/lib/python3/dist-packages
-          cd $GITHUB_WORKSPACE/telematic_system/telematic_units/ros2_bridge/ros2_nats_bridge/test/
+          # Run from the package root so tests can import ros2_nats_bridge
+          cd $GITHUB_WORKSPACE/telematic_system/telematic_units/ros2_bridge/ros2_nats_bridge/
           source /opt/ros/humble/setup.bash
           # Delete connection test
-          rm -f test_prep257.py
-          python3 -m coverage run -m pytest
-          python3 -m coverage xml --omit="/opt/*,/root/*,/tmp/*,/usr/*,/var/*,**/__init__.py"
+          rm -f test/test_prep257.py
+          python3 -m coverage run --source=ros2_nats_bridge -m pytest test
+          python3 -m coverage xml --omit="**/__init__.py"
       - name: Archive code coverage results
         uses: actions/upload-artifact@v6
         with:
           name: ros2-bridge-coverage
-          path: telematic_system/telematic_units/ros2_bridge/ros2_nats_bridge/test/coverage.xml
+          path: telematic_system/telematic_units/ros2_bridge/ros2_nats_bridge/coverage.xml
           if-no-files-found: error
   telematic_cloud_messaging_coverage:
     runs-on: ubuntu-latest
