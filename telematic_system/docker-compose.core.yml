@@ -1,0 +1,58 @@
+services:
+  nats:
+    image: 'nats:2.7.3-alpine3.15'
+    restart: always
+    container_name: nats
+    logging:
+      options:
+        max-size: "2g"
+        max-file: "1"
+    network_mode: host
+
+  rosbag2_processing_service:
+    build:
+          context: ./telematic_historical_data_processing
+          dockerfile: Dockerfile
+          network: host
+    image: ${DOCKER_ORG}/telematic_historical_data_processing:${DOCKER_TAG}
+    restart: always
+    depends_on:
+      - nats
+    network_mode: host
+    logging:
+      options:
+        max-size: "2g"
+        max-file: "1"
+    container_name: rosbag2_processing_service
+    volumes:
+           - /opt/telematics:/opt/telematics
+    environment:
+      # NATS (shared) -> HPS names
+      - HPS_NATS_SERVER_IP_PORT=${NATS_URL}
+      - HPS_FILE_PROCESSING_SUBJECT=${FILE_PROCESSING_SUBJECT}
+      # InfluxDB v2 (shared) -> HPS names.
+      # config.py builds the client URL as HPS_INFLUX_IP + ":" + HPS_INFLUX_PORT, so IP is host only.
+      - HPS_INFLUX_IP=${INFLUXDB_HOST}
+      - HPS_INFLUX_PORT=${INFLUXDB_PORT}
+      - HPS_INFLUX_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - HPS_INFLUX_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      - HPS_INFLUX_BUCKET=${HPS_INFLUX_BUCKET}
+      # MySQL (shared) -> HPS names
+      - HPS_MYSQL_HOST=${MYSQL_HOST}
+      - HPS_MYSQL_PORT=${MYSQL_PORT}
+      - HPS_MYSQL_DB=${MYSQL_DATABASE}
+      - HPS_MYSQL_USER=${MYSQL_USER}
+      - HPS_MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      # File handling
+      - HPS_UPLOAD_DESTINATION_PATH=${HPS_UPLOAD_DESTINATION_PATH}
+      - HPS_ACCEPTED_FILE_EXTENSIONS=${HPS_ACCEPTED_FILE_EXTENSIONS}
+      - HPS_TO_STR_FIELDS=${HPS_TO_STR_FIELDS}
+      - HPS_IGNORE_FIELDS=${HPS_IGNORE_FIELDS}
+      - HPS_TOPIC_EXCLUSION_LIST=${HPS_TOPIC_EXCLUSION_LIST}
+      # Logging
+      - HPS_LOG_LEVEL=${HPS_LOG_LEVEL}
+      - HPS_LOG_NAME=${HPS_LOG_NAME}
+      - HPS_LOG_PATH=${HPS_LOG_PATH}
+      - HPS_LOG_ROTATION_SIZE_BYTES=${HPS_LOG_ROTATION_SIZE_BYTES}
+      - HPS_LOG_HANDLER_TYPE=${HPS_LOG_HANDLER_TYPE}
+    command: bash -c 'wait-for-it ${MYSQL_HOST}:${MYSQL_PORT} && wait-for-it ${NATS_IP}:${NATS_PORT} && source /ws/install/setup.bash && ros2 run rosbag2_processing_service main'

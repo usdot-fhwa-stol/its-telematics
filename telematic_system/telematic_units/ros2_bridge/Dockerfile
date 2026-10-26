@@ -1,15 +1,16 @@
-FROM ros:foxy-ros1-bridge AS base
+# Use minimal official Humble image
+FROM ros:humble-ros-base as base
 
 SHELL ["/bin/bash", "-c"]
 
-RUN set -xe \
-    && sudo apt-get update \
-    && sudo apt-get install -y \
-    git \
-    vim \
-    python3-pip
+# Install only what the bridge needs
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    python3-colcon-common-extensions \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN sudo pip install --upgrade pip nats-py
+# Install NATS dependency
+RUN pip3 install --no-cache-dir nats-py
 
 FROM base AS dep
 
@@ -20,7 +21,7 @@ RUN sudo src/ros2_nats_bridge/docker/checkout.sh
 RUN src/ros2_nats_bridge/docker/install.sh
 
 FROM base AS install
-COPY --from=dep /opt/ros/foxy /opt/ros/foxy
+COPY --from=dep /opt/ros/humble /opt/ros/humble
 
 WORKDIR /ws
 COPY --from=dep /ws/build /ws/build

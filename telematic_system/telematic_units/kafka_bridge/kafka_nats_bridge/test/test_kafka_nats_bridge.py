@@ -5,6 +5,7 @@ import logging.handlers
 import sys
 import types
 from pathlib import Path
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -532,3 +533,42 @@ def test_register_unit_returns_false_on_no_responders(bridge_env, monkeypatch):
 
     assert result is False
     assert bridge.registered is False
+
+@pytest.mark.parametrize("raw", [None, b"", b"not-json", b"\xff\xfe"])
+def test_invalid_json_deserialize(bridge_env, raw):
+    bridge = KafkaNatsBridge()
+
+    assert bridge.forwarding_loop_service._safe_json_deserialize(raw) is None
+
+
+def test_valid_json_deserialize(bridge_env):
+    bridge = KafkaNatsBridge()
+
+    assert bridge.forwarding_loop_service._safe_json_deserialize(b'{"a": 1}') == {"a": 1}
+
+
+def test_ode_received_at_normalize_timestamp(bridge_env):
+    bridge = KafkaNatsBridge()
+    payload = {"metadata": {"odeReceivedAt": "2026-01-01T00:00:00.123Z"}}
+
+    timestamp = bridge.forwarding_loop_service._normalize_timestamp("ode_topic", payload)
+
+    assert timestamp == 1767225600123000
+
+@pytest.mark.parametrize(
+    "topic,payload",
+    [
+        ("any_topic", None),
+        ("any_topic", {"metadata": {"odeReceivedAt": "not-a-date"}}),
+        ("modified_spat", {"intersections": []}),
+    ],
+)
+def test_revert_invalid_timestamp_to_now(bridge_env, topic, payload):
+    bridge = KafkaNatsBridge()
+
+    before = datetime.now(timezone.utc).timestamp() * 1_000_000
+    timestamp = bridge.forwarding_loop_service._normalize_timestamp(topic, payload)
+    after = datetime.now(timezone.utc).timestamp() * 1_000_000
+
+    assert before <= timestamp <= after
+
