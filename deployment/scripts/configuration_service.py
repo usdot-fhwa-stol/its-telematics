@@ -4,20 +4,96 @@
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
+
+from models import DeploymentProfile, TerraformContext
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 DEPLOYMENT_DIR = REPO_ROOT / "deployment"
 SYSTEM_DIR = REPO_ROOT / "telematic_system"
+TERRAFORM_DIR = DEPLOYMENT_DIR / "infra" / "terraform" / "aws"
+DEFAULT_WORKSPACE_ROOT = DEPLOYMENT_DIR / "targets" / "cloud"
+DEFAULT_AWS_REGION = "us-east-1"
+PUBLIC_WEB_ROLES = {"ui", "all"}
 SECRET_KEYS = (
     "mysql_password",
     "mysql_root_password",
     "grafana_secret_key",
     "influx_admin_token",
 )
+
+
+def load_terraform_profiles(serialized):
+    """Rebuild the role -> DeploymentProfile mapping serialized by setup.py."""
+    try:
+        raw = json.loads(serialized)
+        return {
+            role: DeploymentProfile(**{**fields, "path_to_ssh_token": Path(fields["path_to_ssh_token"])})
+            for role, fields in raw.items()
+        }
+    except (ValueError, TypeError, KeyError, AttributeError):
+        raise ValueError("TERRAFORM_PROFILES is not a valid role-to-profile mapping.") from None
+
+
+def resolve_public_key(key_path, work_dir):
+    """Return a public key file for the key pair, deriving it when given a private key (e.g. a .pem)."""
+    key_path = Path(key_path)
+    try:
+        first_line = key_path.read_text(errors="ignore").lstrip().split("\n", 1)[0]
+    except OSError:
+        raise ValueError("Cannot read the SSH key file.") from None
+    if first_line.startswith(("ssh-", "ecdsa-", "sk-")):
+        return key_path
+    try:
+        result = subprocess.run(
+            ["ssh-keygen", "-y", "-f", str(key_path)],
+            capture_output=True, text=True, stdin=subprocess.DEVNULL, check=False,
+        )
+    except OSError:
+        raise ValueError("ssh-keygen is required to derive a public key from a private key.") from None
+    if result.returncode != 0 or not result.stdout.startswith(("ssh-", "ecdsa-", "sk-")):
+        raise ValueError("Could not derive a public key; use an unencrypted private key or a .pub file.")
+    work_dir.mkdir(parents=True, exist_ok=True)
+    public_key = work_dir / "ssh_public_key.pub"
+    write_atomic(public_key, result.stdout.encode("utf-8"), mode=0o644)
+    return public_key
+
+
+def generate_terraform_variables(
+    profiles, region=DEFAULT_AWS_REGION, aws_profile="default",
+    root_path=TERRAFORM_DIR, work_dir=DEFAULT_WORKSPACE_ROOT,
+):
+    """Write the Terraform variable file from the setup.py profiles and return the TerraformContext."""
+    context = TerraformContext(
+        root_path=root_path,
+        config_reference=profiles,
+        var_file=work_dir / "terraform.tfvars.json",
+        plan_file=work_dir / "infrastructure.tfplan",
+    )
+    variables = {
+        "region": region,
+        "aws_profile": aws_profile,
+        "public_key_path": str(resolve_public_key(next(iter(profiles.values())).path_to_ssh_token, work_dir)),
+        "nodes": {
+            role: {
+                "instance_type": p.instance_type,
+                "instance_count": p.instance_count,
+                "ami_id": p.ami_id,
+                "subnet_id": p.subnet_id,
+                "root_volume_size_gib": p.root_volume_size_gib,
+                "volume_type": p.volume_type,
+                "public_web": role in PUBLIC_WEB_ROLES,
+            }
+            for role, p in profiles.items()
+        },
+    }
+    work_dir.mkdir(parents=True, exist_ok=True)
+    write_atomic(context.var_file, json.dumps(variables, indent=2).encode("utf-8"))
+    return context
 
 
 def validate_configuration():
@@ -209,6 +285,11 @@ def main():
         config_map = rotate_secret_artifacts(config_map, parameters)
         deployment_context = apply_parameter_overrides(parameters)
         generate_consolidated_runtime_manifest(config_map, deployment_context)
+        if parameters["target"] == "cloud":
+            profiles = load_terraform_profiles(os.environ.get("TERRAFORM_PROFILES", ""))
+            context = generate_terraform_variables(
+                profiles, region=os.environ.get("AWS_REGION") or DEFAULT_AWS_REGION)
+            print(f"Generated Terraform variables: {context.var_file}", flush=True)
     except OSError:
         print("error: filesystem operation failed; check configuration paths and permissions.", file=sys.stderr)
         return 2
