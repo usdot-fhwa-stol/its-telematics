@@ -18,3 +18,12 @@ output/
 .gitconfig
 
 .env
+
+# Terraform local state, providers, and generated cloud provisioning artifacts
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+deployment/targets/cloud/terraform.tfvars.json
+deployment/targets/cloud/ssh_public_key.pub
+deployment/targets/cloud/inventory.ini

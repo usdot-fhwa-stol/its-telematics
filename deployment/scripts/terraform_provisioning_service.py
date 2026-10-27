@@ -3,6 +3,7 @@
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -86,11 +87,22 @@ class TerraformProvisioningService(CloudProvisioningService):
             result.returncode == 0, Path(approved_plan), [], result.stdout, result.stderr,
         )
 
-    def destroy_infrastructure(self, context: TerraformContext) -> TerraformExecutionResult:
+    def rollback_infrastructure(self, context: TerraformContext) -> TerraformExecutionResult:
         """Destroy all resources in the selected workspace, including partially created ones."""
-        result = self._run(
-            context, "destroy", "-input=false", "-auto-approve", f"-var-file={context.var_file}",
-        )
+        print("Provisioning failed; destroying the created resources.", file=sys.stderr, flush=True)
+        try:
+            result = self._run(
+                context, "destroy", "-input=false", "-auto-approve", f"-var-file={context.var_file}",
+            )
+        except OSError as error:
+            print(f"Rollback could not run: {error}", file=sys.stderr)
+            return TerraformExecutionResult(False, None, [], "", str(error))
+        if result.returncode == 0:
+            print("Rollback complete: all created resources were destroyed.", flush=True)
+        else:
+            print(result.stderr, file=sys.stderr)
+            print(f"Rollback FAILED. Remove leftovers manually: terraform -chdir={context.root_path} destroy "
+                  f"-var-file={context.var_file}", file=sys.stderr, flush=True)
         return TerraformExecutionResult(result.returncode == 0, None, [], result.stdout, result.stderr)
 
     def read_infrastructure_outputs(

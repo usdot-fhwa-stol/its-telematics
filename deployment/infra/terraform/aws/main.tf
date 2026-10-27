@@ -1,12 +1,52 @@
-data "aws_vpc" "default" {
-  default = true
+data "aws_availability_zones" "available" {
+  state = "available"
 }
 
-data "aws_subnets" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
+resource "aws_vpc" "telematics" {
+  cidr_block           = var.vpc_cidr
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = {
+    Name = "${var.name_prefix}-vpc"
   }
+}
+
+resource "aws_internet_gateway" "telematics" {
+  vpc_id = aws_vpc.telematics.id
+
+  tags = {
+    Name = "${var.name_prefix}-igw"
+  }
+}
+
+resource "aws_subnet" "public" {
+  vpc_id                  = aws_vpc.telematics.id
+  cidr_block              = cidrsubnet(var.vpc_cidr, 8, 0)
+  availability_zone       = data.aws_availability_zones.available.names[0]
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "${var.name_prefix}-public"
+  }
+}
+
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.telematics.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.telematics.id
+  }
+
+  tags = {
+    Name = "${var.name_prefix}-public"
+  }
+}
+
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
 }
 
 data "aws_ami" "ubuntu" {
@@ -20,8 +60,6 @@ data "aws_ami" "ubuntu" {
 }
 
 locals {
-  default_subnet = sort(data.aws_subnets.default.ids)[0]
-
   # One entry per instance, keyed "<role>-<index>"
   instances = merge([
     for role, node in var.nodes : {
@@ -37,7 +75,7 @@ resource "aws_key_pair" "this" {
 
 resource "aws_security_group" "cluster_internal" {
   name_prefix = "${var.name_prefix}-cluster-internal-"
-  vpc_id      = data.aws_vpc.default.id
+  vpc_id      = aws_vpc.telematics.id
 
   ingress {
     description = "SSH"
@@ -65,7 +103,7 @@ resource "aws_security_group" "cluster_internal" {
 
 resource "aws_security_group" "ui_web" {
   name_prefix = "${var.name_prefix}-ui-web-"
-  vpc_id      = data.aws_vpc.default.id
+  vpc_id      = aws_vpc.telematics.id
 
   ingress {
     description = "HTTP"
@@ -119,7 +157,7 @@ resource "aws_instance" "node" {
 
   ami                    = each.value.ami_id != "" ? each.value.ami_id : data.aws_ami.ubuntu.id
   instance_type          = each.value.instance_type
-  subnet_id              = each.value.subnet_id != "" ? each.value.subnet_id : local.default_subnet
+  subnet_id              = each.value.subnet_id != "" ? each.value.subnet_id : aws_subnet.public.id
   key_name               = aws_key_pair.this.key_name
   monitoring             = true # detailed CloudWatch metrics (1-minute)
   iam_instance_profile   = aws_iam_instance_profile.instance.name

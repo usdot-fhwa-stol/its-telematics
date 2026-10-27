@@ -305,55 +305,22 @@ def execute_deployment_pipeline(parameters):
 
 
 def provision_cloud_infrastructure(parameters):
-    """Run the plan/apply workflow, then write the inventory."""
+    """Provision through the cloud service (which rolls back on failure), then write the inventory."""
     service = TerraformProvisioningService()
     context = generate_terraform_variables(parameters.terraform_profiles, region=parameters.aws_region)
     try:
-        service.initialize_terraform(context)
-        plan = service.generate_infrastructure_plan(context)
-        if not plan.success:
-            print(plan.stderr or plan.stdout, file=sys.stderr)
-            raise DeploymentError("Terraform validation or planning failed.")
-        print("Proposed infrastructure changes:")
-        for change in plan.changes or ["(none)"]:
-            print(f"  {change}")
-        print("Applying the plan.", flush=True)
-    except (RuntimeError, ValueError, OSError) as error:
+        infrastructure = service.provision(context)
+    except (RuntimeError, ValueError, OSError, KeyError) as error:
         raise DeploymentError(f"Cloud provisioning failed: {error}") from None
-
     try:
-        applied = service.apply_infrastructure_plan(context, plan.plan_file)
-        print(applied.stdout, flush=True)
-        if not applied.success:
-            print(applied.stderr, file=sys.stderr)
-            raise DeploymentError("Terraform apply failed.")
-        infrastructure = service.read_infrastructure_outputs(context, applied)
         inventory = generate_ansible_inventory(
             infrastructure, next(iter(parameters.terraform_profiles.values())),
             context.var_file.parent / "inventory.ini",
         )
-        print(f"Ansible inventory: {inventory.inventory_file_path}", flush=True)
-    except (DeploymentError, RuntimeError, ValueError, OSError, KeyError) as error:
-        rollback_cloud_infrastructure(service, context)
-        if isinstance(error, DeploymentError):
-            raise
-        raise DeploymentError(f"Cloud provisioning failed: {error}") from None
-
-
-def rollback_cloud_infrastructure(service, context):
-    """Destroy resources created by a failed run so nothing is left running or billed."""
-    print("Provisioning failed; destroying the created resources.", file=sys.stderr, flush=True)
-    try:
-        result = service.destroy_infrastructure(context)
-    except OSError as error:
-        print(f"Rollback could not run: {error}", file=sys.stderr)
-        return
-    if result.success:
-        print("Rollback complete: all created resources were destroyed.", flush=True)
-    else:
-        print(result.stderr, file=sys.stderr)
-        print(f"Rollback FAILED. Remove leftovers manually: terraform -chdir={context.root_path} destroy "
-              f"-var-file={context.var_file}", file=sys.stderr, flush=True)
+    except (ValueError, OSError, KeyError) as error:
+        service.rollback_infrastructure(context)
+        raise DeploymentError(f"Inventory generation failed: {error}") from None
+    print(f"Ansible inventory: {inventory.inventory_file_path}", flush=True)
 
 
 def display_troubleshooting_hints(failed_step, exit_code):

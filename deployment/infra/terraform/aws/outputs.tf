@@ -2,6 +2,10 @@ output "region" {
   value = var.region
 }
 
+output "vpc_id" {
+  value = aws_vpc.telematics.id
+}
+
 output "cloudwatch_log_group" {
   value = aws_cloudwatch_log_group.instances.name
 }
