@@ -60,7 +60,6 @@ function createSignInQueue({ ask, idle }) {
         realm: String(authInfo.realm || ''),
         isProxy: Boolean(authInfo.isProxy),
         retry: details.firstAuthAttempt === false,
-        unencrypted: !authInfo.isProxy && site.startsWith('http:'),
       },
     });
     if (waiting.length === 1) showNext();

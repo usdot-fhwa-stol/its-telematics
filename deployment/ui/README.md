@@ -46,9 +46,18 @@ For example, on-premise / This machine / dev / core runs:
 ```
 
 The command is shown on the form before Launch. `electron/cliBridge.js` checks
-every value against the choices in `electron/cliOptions.js` and starts the
-script without a shell, so a value cannot add another option or command.
-Free-text values use `--flag=value` for the same reason.
+every value against the choices the form showed and starts the script without
+a shell, so a value cannot add another option or command. Free-text values use
+`--flag=value` for the same reason.
+
+The choices come from `setup.py` itself. At startup the app runs
+`setup.py --list-options`, which prints each option's choices, default and
+help as JSON and exits without checking or changing the host.
+`electron/cliOptions.js` only adds labels, such as "core: NATS, messaging
+server, databases, web app"; a new choice in `setup.py` shows up with its plain
+value. If the script cannot list its options (an older `setup.py`), the form
+uses the lists in `cliOptions.js` and says so. `npm test` runs the real
+listing and fails if it no longer matches those labels.
 
 For `localhost`, the app first warns that `local.setup.sh` edits `/etc/hosts`
 and deletes and recreates `/opt/grafana`, `/opt/apache2` and `/opt/influxdb2`.
@@ -90,8 +99,6 @@ server's pages load in a view below the app's strip.
   wait for those pipelines.
 - "Open Telematics" on the deploy result page. `setup.py` does not start the
   stack or report its address yet.
-- `deploy --options`. Until it exists, keep `electron/cliOptions.js` in step
-  with the argparse choices in `setup.py`.
 - Packaging (`.deb`, AppImage). `electron/askpass.sh` must be unpacked from
   the app archive (`asarUnpack`) so `sudo` can run it.
 
@@ -102,7 +109,8 @@ server's pages load in a view below the app's strip.
 | `electron/main.js` | Window, IPC handlers, app lifecycle |
 | `electron/preload.js` | The only API the screens can call (`window.deployApi`) |
 | `electron/cliBridge.js` | Validates the form, builds the arguments, runs `setup.py`, parses its output |
-| `electron/cliOptions.js` | Choices that `setup.py` accepts |
+| `electron/scriptOptions.js` | Reads the form's choices from `setup.py --list-options` |
+| `electron/cliOptions.js` | Labels for those choices, and the lists used when `setup.py` cannot list them |
 | `electron/settings.js` | Saved settings in `~/.config/Telematics Deploy/`: non-secret target fields (`targets.json`) and saved servers (`servers.json`) |
 | `electron/serverConnection.js` | Validates server addresses and checks that a server responds |
 | `electron/telematicsView.js` | The sandboxed view that shows a server's pages, and its navigation rules |

@@ -3,8 +3,8 @@
 const { app, BrowserWindow, dialog, ipcMain, net } = require('electron');
 const os = require('node:os');
 const path = require('node:path');
-const options = require('./cliOptions');
 const { ValidationError, validateParams, buildArgs, formatCommand, runSetup } = require('./cliBridge');
+const { loadScriptOptions } = require('./scriptOptions');
 const {
   loadTargetSettings, saveTargetSettings, listServers, rememberServer, touchServer, forgetServer,
 } = require('./settings');
@@ -23,6 +23,13 @@ const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 let mainWindow = null;
 let telematicsView = null;
 let activeRun = null;
+let scriptOptions = null;
+
+// The form's choices, read once from `setup.py --list-options`.
+function getScriptOptions() {
+  if (!scriptOptions) scriptOptions = loadScriptOptions({ repoRoot: REPO_ROOT });
+  return scriptOptions;
+}
 
 // Sign-in prompts for the Telematics view. The renderer shows the dialog;
 // a prompt of null closes it.
@@ -87,15 +94,16 @@ function validationResult(error) {
   throw error;
 }
 
-handle('deploy:get-options', () => ({
-  options,
+handle('deploy:get-options', async () => ({
+  options: await getScriptOptions(),
   saved: loadTargetSettings(app.getPath('userData')),
   repoRoot: REPO_ROOT,
 }));
 
-handle('deploy:preview-command', (params) => {
+handle('deploy:preview-command', async (params) => {
+  const options = await getScriptOptions();
   try {
-    return { command: formatCommand(buildArgs(validateParams(params))) };
+    return { command: formatCommand(buildArgs(validateParams(params, options))) };
   } catch (error) {
     return validationResult(error);
   }
@@ -111,10 +119,11 @@ handle('deploy:pick-key-file', async () => {
 });
 
 handle('deploy:launch', async (params, { remember } = {}) => {
+  const options = await getScriptOptions();
   if (activeRun) return { validationErrors: ['A run is already in progress.'] };
   let valid;
   try {
-    valid = validateParams(params);
+    valid = validateParams(params, options);
   } catch (error) {
     return validationResult(error);
   }

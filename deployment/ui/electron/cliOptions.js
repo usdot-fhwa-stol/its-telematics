@@ -1,8 +1,9 @@
 'use strict';
 
-// Choices accepted by deployment/scripts/setup.py (its argparse `choices`).
-// Keep these in step with setup.py until the CLI can list them itself
-// (`deploy --options --output json` in the design).
+// Labels for the choices deployment/scripts/setup.py accepts. At startup the
+// app reads the choices themselves from `setup.py --list-options`
+// (electron/scriptOptions.js); these lists are used as they are only when the
+// script cannot list them, for example an older setup.py.
 
 const TARGETS = [
   { value: 'on-premise', label: 'on-premise: this machine or a host on your network' },

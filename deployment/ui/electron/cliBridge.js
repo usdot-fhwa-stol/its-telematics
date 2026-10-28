@@ -7,7 +7,7 @@
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-const { TARGETS, DEPLOY_TO, ENVIRONMENTS, USE_CASES } = require('./cliOptions');
+const builtInOptions = require('./cliOptions');
 
 const SETUP_SCRIPT = path.join('deployment', 'scripts', 'setup.py');
 const MAX_OUTPUT_CHARS = 1_000_000;
@@ -37,7 +37,9 @@ function checkText(value, label, errors) {
 }
 
 // Returns the values setup.py needs, or throws ValidationError listing every problem.
-function validateParams(params) {
+// `options` are the lists the form showed (see scriptOptions.js).
+function validateParams(params, options = builtInOptions) {
+  const { TARGETS, DEPLOY_TO, ENVIRONMENTS, USE_CASES } = options;
   const input = params && typeof params === 'object' ? params : {};
   const errors = [];
 

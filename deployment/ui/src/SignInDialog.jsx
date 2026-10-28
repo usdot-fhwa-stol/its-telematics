@@ -50,11 +50,6 @@ export default function SignInDialog({ prompt, onAnswer }) {
                 {prompt.isProxy ? null : ' On a Telematics server, use your Telematics user name and password.'}
               </DialogContentText>
               {prompt.retry && <Alert severity="error">That user name or password was not accepted.</Alert>}
-              {prompt.unencrypted && (
-                <Alert severity="warning">
-                  This connection is not encrypted, so others on the network could read the password.
-                </Alert>
-              )}
               <TextField
                 id="sign-in-username"
                 label="User name"

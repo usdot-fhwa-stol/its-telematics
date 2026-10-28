@@ -98,6 +98,7 @@ export default function ConfigureForm({
   return (
     <Paper variant="outlined" component="form" onSubmit={(event) => event.preventDefault()}>
       <Section title="Deployment" note="Required">
+        {options.notice && <Alert severity="info">{options.notice}</Alert>}
         <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
           <OptionSelect
             id="target" label="Target" value={params.target} options={options.TARGETS}

@@ -2,6 +2,9 @@
 """Run the ITS Telematics deployment workflow."""
 
 import argparse
+import contextlib
+import io
+import json
 import os
 from pathlib import Path
 import shlex
@@ -37,6 +40,42 @@ class DeploymentArgumentParser(argparse.ArgumentParser):
         self.exit(2, "error: invalid command-line input; review --help and supported values.\n")
 
 
+class ListOptionsAction(argparse.Action):
+    def __init__(self, option_strings, dest, **kwargs):
+        """Take no value, like --help, and leave no attribute on the parsed parameters."""
+        super().__init__(option_strings, dest, nargs=0, default=argparse.SUPPRESS, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Print the supported options as JSON for tools such as the deployment UI, then exit."""
+        defaults = argparse.Namespace(**{
+            action.dest: action.default for action in parser._actions
+            if action.default is not argparse.SUPPRESS
+        })
+        # Omitted environment and target values are resolved during validation; reuse it so the
+        # listing reports the defaults a run would use. Its default notices are not printed.
+        with contextlib.redirect_stdout(io.StringIO()):
+            validate_input_parameters(defaults)
+        options = []
+        for action in parser._actions:
+            if action.default is argparse.SUPPRESS:
+                continue  # --help and --list-options
+            option = {
+                "name": action.option_strings[0],
+                "choices": list(action.choices) if action.choices else None,
+                "default": getattr(defaults, action.dest),
+                "repeatable": isinstance(action, argparse._AppendAction),
+                "metavar": action.metavar,
+                "help": action.help,
+            }
+            if action.dest == "secret_override":
+                option["keys"] = list(SECRET_KEYS)
+            options.append(option)
+        json.dump({"schema_version": 1, "description": parser.description, "options": options},
+                  sys.stdout, indent=2)
+        print(flush=True)
+        parser.exit(0)
+
+
 def parse_input_parameters():
     """Parse bounded CLI options and collect supported secret overrides without logging values."""
     parser = DeploymentArgumentParser(
@@ -61,6 +100,8 @@ def parse_input_parameters():
         "--secret-override", action="append", default=[], metavar="key=value",
         help="Repeatable; last value wins. Supported keys: " + ", ".join(SECRET_KEYS),
     )
+    parser.add_argument("--list-options", action=ListOptionsAction,
+                        help="Print the supported options, choices, defaults and help as JSON, then exit")
     parameters = parser.parse_args()
     overrides = {}
     for override in parameters.secret_override:

@@ -22,7 +22,7 @@ test('asks once per site and realm, and shares the answer', () => {
   queue.add({ ...first, url: 'https://grafana.example.org/grafana/public/app.js' }, grafana, callback('script'));
   assert.equal(shown.length, 1);
   assert.deepEqual(shown[0], {
-    id: 1, site: 'https://grafana.example.org', realm: 'Grafana Login', isProxy: false, retry: false, unencrypted: false,
+    id: 1, site: 'https://grafana.example.org', realm: 'Grafana Login', isProxy: false, retry: false,
   });
 
   assert.equal(queue.answer(1, { username: 'alice', password: 'pw' }), true);
@@ -43,7 +43,6 @@ test('asks for other realms one at a time', () => {
   assert.equal(shown.length, 2);
   assert.equal(shown[1].site, 'http://10.0.0.5:8888');
   assert.equal(shown[1].retry, true);
-  assert.equal(shown[1].unencrypted, true);
 });
 
 test('ignores stale ids and cancels malformed answers', () => {
@@ -61,7 +60,6 @@ test('names the proxy for proxy challenges', () => {
   const { queue, shown, callback } = setup();
   queue.add(first, { ...grafana, isProxy: true, host: 'proxy.corp', port: 3128 }, callback('page'));
   assert.equal(shown[0].site, 'proxy.corp:3128');
-  assert.equal(shown[0].unencrypted, false);
 });
 
 test('cancels everything when the view closes', () => {
