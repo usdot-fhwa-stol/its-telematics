@@ -1,0 +1,94 @@
+---
+# Base host provisioning: container toolchain and rootless Docker access for the deployment user.
+- name: Install container toolchain
+  hosts: all
+  become: true
+  vars:
+    deployment_user: "{{ ansible_user | default(ansible_user_id) }}"
+    # Host directories bind-mounted by the compose files; created once so deployment needs no sudo.
+    bind_mount_directories:
+      - /opt/telematics
+      - /opt/telematics/upload
+      - /opt/telematics/logs
+      - /opt/grafana
+      - /opt/grafana/logs
+      - /opt/grafana/data
+      - /opt/grafana/provisioning
+      - /opt/apache2
+      - /opt/influxdb2
+      - /opt/influxdb2/data
+    # Host names used to reach the stack when it is deployed on this machine.
+    local_host_names:
+      - grafana.local.cav-telematics.com
+      - local.cav-telematics.com
+      - topic-service.local.cav-telematics.com
+      - ui-service.local.cav-telematics.com
+      - ui-upload-service.local.cav-telematics.com
+  tasks:
+    - name: Map the local host names to loopback (localhost deployments only)
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        line: "127.0.0.1 {{ item }}"
+        regexp: '^127\.0\.0\.1\s+{{ item | regex_escape }}\s*$'
+      loop: "{{ local_host_names }}"
+      when: ansible_connection | default('ssh') == 'local'
+
+    - name: Install Docker and system transport libraries
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - ca-certificates
+          - curl
+          - gnupg
+          - apt-transport-https
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+      register: base_packages
+      retries: 5
+      delay: 15
+      until: base_packages is succeeded
+
+    - name: Install the Docker Compose plugin
+      block:
+        - name: Install docker-compose-plugin
+          ansible.builtin.apt:
+            name: docker-compose-plugin
+            state: present
+      rescue:
+        - name: Install docker-compose-v2 (Ubuntu archive package name)
+          ansible.builtin.apt:
+            name: docker-compose-v2
+            state: present
+
+    - name: Ensure the Docker daemon is running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Allow the deployment user to run Docker without sudo
+      ansible.builtin.user:
+        name: "{{ deployment_user }}"
+        groups: docker
+        append: true
+
+    - name: Create bind-mount directories owned by the deployment user
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ deployment_user }}"
+        mode: "0777"
+      loop: "{{ bind_mount_directories }}"
+
+    - name: Create the Grafana htpasswd file mounted by the web app
+      ansible.builtin.file:
+        path: /opt/apache2/grafana_htpasswd
+        state: touch
+        owner: "{{ deployment_user }}"
+        mode: "0666"
+        modification_time: preserve
+        access_time: preserve
+
+    - name: Apply the new group membership to the current connection
+      ansible.builtin.meta: reset_connection

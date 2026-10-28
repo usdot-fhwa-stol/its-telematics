@@ -75,6 +75,7 @@ services:
         max-size: "10m"
         max-file: "1"
     network_mode: host
+    user: root
     environment:
       # Reverse-proxy targets - deployment specific, no counterpart in telematic.env.
       - CLIENT_LOCAL_URL=http://127.0.0.1:8082/
@@ -100,9 +101,16 @@ services:
         max-size: "10m"
         max-file: "1"
     network_mode: host
+    environment:
+      - GF_DATABASE_TYPE=mysql
+      - GF_DATABASE_HOST=${MYSQL_HOST}:${MYSQL_PORT}
+      - GF_DATABASE_NAME=${MYSQL_DATABASE}
+      - GF_DATABASE_USER=${MYSQL_USER}
+      - GF_DATABASE_PASSWORD=${MYSQL_PASSWORD}
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
     volumes:
       - /opt/grafana/logs:/var/log/grafana
-      - ./telematic_apps/grafana/grafana.ini:/etc/grafana/grafana.ini
       - /opt/grafana/data:/var/lib/grafana
       - /opt/grafana/provisioning:/home/grafana/conf/provisioning
       - /home/ubuntu/.aws/credentials:/usr/share/grafana/.aws/credentials

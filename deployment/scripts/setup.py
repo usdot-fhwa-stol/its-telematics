@@ -7,19 +7,35 @@ from dataclasses import asdict
 import json
 import os
 from pathlib import Path
-import shlex
 import shutil
 import subprocess
 import sys
 
 from configuration_service import generate_terraform_variables, DEFAULT_AWS_REGION
-from models import DeploymentProfile
-from cloud_provisioning_service import CloudProvisioningService, generate_ansible_inventory
+from models import (
+    ENVIRONMENT_PROD,
+    ENVIRONMENTS,
+    REPO_ROOT,
+    ROLE_ALL,
+    ROLE_DATABASE,
+    ROLE_PROCESSING,
+    ROLE_UI,
+    TARGET_CLOUD,
+    TARGET_LOCALHOST,
+    TARGET_REMOTE,
+    TARGETS,
+    USE_CASE_ALL,
+    USE_CASES,
+    DeploymentProfile,
+    InputParameters,
+)
+from cloud_provisioning_service import CloudProvisioningService
+from host_preparation_service import PLAYBOOK as HOST_PREPARATION_PLAYBOOK
+from inventory_synthesizer import InventorySynthesizer
+from task_automation_service import TaskAutomationService
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parent.parent
-LOCAL_SETUP = SCRIPT_DIR / "local.setup.sh"
 CONFIGURATION_SERVICE = SCRIPT_DIR / "configuration_service.py"
 SECRET_KEYS = (
     "mysql_password",
@@ -31,12 +47,12 @@ SECRET_KEYS = (
 
 ROOT_VOLUME_GIB = 100
 VOLUME_TYPE = "gp3"
-# role -> instance type; the centralized "all" role runs ui, processing, and database on one node
-CENTRALIZED_ROLES = {"all": "m5n.8xlarge"}
+# role -> instance type; the centralized ROLE_ALL role runs ui, processing, and database on one node
+CENTRALIZED_ROLES = {ROLE_ALL: "m5n.8xlarge"}
 DISTRIBUTED_ROLES = {
-    "processing": "m5n.8xlarge",
-    "ui": "t2.2xlarge",
-    "database": "t2.large",
+    ROLE_PROCESSING: "m5n.8xlarge",
+    ROLE_UI: "t2.2xlarge",
+    ROLE_DATABASE: "t2.large",
 }
 
 
@@ -46,22 +62,42 @@ AWS_CREDENTIALS_FILE = Path(
 
 
 class DeploymentError(Exception):
+    """Operator-facing failure carrying the process exit code to use."""
+
     def __init__(self, message, exit_code=2):
-        """Store an operator-safe error message and its process exit code."""
+        """Store an operator-safe error message and its process exit code.
+
+        Args:
+            message: Message safe to print (must not contain secrets).
+            exit_code: Process exit code for this failure.
+        """
         super().__init__(message)
         self.exit_code = exit_code
 
 
 class DeploymentArgumentParser(argparse.ArgumentParser):
+    """ArgumentParser that never echoes raw argument values, which may be secrets."""
+
     def error(self, message):
-        """Reject invalid CLI input without echoing potentially secret argument values."""
+        """Reject invalid CLI input without echoing potentially secret argument values.
+
+        Args:
+            message: argparse's message; intentionally not printed.
+        """
         # argparse's original message can contain raw arguments, including secrets.
         self.print_usage(sys.stderr)
         self.exit(2, "error: invalid command-line input; review --help and supported values.\n")
 
 
-def parse_input_parameters():
-    """Parse bounded CLI options and collect supported secret overrides without logging values."""
+def parse_input_parameters() -> InputParameters:
+    """Parse bounded CLI options and collect supported secret overrides without logging values.
+
+    Returns:
+        InputParameters built from the CLI options, with secret_overrides as a dict of key to value.
+
+    Raises:
+        DeploymentError: If a --secret-override is malformed or uses an unsupported key.
+    """
     parser = DeploymentArgumentParser(
         description="Run the ITS Telematics deployment workflow.",
         allow_abbrev=False,
@@ -71,12 +107,12 @@ def parse_input_parameters():
         ),
     )
     # Resolve omitted defaults during validation so --help prints no default notices.
-    parser.add_argument("--environment", choices=("dev", "test", "prod"),
-                        help="Deployment environment (default: prod)")
-    parser.add_argument("--target", choices=("localhost", "remote", "cloud"),
-                        help="Deployment target (default: localhost)")
-    parser.add_argument("--use-case", choices=("all", "core", "rsu_integration"), default="all",
-                        help="Optional use case (default: all); all enables every service")
+    parser.add_argument("--environment", choices=ENVIRONMENTS,
+                        help=f"Deployment environment (default: {ENVIRONMENT_PROD})")
+    parser.add_argument("--target", choices=TARGETS,
+                        help=f"Deployment target (default: {TARGET_LOCALHOST})")
+    parser.add_argument("--use-case", choices=USE_CASES, default=USE_CASE_ALL,
+                        help=f"Optional use case (default: {USE_CASE_ALL}); {USE_CASE_ALL} enables every service")
     parser.add_argument("--remote-io", default="", help="Remote host address or endpoint")
     parser.add_argument("--remote-user", default="", help="Remote connection user")
     parser.add_argument("--key-path", default="", help="Existing readable credential key file")
@@ -95,38 +131,63 @@ def parse_input_parameters():
         "--secret-override", action="append", default=[], metavar="key=value",
         help="Repeatable; last value wins. Supported keys: " + ", ".join(SECRET_KEYS),
     )
-    parameters = parser.parse_args()
+    parser.add_argument(
+        "--volume-prune", action=argparse.BooleanOptionalAction, default=True,
+        help="Remove the stack's Docker volumes before each deployment (default: enabled; "
+             "use --no-volume-prune to keep existing data)",
+    )
+    arguments = parser.parse_args()
     overrides = {}
-    for override in parameters.secret_override:
+    for override in arguments.secret_override:
         key, separator, value = override.partition("=")
         if not separator or not key:
             raise DeploymentError("--secret-override requires key=value with a non-empty key.")
         if key not in SECRET_KEYS:
             raise DeploymentError("Unsupported secret key; supported keys: " + ", ".join(SECRET_KEYS))
         overrides[key] = value
-    parameters.secret_overrides = overrides
-    del parameters.secret_override
+    parameters = InputParameters(
+        aws_region=arguments.aws_region,
+        target=arguments.target,
+        environment=arguments.environment,
+        use_case=arguments.use_case,
+        remote_io=arguments.remote_io,
+        remote_user=arguments.remote_user,
+        key_path=arguments.key_path,
+        distributed=arguments.distributed,
+        aws_access_key_id=arguments.aws_access_key_id,
+        aws_secret_access_key=arguments.aws_secret_access_key,
+        secret_overrides=overrides,
+        prune_volumes=arguments.volume_prune,
+    )
     return parameters
 
 
-def validate_input_parameters(parameters):
-    """Apply omitted defaults and validate required remote inputs and optional key-file access."""
+def validate_input_parameters(parameters: InputParameters):
+    """Apply omitted defaults and validate required remote inputs and optional key-file access.
+
+    Args:
+        parameters: Input parameters; environment and target defaults are set in place.
+
+    Raises:
+        DeploymentError: Listing every violated requirement (remote inputs, cloud key, Terraform,
+            AWS credentials, or an unreadable key file).
+    """
     if parameters.environment is None:
-        parameters.environment = "prod"
-        print("No environment specified. Defaulting to 'prod'.", flush=True)
+        parameters.environment = ENVIRONMENT_PROD
+        print(f"No environment specified. Defaulting to '{ENVIRONMENT_PROD}'.", flush=True)
     if parameters.target is None:
-        parameters.target = "localhost"
-        print("No target specified. Defaulting to 'localhost'.", flush=True)
+        parameters.target = TARGET_LOCALHOST
+        print(f"No target specified. Defaulting to '{TARGET_LOCALHOST}'.", flush=True)
 
     errors = []
-    if parameters.target == "remote":
+    if parameters.target == TARGET_REMOTE:
         if not parameters.remote_io:
             errors.append("--remote-io is required for target remote.")
         if not parameters.remote_user:
             errors.append("--remote-user is required for target remote.")
-    if parameters.target == "cloud" and not parameters.key_path:
+    if parameters.target == TARGET_CLOUD and not parameters.key_path:
         errors.append("--key-path (SSH public key) is required for target cloud.")
-    if parameters.target == "cloud":
+    if parameters.target == TARGET_CLOUD:
         if shutil.which("terraform") is None:
             errors.append(
                 "Terraform is not installed or not in PATH. Install it from "
@@ -148,7 +209,15 @@ def validate_input_parameters(parameters):
 
 
 def build_terraform_profile(key_path, is_distributed):
-    """Create one DeploymentProfile per node role; empty ami_id/subnet_id are auto-discovered by Terraform."""
+    """Create one DeploymentProfile per node role; empty ami_id/subnet_id are auto-discovered by Terraform.
+
+    Args:
+        key_path: Path to the SSH key used for the nodes.
+        is_distributed: True for separate processing, ui, and database nodes; False for one node.
+
+    Returns:
+        Dict mapping each role to its DeploymentProfile.
+    """
     roles = DISTRIBUTED_ROLES if is_distributed else CENTRALIZED_ROLES
     return {
         role: DeploymentProfile(
@@ -167,7 +236,11 @@ def build_terraform_profile(key_path, is_distributed):
 
 
 def aws_default_profile_exists():
-    """Return whether the shared credentials file holds a complete default profile."""
+    """Return whether the shared credentials file holds a complete default profile.
+
+    Returns:
+        True if aws_access_key_id and aws_secret_access_key exist in [default]; False otherwise.
+    """
     credentials = configparser.RawConfigParser()
     try:
         credentials.read(AWS_CREDENTIALS_FILE)
@@ -177,8 +250,15 @@ def aws_default_profile_exists():
             and credentials.has_option("default", "aws_secret_access_key"))
 
 
-def save_aws_default_profile(parameters):
-    """Persist supplied AWS credentials to the default profile with owner-only permissions."""
+def save_aws_default_profile(parameters: InputParameters):
+    """Persist supplied AWS credentials to the default profile with owner-only permissions.
+
+    Args:
+        parameters: Input parameters; nothing is written when no access key ID was supplied.
+
+    Raises:
+        DeploymentError: If the credentials file cannot be written.
+    """
     if not parameters.aws_access_key_id:
         return
     credentials = configparser.RawConfigParser()
@@ -198,37 +278,54 @@ def save_aws_default_profile(parameters):
     print("AWS default profile: saved", flush=True)
 
 
-def validate_host_prerequisites():
-    """Check local scripts, supported OS, and privilege availability without changing the host."""
+def validate_host_prerequisites(parameters: InputParameters):
+    """Check that the machine running this script can drive the deployment, before any state change.
+
+    Applies to every target. Ansible, PyYAML, and the host preparation playbook are needed on this
+    machine; remote and cloud targets also need the ssh client, and a localhost target needs root
+    or sudo privileges because Ansible then changes this machine. Sudo authentication is requested
+    immediately before host preparation. The target operating system is
+    verified later by the pipeline's OS check.
+
+    Args:
+        parameters: Input parameters; only the target is used.
+
+    Raises:
+        DeploymentError: Listing every missing prerequisite.
+    """
     errors = []
-    for script in (LOCAL_SETUP,):
-        if not script.is_file():
-            errors.append(f"Required host preparation script is missing: {script}")
-        elif not os.access(script, os.X_OK):
-            errors.append(f"Host preparation script is not executable: {script}")
-
+    for executable in ("ansible", "ansible-playbook"):
+        if shutil.which(executable) is None:
+            errors.append(f"{executable} is not installed or not in PATH; install Ansible on this machine.")
     try:
-        # Parse the OS identifier as data; never execute /etc/os-release.
-        os_id = ""
-        for line in Path("/etc/os-release").read_text().splitlines():
-            key, separator, value = line.partition("=")
-            if separator and key.strip() == "ID":
-                words = shlex.split(value, comments=True)
-                os_id = words[0] if len(words) == 1 else ""
-        if os_id not in ("ubuntu", "debian"):
-            errors.append("Unsupported OS; localhost deployment supports only Ubuntu and Debian.")
-    except (OSError, ValueError):
-        errors.append("Cannot read /etc/os-release; only Ubuntu and Debian hosts are supported.")
+        import yaml  # noqa: F401  (used by the container orchestrator to read compose manifests)
+    except ImportError:
+        errors.append("The PyYAML package is required; install it with 'pip install pyyaml'.")
+    if not HOST_PREPARATION_PLAYBOOK.is_file():
+        errors.append(f"Host preparation playbook is missing: {HOST_PREPARATION_PLAYBOOK}")
 
-    if os.geteuid() != 0 and shutil.which("sudo") is None:
-        errors.append("Localhost setup requires root privileges or sudo.")
+    if parameters.target != TARGET_LOCALHOST:
+        if shutil.which("ssh") is None:
+            errors.append("The ssh client is not installed or not in PATH.")
+    elif os.geteuid() != 0:
+        if shutil.which("sudo") is None:
+            errors.append("Localhost deployment requires root privileges or sudo.")
     if errors:
         raise DeploymentError("\nerror: ".join(errors))
     print("Host prerequisites validation: PASS", flush=True)
 
 
 def run_command(command, env=None):
-    """Run a child process and preserve failure codes without exposing commands or environment."""
+    """Run a child process and preserve failure codes without exposing commands or environment.
+
+    Args:
+        command: Argument list to execute.
+        env: Environment for the child process; defaults to the current environment.
+
+    Raises:
+        DeploymentError: If the program is missing (127), cannot be executed (126), receives
+            invalid input, or exits nonzero (its exit code, or 128 plus the signal number).
+    """
     try:
         result = subprocess.run(command, env=env, check=False)
     except FileNotFoundError:
@@ -242,39 +339,15 @@ def run_command(command, env=None):
         raise DeploymentError("Required program failed; review its preceding output.", code)
 
 
-def prepare_local_host():
-    """Run local setup with the required privileges; dependency provisioning is external."""
-    if os.geteuid() == 0:
-        run_command([str(LOCAL_SETUP)])
-    else:
-        run_command(["sudo", "-v"])
-        run_command(["sudo", str(LOCAL_SETUP)])
+def generate_deployment_configuration(parameters: InputParameters):
+    """Display non-secret context and pass resolved inputs to the Python configuration service.
 
+    Args:
+        parameters: Input parameters; terraform_profiles must be set for the cloud target.
 
-def verify_runtime_dependencies():
-    """Verify Docker command, daemon access, and Compose availability without starting containers."""
-    if shutil.which("docker") is None:
-        raise DeploymentError("Docker is not installed or not available in PATH.")
-    errors = []
-    checks = (
-        (["docker", "info"], "Docker is installed but the Docker daemon is not accessible."),
-        (["docker", "compose", "version"], "Docker Compose plugin is not available."),
-    )
-    for command, message in checks:
-        try:
-            result = subprocess.run(command, stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL, check=False)
-            if result.returncode:
-                errors.append(message)
-        except OSError:
-            errors.append(message)
-    if errors:
-        raise DeploymentError("\nerror: ".join(errors))
-    print("Runtime dependencies verification: PASS", flush=True)
-
-
-def execute_deployment_pipeline(parameters):
-    """Display non-secret context and pass resolved inputs to the Python configuration service."""
+    Raises:
+        DeploymentError: If the configuration service fails.
+    """
     print("Deployment configuration:")
     print(f"  environment : {parameters.environment}")
     print(f"  target      : {parameters.target}")
@@ -291,7 +364,7 @@ def execute_deployment_pipeline(parameters):
         "KEY_PATH": parameters.key_path,
         "AWS_REGION": parameters.aws_region,
     })
-    if parameters.target == "cloud":
+    if parameters.target == TARGET_CLOUD:
         environment["TERRAFORM_PROFILES"] = json.dumps(
             {role: asdict(profile) for role, profile in parameters.terraform_profiles.items()},
             default=str,
@@ -304,38 +377,94 @@ def execute_deployment_pipeline(parameters):
     )
 
 
-def provision_cloud_infrastructure(parameters):
-    """Provision through the cloud service (which rolls back on failure), then write the inventory."""
-    service = CloudProvisioningService()
-    context = generate_terraform_variables(parameters.terraform_profiles, region=parameters.aws_region)
+def provision_cloud_infrastructure(parameters: InputParameters):
+    """Provision through the cloud service (which rolls back on failure), then write the cloud inventory.
+
+    Every stage runs through run_step. If the inventory cannot be generated after provisioning
+    succeeded, the created infrastructure is destroyed.
+
+    Args:
+        parameters: Input parameters with terraform_profiles, aws_region, and key_path.
+
+    Returns:
+        Tuple of the InventoryReference and the resolved TargetProfile list.
+
+    Raises:
+        SystemExit: If any stage fails.
+    """
     try:
-        infrastructure = service.provision(context)
-    except (RuntimeError, ValueError, OSError, KeyError) as error:
-        raise DeploymentError(f"Cloud provisioning failed: {error}") from None
-    try:
-        inventory = generate_ansible_inventory(
-            infrastructure, next(iter(parameters.terraform_profiles.values())),
-            context.var_file.parent / "inventory.ini",
+        service = CloudProvisioningService()
+        context = run_step("Generate Terraform variables", generate_terraform_variables,
+                       parameters.terraform_profiles, parameters.aws_region)
+        infrastructure = run_step("Provision cloud infrastructure", service.provision, context)
+        synthesizer = InventorySynthesizer(
+            parameters.target, key_path=parameters.key_path, infrastructure=infrastructure,
+            inventory_path=context.var_file.parent / "inventory.ini",
         )
-    except (ValueError, OSError, KeyError) as error:
+        inventory = run_step("Generate inventory", synthesizer.generate_execution_inventory)
+    except SystemExit:
         service.rollback_infrastructure(context)
-        raise DeploymentError(f"Inventory generation failed: {error}") from None
+        raise
+    return inventory, synthesizer.target_profiles
+
+
+def execute_deployment_pipeline(parameters: InputParameters):
+    """Run every deployment stage for the selected target, in order.
+
+    Stages: AWS profile and Terraform profiles (cloud only), configuration generation, cloud
+    provisioning (cloud only), inventory generation, and the Ansible-driven automation plan.
+
+    Args:
+        parameters: Validated input parameters.
+
+    Raises:
+        SystemExit: With the failing stage's exit code if any stage or pipeline step fails.
+    """
+    if parameters.target == TARGET_CLOUD:
+        run_step("Save AWS profile", save_aws_default_profile, parameters)
+        parameters.terraform_profiles = build_terraform_profile(parameters.key_path, parameters.distributed)
+    run_step("Generate deployment configuration", generate_deployment_configuration, parameters)
+
+    if parameters.target == TARGET_CLOUD:
+        inventory, target_profiles = provision_cloud_infrastructure(parameters)
+    else:
+        synthesizer = InventorySynthesizer(
+            parameters.target, parameters.remote_io, parameters.remote_user, parameters.key_path,
+        )
+        inventory = run_step("Generate inventory", synthesizer.generate_execution_inventory)
+        target_profiles = synthesizer.target_profiles
     print(f"Ansible inventory: {inventory.inventory_file_path}", flush=True)
+    print(f"SSH debug connection: {inventory.ssh_debug_command}", flush=True)
+
+    automation = TaskAutomationService(REPO_ROOT, prune_volumes=parameters.prune_volumes)
+    run_step("Initialize execution context", automation.initialize_execution_context, target_profiles, inventory)
+    result = run_step("Run automated deployment", automation.dispatch_automation_plan)
+    if not result.success:
+        print(f"error: {result.report()}", file=sys.stderr)
+        raise SystemExit(result.exit_code)
+    print(result.report(), flush=True)
 
 
 def display_troubleshooting_hints(failed_step, exit_code):
-    """Print the failed stage, original exit code, and a stage-specific remediation hint."""
+    """Print the failed stage, original exit code, and a stage-specific remediation hint.
+
+    Args:
+        failed_step: Name of the stage that failed.
+        exit_code: Exit code reported by the failure.
+    """
     hints = {
         "Parse input parameters": "Review --help, option names, and required option values.",
         "Validate input parameters": (
             "Review --help and supported environment/target/use-case values, remote inputs, "
             "and key-file access."
         ),
-        "Validate host prerequisites": "Verify the supported OS, script permissions, and sudo availability.",
-        "Prepare local host": "Review local.setup.sh output and sudo permissions.",
+        "Validate host prerequisites": "Install Ansible, PyYAML, and the ssh client on this machine; for localhost also provide root or sudo privileges.",
         "Verify runtime dependencies": "Verify Docker daemon access and Docker Compose availability; dependency installation belongs to Ansible Host Provisioning.",
         "Save AWS profile": "Check write permissions for the AWS shared credentials file.",
         "Provision cloud infrastructure": "Review the Terraform output above, AWS credentials and permissions, and that terraform is installed.",
+        "Initialize execution context": "Review the resolved targets and inventory reference.",
+        "Generate inventory": "Verify --remote-io, --remote-user, and that --key-path is a readable private key.",
+        "Run automated deployment": "Review the failed pipeline step and its remediation hints above.",
         "Generate deployment configuration": "Review configuration layers, secret defaults/overrides, and file paths.",
     }
     print(f"Deployment failed at step: {failed_step}", file=sys.stderr)
@@ -344,13 +473,29 @@ def display_troubleshooting_hints(failed_step, exit_code):
 
 
 def run_step(name, function, *args):
-    """Execute a named stage and supplement failures with diagnostics; allow normal help exits."""
+    """Execute a named stage and supplement failures with diagnostics; allow normal help exits.
+
+    Args:
+        name: Stage name used for troubleshooting hints.
+        function: Callable to run.
+        *args: Positional arguments passed to the callable.
+
+    Returns:
+        The callable's return value.
+
+    Raises:
+        SystemExit: With the failure's exit code (2 for runtime, value, OS, or key errors).
+    """
     try:
         return function(*args)
     except DeploymentError as error:
         print(f"error: {error}", file=sys.stderr)
         display_troubleshooting_hints(name, error.exit_code)
         raise SystemExit(error.exit_code) from None
+    except (RuntimeError, ValueError, OSError, KeyError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        display_troubleshooting_hints(name, 2)
+        raise SystemExit(2) from None
     except SystemExit as error:
         if error.code:
             display_troubleshooting_hints(name, error.code)
@@ -358,19 +503,11 @@ def run_step(name, function, *args):
 
 
 def main():
-    """Validate inputs, prepare localhost only when selected, and generate deployment configuration."""
+    """Parse and validate inputs, then run the deployment pipeline."""
     parameters = run_step("Parse input parameters", parse_input_parameters)
     run_step("Validate input parameters", validate_input_parameters, parameters)
-    if parameters.target == "localhost":
-        run_step("Validate host prerequisites", validate_host_prerequisites)
-        run_step("Prepare local host", prepare_local_host)
-        run_step("Verify runtime dependencies", verify_runtime_dependencies)
-    if parameters.target == "cloud":
-        run_step("Save AWS profile", save_aws_default_profile, parameters)
-        parameters.terraform_profiles = build_terraform_profile(parameters.key_path, parameters.distributed)
-    run_step("Generate deployment configuration", execute_deployment_pipeline, parameters)
-    if parameters.target == "cloud":
-        run_step("Provision cloud infrastructure", provision_cloud_infrastructure, parameters)
+    run_step("Validate host prerequisites", validate_host_prerequisites, parameters)
+    run_step("Execute deployment pipeline", execute_deployment_pipeline, parameters)
 
 
 if __name__ == "__main__":
