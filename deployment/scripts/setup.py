@@ -14,7 +14,7 @@ import sys
 
 from configuration_service import generate_terraform_variables, DEFAULT_AWS_REGION
 from models import DeploymentProfile
-from terraform_provisioning_service import TerraformProvisioningService, generate_ansible_inventory
+from cloud_provisioning_service import CloudProvisioningService, generate_ansible_inventory
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -306,7 +306,7 @@ def execute_deployment_pipeline(parameters):
 
 def provision_cloud_infrastructure(parameters):
     """Provision through the cloud service (which rolls back on failure), then write the inventory."""
-    service = TerraformProvisioningService()
+    service = CloudProvisioningService()
     context = generate_terraform_variables(parameters.terraform_profiles, region=parameters.aws_region)
     try:
         infrastructure = service.provision(context)
