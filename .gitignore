@@ -27,3 +27,4 @@ output/
 deployment/targets/cloud/terraform.tfvars.json
 deployment/targets/cloud/ssh_public_key.pub
 deployment/targets/cloud/inventory.ini
+deployment/targets/on-premise/inventory.ini

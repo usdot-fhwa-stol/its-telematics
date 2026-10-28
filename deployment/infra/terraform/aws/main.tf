@@ -51,11 +51,11 @@ resource "aws_route_table_association" "public" {
 
 data "aws_ami" "ubuntu" {
   most_recent = true
-  owners      = ["099720109477"] # Canonical
+  owners      = ["099720109477"] # Official Canonical AWS Account ID for public AMIs
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"] #  currently tested version is ubuntu-22, but deployment can also use 20 and 24.
   }
 }
 

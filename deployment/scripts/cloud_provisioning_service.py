@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-"""Zero-touch AWS provisioning via Terraform with Ansible inventory generation."""
-
 import json
 import subprocess
 import sys

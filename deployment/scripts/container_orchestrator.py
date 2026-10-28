@@ -9,11 +9,27 @@ from typing import List, Tuple
 import yaml
 
 from ansible_runner import ALL_HOSTS, run_ad_hoc, run_shell
-from models import CommandResult, ExecutionContext
+from models import CommandResult, ExecutionContext, ROLE_DATABASE, ROLE_PROCESSING, ROLE_UI
 
 COMPOSE_PROJECT = "deployment"
 ENV_RUNTIME_FILE = ".env"
 BIND_MOUNTED_FILES = ("scripts/database/init-databases.sh",)
+# Cross-node settings: variable -> (role of the node running the service, value template).
+# {ip} is the role node's private IP (or address). Services default to this host in .env, so a
+# variable is rewritten only on nodes that do not run the service themselves.
+SERVICE_ENDPOINTS = {
+    "CLIENT_LOCAL_URL": (ROLE_UI, "http://{ip}:8082/"),
+    "GRAFANA_LOCAL_URL": (ROLE_UI, "http://{ip}:3000/"),
+    "UISERVICE_LOCAL_URL": (ROLE_UI, "http://{ip}:9010/"),
+    "UISERVICE_LOCAL_UPLOAD_URL": (ROLE_UI, "http://{ip}:9011/"),
+    "TOPICSERVICE_LOCAL_URL": (ROLE_PROCESSING, "http://{ip}:8080/"),
+    # Port stays tied to rsu_server_port, defined earlier in the same .env.
+    "RSU_MANAGEMENT_SERVICE_URL": (ROLE_PROCESSING, "http://{ip}:${{rsu_server_port}}"),
+    "NATS_IP": (ROLE_PROCESSING, "{ip}"),
+    "MYSQL_HOST": (ROLE_DATABASE, "{ip}"),
+    "INFLUXDB_HOST": (ROLE_DATABASE, "{ip}"),
+    "INFLUXDB3_IP": (ROLE_DATABASE, "{ip}"),
+}
 PULL_TIMEOUT_SECONDS = 1800
 STEP_TIMEOUT_SECONDS = 300
 
@@ -101,7 +117,40 @@ class ContainerOrchestrator:
                                 step, timeout=STEP_TIMEOUT_SECONDS)
             if not copied.success:
                 return copied
+        for host, overrides in self._service_endpoint_overrides().items():
+            for variable, value in overrides.items():
+                configured = run_ad_hoc(
+                    self.inventory, host, "ansible.builtin.lineinfile",
+                    {"path": f"{self.workspace}/{ENV_RUNTIME_FILE}", "line": f"{variable}={value}",
+                     "regexp": f"^{variable}="}, step, timeout=STEP_TIMEOUT_SECONDS)
+                if not configured.success:
+                    return configured
         return CommandResult(step, True, 0, f"Synchronized {len(transfers)} files to {self.workspace}")
+
+    def _service_endpoint_overrides(self) -> dict:
+        """Return, per host, the .env settings that must point at another node's service.
+
+        In a centralized deployment (role "all") every host runs every service, so nothing is
+        overridden and the localhost defaults stay. In a distributed deployment a host that is not in
+        a service's role group addresses the first node of that group by private IP (or address).
+
+        Returns:
+            Dict of inventory host to {variable: value}; hosts with no overrides are omitted.
+        """
+        groups = self.context.inventory.target_groups
+        host_vars = self.context.inventory.host_variables
+        hosts = sorted({host for members in groups.values() for host in members})
+        result = {}
+        for host in hosts:
+            overrides = {}
+            for variable, (role, template) in SERVICE_ENDPOINTS.items():
+                members = groups.get(role, [])
+                if members and host not in members:
+                    ip = host_vars.get(members[0], {}).get("private_ip") or members[0]
+                    overrides[variable] = template.format(ip=ip)
+            if overrides:
+                result[host] = overrides
+        return result
 
     def pull_managed_images(self) -> CommandResult:
         """Pre-fetch the latest images so startup does not time out on downloads.
