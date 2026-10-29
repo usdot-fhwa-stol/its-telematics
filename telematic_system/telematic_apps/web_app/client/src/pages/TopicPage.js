@@ -67,12 +67,11 @@ const TopicPage = React.memo(() => {
           element.event_id = filteredEvent.id;
           element.event_name = filteredEvent.name;
           if (element.unit_type !== undefined &&
-            (element.unit_type.toLocaleLowerCase() === VALID_UNIT_TYPES.CAV_VEHICLE.toLocaleLowerCase()
-              || element.unit_type.toLocaleLowerCase() === VALID_UNIT_TYPES.NON_CAV_VEHICLE.toLocaleLowerCase())) {
+            element.unit_type.toLocaleLowerCase() === VALID_UNIT_TYPES.ROS2_VEHICLE.toLocaleLowerCase()) {
             filteredVehicles = [...filteredVehicles, element];
           } else if (element.unit_type !== undefined &&
             (element.unit_type.toLocaleLowerCase() === VALID_UNIT_TYPES.CLOUD_INFRASTRUCTURE.toLocaleLowerCase()
-              || element.unit_type.toLocaleLowerCase() === VALID_UNIT_TYPES.STREETS_INFRASTRUCTURE.toLocaleLowerCase()
+              || element.unit_type.toLocaleLowerCase() === VALID_UNIT_TYPES.KAFKA_INFRASTRUCTURE.toLocaleLowerCase()
               || element.unit_type.toLocaleLowerCase() === VALID_UNIT_TYPES.V2XHUB_INFRASTRUCTURE.toLocaleLowerCase())) {
             filteredInfrastructures = [...filteredInfrastructures, element];
             console.log(element.unit_type);
