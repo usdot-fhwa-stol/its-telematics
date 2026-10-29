@@ -1,4 +1,6 @@
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -346,6 +348,75 @@ class ExecutionContext:
 
 
 @dataclass(frozen=True)
+class LogTrace:
+    """Captured container log output.
+
+    Attributes:
+        service_name: Service (or group of services) the logs belong to.
+        line_count: Number of lines in log_payload.
+        log_payload: The log text.
+        timestamp_utc: ISO 8601 UTC capture time.
+    """
+    service_name: str
+    line_count: int
+    log_payload: str
+    timestamp_utc: str
+
+    @classmethod
+    def from_text(cls, service_name: str, payload: str) -> "LogTrace":
+        """Build a LogTrace stamped with the current UTC time."""
+        return cls(service_name, len(payload.splitlines()), payload,
+                   datetime.now(timezone.utc).isoformat(timespec="seconds"))
+
+
+@dataclass(frozen=True)
+class DiagnosticReport:
+    """Details of the failed task.
+
+    Attributes:
+        failed_task_id: Name of the failing step.
+        exit_code: Exit code of the failure.
+        error_stderr: Concise error output of the failure.
+        container_logs: Container logs captured on failure, if any.
+        remediation_hints: Suggested fixes for the operator.
+    """
+    failed_task_id: str
+    exit_code: int
+    error_stderr: str
+    container_logs: Optional[LogTrace] = None
+    remediation_hints: Tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ExecutionSummary:
+    """Operator-facing outcome of a deployment run, printed as JSON.
+
+    Attributes:
+        overall_status: "SUCCESS" or "FAILED".
+        elapsed_time_seconds: Duration of the run in seconds.
+        active_services: Names of the running services.
+        ui_url: Address of the web UI; None when the deployment failed.
+        diagnostics: Failure details; None on success.
+
+    Example:
+        ExecutionSummary("SUCCESS", 12.5, ("web_client",), "http://localhost/").to_json()
+    """
+    overall_status: str
+    elapsed_time_seconds: float
+    active_services: Tuple[str, ...] = ()
+    ui_url: Optional[str] = None
+    diagnostics: Optional[DiagnosticReport] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return the summary as nested JSON-serializable dictionaries."""
+        return asdict(self)
+
+    def to_json(self) -> str:
+        """Return the summary as indented JSON."""
+        return json.dumps(self.to_dict(), indent=2)
+
+
+@dataclass(frozen=True)
 class TaskExecutionResult:
     """Structured pipeline outcome, including a diagnostic report on failure.
 
@@ -355,8 +426,9 @@ class TaskExecutionResult:
         failed_step: Name of the failing step; empty on success.
         exit_code: Exit code of the failure; 0 on success.
         reason: Concise failure reason.
-        log_trace: Timestamped container logs captured on failure.
+        log_trace: Container logs captured on failure; None when not collected.
         remediation_hints: Suggested fixes shown to the operator.
+        active_services: Names of the running services after a successful run.
 
     Example:
         TaskExecutionResult(
@@ -370,20 +442,22 @@ class TaskExecutionResult:
     failed_step: str = ""
     exit_code: int = 0
     reason: str = ""
-    log_trace: str = ""
+    log_trace: Optional[LogTrace] = None
     remediation_hints: Tuple[str, ...] = ()
+    active_services: Tuple[str, ...] = ()
 
-    def report(self) -> str:
-        """Format the outcome as text.
+    def summarize(self, elapsed_time_seconds: float, ui_url: Optional[str] = None) -> ExecutionSummary:
+        """Convert the outcome to an ExecutionSummary.
+
+        Args:
+            elapsed_time_seconds: Duration of the run.
+            ui_url: Web UI address, reported only on success.
 
         Returns:
-            A one-line summary on success; otherwise the failed step, exit code, reason,
-            remediation hints, and container log trace.
+            Summary with a DiagnosticReport (carrying the LogTrace, if any) on failure.
         """
+        elapsed = round(elapsed_time_seconds, 2)
         if self.success:
-            return "Deployment completed: " + ", ".join(self.completed_steps)
-        lines = [f"Failed step: {self.failed_step}", f"Exit code: {self.exit_code}", f"Reason: {self.reason}"]
-        lines += [f"Hint: {hint}" for hint in self.remediation_hints]
-        if self.log_trace:
-            lines += ["Container log trace:", self.log_trace]
-        return "\n".join(lines)
+            return ExecutionSummary("SUCCESS", elapsed, self.active_services, ui_url)
+        report = DiagnosticReport(self.failed_step, self.exit_code, self.reason, self.log_trace, self.remediation_hints)
+        return ExecutionSummary("FAILED", elapsed, diagnostics=report)

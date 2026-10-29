@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Manage container images, manifests, and runtime services on the prepared host."""
 
-from datetime import datetime, timezone
 import json
 import shlex
 import time
@@ -11,7 +10,7 @@ from typing import Callable, List, Tuple
 import yaml
 
 from ansible_runner import ALL_HOSTS, run_ad_hoc, run_shell
-from models import CommandResult, ExecutionContext, ROLE_DATABASE, ROLE_PROCESSING, ROLE_UI
+from models import CommandResult, ExecutionContext, LogTrace, ROLE_DATABASE, ROLE_PROCESSING, ROLE_UI
 
 MAX_UPDATE_ATTEMPTS = 10
 STABILITY_SECONDS = 10
@@ -293,12 +292,12 @@ class ContainerOrchestrator:
         outcome = "Failed deployment torn down." if result.success else "Could not tear down the failed deployment."
         return CommandResult(result.step, result.success, result.exit_code, outcome, result.stderr)
 
-    def capture_error_logs(self) -> str:
-        """Return a timestamped trace of the last N log lines from every stopped or unhealthy container.
+    def capture_error_logs(self) -> LogTrace:
+        """Capture the last N log lines from every stopped or unhealthy container.
 
         Returns:
-            Trace text with a UTC timestamp header and the collected logs, or a note that no
-            failing containers were found.
+            LogTrace stamped with the UTC capture time whose payload is the collected logs, or a
+            note that no failing containers were found.
         """
         lines = int(self.context.log_tail_lines)
         label = f"label=com.docker.compose.project={COMPOSE_PROJECT}"
@@ -310,9 +309,8 @@ class ContainerOrchestrator:
             f'echo "=== container $c"; docker logs --tail {lines} --timestamps "$c" 2>&1; done'
         )
         result = run_shell(self.inventory, ALL_HOSTS, script, "Capture error logs", timeout=STEP_TIMEOUT_SECONDS)
-        stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
         body = result.stdout.strip() or result.stderr.strip() or "No failing containers were found."
-        return f"[{stamp}] last {lines} log lines per failing container\n{body}"
+        return LogTrace.from_text("containers", body)
 
     def terminate_orphaned_workloads(self) -> CommandResult:
         """Remove stopped containers left by earlier deployment runs.

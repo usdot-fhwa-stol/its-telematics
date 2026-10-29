@@ -11,6 +11,7 @@ import pwd
 import shutil
 import subprocess
 import sys
+import time
 
 from configuration_service import generate_terraform_variables, DEFAULT_AWS_REGION
 from models import (
@@ -463,13 +464,21 @@ def execute_deployment_pipeline(parameters: InputParameters):
     print(f"Ansible inventory: {inventory.inventory_file_path}", flush=True)
     print(f"SSH debug connection: {inventory.ssh_debug_command}", flush=True)
 
+    started = time.monotonic()
     automation = TaskAutomationService(REPO_ROOT, prune_volumes=parameters.prune_volumes)
     run_step("Initialize execution context", automation.initialize_execution_context, target_profiles, inventory)
     result = run_step("Run automated deployment", automation.dispatch_automation_plan)
+    ui_url = None
+    if result.success:
+        ui_hosts = inventory.target_groups.get("ui") or [target_profiles[0].address]
+        host = "localhost" if parameters.target == TARGET_LOCALHOST else ui_hosts[0]
+        ui_url = f"http://{host}/"
+    summary = result.summarize(time.monotonic() - started, ui_url)
     if not result.success:
-        print(f"error: {result.report()}", file=sys.stderr)
+        print(summary.to_json(), file=sys.stderr, flush=True)
         raise SystemExit(result.exit_code)
-    print(result.report(), flush=True)
+    print(summary.to_json(), flush=True)
+    print(f"\nOpen the UI: {ui_url}", flush=True)
 
 
 def display_troubleshooting_hints(failed_step, exit_code):

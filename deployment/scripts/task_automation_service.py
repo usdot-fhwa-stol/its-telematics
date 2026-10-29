@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Pipeline engine: runs the deployment steps in a fixed order and aggregates diagnostics on failure."""
 
+from dataclasses import replace
 import sys
 from threading import Event, Lock, Thread
 from pathlib import Path
@@ -114,6 +115,7 @@ class TaskAutomationService:
         if self.context is None:
             raise RuntimeError("initialize_execution_context must be called before dispatching the plan")
         completed: List[str] = []
+        active_services: Tuple[str, ...] = ()
         for name, action in self._plan():
             print(f"[{len(completed) + 1}] {name} ", end="", flush=True)
             stop_progress = Event()
@@ -137,7 +139,20 @@ class TaskAutomationService:
                     print("    - Container status:", flush=True)
                 print(result.stdout.strip(), flush=True)
             completed.append(name)
-        return TaskExecutionResult(True, tuple(completed))
+            if name == "Deploy services":
+                active_services = self._parse_service_names(result.stdout)
+        return TaskExecutionResult(True, tuple(completed), active_services=active_services)
+
+    @staticmethod
+    def _parse_service_names(status_table: str) -> Tuple[str, ...]:
+        """Return the container names listed in a Compose status table, skipping Ansible banners."""
+        names = []
+        for line in status_table.splitlines():
+            parts = line.split()
+            if not parts or "|" in line or ">>" in line or parts[0] == "NAME":
+                continue
+            names.append(parts[0])
+        return tuple(dict.fromkeys(names))
 
     def _report(self, message: str, depth: int = 1) -> None:
         """Print a progress bullet under the running step as soon as it is reported."""
@@ -169,11 +184,12 @@ class TaskAutomationService:
             Failed TaskExecutionResult with the step name, exit code, reason, log trace,
             and remediation hints.
         """
-        trace = ""
+        trace = None
         if failed.step in CONTAINER_LOG_STEPS:
             trace = self.orchestrator.capture_error_logs()
             # Logs are collected first; then the partially started stack is removed.
-            trace += "\n" + self.orchestrator.tear_down_stack().stdout.strip()
+            payload = trace.log_payload + "\n" + self.orchestrator.tear_down_stack().stdout.strip()
+            trace = replace(trace, line_count=len(payload.splitlines()), log_payload=payload)
         reason = self._failure_reason(failed)
         return TaskExecutionResult(
             False, completed_steps, failed.step, failed.exit_code or 1, reason, trace,
