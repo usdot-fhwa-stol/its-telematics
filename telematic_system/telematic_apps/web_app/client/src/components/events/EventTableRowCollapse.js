@@ -25,7 +25,7 @@ import { Box } from '@mui/system';
 import * as React from 'react';
 import AuthContext from '../../context/auth-context';
 import { USER_ROLES } from '../users/UserMetadata';
-import { ACTIVE_EVENT, DEFAULT_NA, INVALID_LOCATION_ID, INVALID_LOCATION_ID_STR, INVALID_TESTING_TYPE_ID, INVALID_TESTING_TYPE_ID_STR, LIVE_EVENT, PAST_EVENT, UNKNOW_DATE, UNKNOW_EVENT } from './EventMetadata';
+import { ACTIVE_EVENT, DEFAULT_NA, INVALID_LOCATION_ID, INVALID_LOCATION_ID_STR, INVALID_TESTING_TYPE_ID, INVALID_TESTING_TYPE_ID_STR, LIVE_EVENT, PAST_EVENT, UNKNOWN_DATE, UNKNOWN_EVENT } from './EventMetadata';
 import EventTableControlsItem from './EventTableControlsItem';
 import EventTableItemPopover from './EventTableItemPopover';
 import EventTableRowCollapseDialog from './EventTableRowCollapseDialog';
@@ -77,7 +77,7 @@ const EventTableRowCollapse = (props) => {
                                 } else if (new Date().getTime() > end_ts || new Date().getTime() < start_ts) {
                                     value = PAST_EVENT;
                                 } else {
-                                    value = UNKNOW_EVENT;
+                                    value = UNKNOWN_EVENT;
                                 }
                             }
                         }
@@ -146,10 +146,10 @@ const EventTableRowCollapse = (props) => {
                                                 {props.eventRow.event_units === undefined &&
                                                     <React.Fragment>
                                                         <TableCell key={`${props.eventRow.id}-Unit-${unit.unit_identifier}-start`}>
-                                                            {UNKNOW_DATE}
+                                                            {UNKNOWN_DATE}
                                                         </TableCell>
                                                         <TableCell key={`${props.eventRow.id}-Unit-${unit.unit_identifier}-end`}>
-                                                            {UNKNOW_DATE}
+                                                            {UNKNOWN_DATE}
                                                         </TableCell>
                                                     </React.Fragment>
                                                 }
