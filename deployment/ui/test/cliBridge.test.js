@@ -184,3 +184,57 @@ test('reports a missing Python', async () => {
   assert.equal(result.ok, false);
   assert.equal(result.spawnError, 'no-such-python3 was not found. Install Python 3 and try again.');
 });
+
+const withSecrets = { SECRET_KEYS: ['mysql_password', 'grafana_secret_key'] };
+const secretOptions = { ...require('../electron/cliOptions'), ...withSecrets };
+
+test('keeps secret override values off the command line', () => {
+  const valid = validateParams({
+    ...localCore, secretOverrides: { mysql_password: 'p@ss word', grafana_secret_key: '' },
+  }, secretOptions);
+  assert.deepEqual(valid.secretOverrides, { mysql_password: 'p@ss word' });
+  const args = buildArgs(valid);
+  assert.equal(args.at(-1), '--secret-overrides-stdin');
+  assert.equal(args.some((arg) => arg.includes('p@ss')), false);
+  assert.equal(formatCommand(args).includes('p@ss'), false);
+  // No values, no flag.
+  assert.equal(buildArgs(validateParams({ ...localCore, secretOverrides: { mysql_password: '' } }, secretOptions))
+    .includes('--secret-overrides-stdin'), false);
+});
+
+test('rejects secret overrides the script cannot take, without echoing values', () => {
+  const errors = (overrides, options) => {
+    try {
+      validateParams({ ...localCore, secretOverrides: overrides }, options);
+    } catch (error) {
+      return error.errors.join(' ');
+    }
+    return '';
+  };
+  assert.match(errors({ influx_admin_token: 'hunter2' }, secretOptions), /does not accept a secret override for influx_admin_token/);
+  // A setup.py without --secret-overrides-stdin lists no keys.
+  assert.match(errors({ mysql_password: 'hunter2' }, undefined), /does not accept/);
+  assert.match(errors({ mysql_password: 'two\nlines' }, secretOptions), /line breaks/);
+  assert.match(errors({ mysql_password: 'x'.repeat(4097) }, secretOptions), /4096 characters/);
+  assert.equal(/hunter2/.test(errors({ influx_admin_token: 'hunter2' }, secretOptions)), false);
+});
+
+test('sends secret overrides on standard input only', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-ui-repo-'));
+  fs.mkdirSync(path.join(root, 'deployment', 'scripts'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'deployment', 'scripts', 'setup.py'), [
+    'import json, os, sys',
+    'with open("received-stdin", "w") as received:',
+    '    received.write(sys.stdin.read())',
+    'print(json.dumps({"argv": sys.argv[1:], "env": any("s3cret" in value for value in os.environ.values())}))',
+  ].join('\n'));
+  const valid = validateParams({ ...localCore, secretOverrides: { mysql_password: 's3cret"\\' } }, secretOptions);
+  const run = runSetup(valid, { repoRoot: root });
+  assert.equal(run.child.spawnargs.some((arg) => arg.includes('s3cret')), false);
+  const result = await run.done;
+  const echoed = JSON.parse(result.lines[0].text);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'received-stdin'), 'utf8')), { mysql_password: 's3cret"\\' });
+  assert.equal(echoed.argv.at(-1), '--secret-overrides-stdin');
+  assert.equal(echoed.env, false);
+  assert.equal(JSON.stringify(result).includes('s3cret'), false);
+});

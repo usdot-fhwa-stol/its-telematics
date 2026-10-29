@@ -38,6 +38,7 @@ another checkout, set `TELEMATICS_REPO_ROOT=/path/to/repo`.
 | Target on-premise, Remote host | `--target remote --remote-io=<host> --remote-user=<user>` and, if chosen, `--key-path=<file>` |
 | Target cloud | `--target cloud` |
 | Use case | `--use-case all\|core\|rsu_integration` |
+| Any secret override filled in | `--secret-overrides-stdin`, with the values as JSON on standard input |
 
 For example, on-premise / This machine / dev / core runs:
 
@@ -59,6 +60,19 @@ value. If the script cannot list its options (an older `setup.py`), the form
 uses the lists in `cliOptions.js` and says so. `npm test` runs the real
 listing and fails if it no longer matches those labels.
 
+### Secret overrides
+
+The form has a password field for each key `setup.py` lists for
+`--secret-override`, shown only when the script also lists
+`--secret-overrides-stdin`. An empty field uses its `.example` file. Filled
+fields are sent to `setup.py` as a JSON object on standard input, so the values
+never appear on the command line (`ps`), in the child's environment, in the
+command shown on the form, or in the result. They stay in the app's memory
+until it quits or the form is cleared, and are never written to
+`targets.json`. `setup.py` itself writes them to
+`telematic_system/secrets/*.txt` (mode 644) and `.env`, as it does for
+command-line overrides.
+
 For `localhost`, the app first warns that `local.setup.sh` edits `/etc/hosts`
 and deletes and recreates `/opt/grafana`, `/opt/apache2` and `/opt/influxdb2`.
 
@@ -75,32 +89,6 @@ server's pages load in a view below the app's strip.
 - Top-level navigation stays on the server's origin. Links to other sites open
   in the user's browser. Iframes, such as the embedded Grafana dashboards, are
   not affected.
-- When a page or frame asks for HTTP authentication, the app hides the view and
-  shows its own sign-in dialog, as a browser would. Apache asks this way before
-  it serves Grafana (`/grafana/`, realm "Grafana Login"); the answer is the
-  user's Telematics user name and password, which the web server copies to
-  `grafana_htpasswd` at login. Without the dialog, Electron cancels the
-  challenge and the dashboard frame shows Apache's "Unauthorized" page.
-  Chromium keeps accepted credentials in memory until the app quits; the app
-  stores nothing.
-- The view keeps its cookies in a persistent session, so a signed-in session
-  survives restarting the app. The app itself saves only server names and
-  addresses, in `servers.json`, never a Telematics login.
-- Addresses with a user name or password, and schemes other than `http` and
-  `https`, are rejected. Servers with self-signed HTTPS certificates are
-  refused for now.
-
-## Not built yet
-
-- Secret overrides. `setup.py` takes them only as command-line arguments,
-  which any user on the machine can read with `ps`. They will be added once it
-  reads them from environment variables (`env://` references in the design).
-- Cloud fields (AWS profile, region, key pair) and remote deployment, which
-  wait for those pipelines.
-- "Open Telematics" on the deploy result page. `setup.py` does not start the
-  stack or report its address yet.
-- Packaging (`.deb`, AppImage). `electron/askpass.sh` must be unpacked from
-  the app archive (`asarUnpack`) so `sudo` can run it.
 
 ## Layout
 

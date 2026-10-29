@@ -12,6 +12,7 @@ const builtInOptions = require('./cliOptions');
 const SETUP_SCRIPT = path.join('deployment', 'scripts', 'setup.py');
 const MAX_OUTPUT_CHARS = 1_000_000;
 const MAX_TEXT_LENGTH = 255;
+const MAX_SECRET_LENGTH = 4096;
 
 class ValidationError extends Error {
   constructor(errors) {
@@ -76,6 +77,9 @@ function validateParams(params, options = builtInOptions) {
     }
   }
 
+  const secretOverrides = checkSecretOverrides(input.secretOverrides, options.SECRET_KEYS || [], errors);
+  if (Object.keys(secretOverrides).length) valid.secretOverrides = secretOverrides;
+
   if (errors.length) throw new ValidationError(errors);
   return {
     environment: input.environment,
@@ -83,6 +87,25 @@ function validateParams(params, options = builtInOptions) {
     useCase: input.useCase,
     ...valid,
   };
+}
+
+// Keeps the non-empty values. Messages name the key, never the value.
+function checkSecretOverrides(overrides, secretKeys, errors) {
+  const kept = {};
+  if (!overrides || typeof overrides !== 'object') return kept;
+  for (const [key, value] of Object.entries(overrides)) {
+    if (typeof value !== 'string' || value === '') continue;
+    if (!secretKeys.includes(key)) {
+      errors.push(`setup.py does not accept a secret override for ${key}.`);
+    } else if (value.length > MAX_SECRET_LENGTH) {
+      errors.push(`The ${key} override must be ${MAX_SECRET_LENGTH} characters or fewer.`);
+    } else if (/[\u0000-\u001f\u007f]/.test(value)) {
+      errors.push(`The ${key} override must not contain line breaks or control characters.`);
+    } else {
+      kept[key] = value;
+    }
+  }
+  return kept;
 }
 
 // Enumerated values use the same "--flag value" form as the README examples.
@@ -98,6 +121,8 @@ function buildArgs(valid) {
     args.push(`--remote-io=${valid.remoteIo}`, `--remote-user=${valid.remoteUser}`);
     if (valid.keyPath) args.push(`--key-path=${valid.keyPath}`);
   }
+  // The values themselves go to the script's standard input (runSetup).
+  if (valid.secretOverrides) args.push('--secret-overrides-stdin');
   return args;
 }
 
@@ -184,9 +209,15 @@ function runSetup(valid, { repoRoot, python = 'python3', askpassPath, env = proc
   const child = spawn(python, [path.join(repoRoot, SETUP_SCRIPT), ...args], {
     cwd: repoRoot,
     env: childEnv,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: [valid.secretOverrides ? 'pipe' : 'ignore', 'pipe', 'pipe'],
     detached: true,
   });
+  // Secret values never go on the command line or into the environment,
+  // where other users or child processes could see them.
+  if (valid.secretOverrides) {
+    child.stdin.on('error', () => {}); // The script exited before reading.
+    child.stdin.end(JSON.stringify(valid.secretOverrides));
+  }
 
   // Ends setup.py and everything it started (sudo, local.setup.sh).
   const stop = () => {

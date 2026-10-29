@@ -81,3 +81,18 @@ test('falls back to the built-in lists for an older setup.py', async () => {
   const noisy = fakeRepo('print("not json")\n');
   assert.match((await loadScriptOptions({ repoRoot: noisy })).notice, /not JSON/);
 });
+
+test('offers secret overrides only when setup.py reads them from standard input', async () => {
+  const real = await loadScriptOptions({ repoRoot: REPO_ROOT });
+  assert.deepEqual(real.SECRET_KEYS, ['mysql_password', 'mysql_root_password', 'grafana_secret_key', 'influx_admin_token']);
+
+  const secretOption = { name: '--secret-override', choices: null, default: [], keys: ['mysql_password'] };
+  const withoutStdin = listing();
+  withoutStdin.options.push(secretOption);
+  assert.deepEqual(optionsFromListing(withoutStdin).SECRET_KEYS, []);
+  withoutStdin.options.push({ name: '--secret-overrides-stdin', choices: null, default: false });
+  assert.deepEqual(optionsFromListing(withoutStdin).SECRET_KEYS, ['mysql_password']);
+
+  const older = fakeRepo('import sys\nsys.exit(2)\n');
+  assert.deepEqual((await loadScriptOptions({ repoRoot: older })).SECRET_KEYS, []);
+});

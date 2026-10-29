@@ -76,6 +76,25 @@ class ListOptionsAction(argparse.Action):
         parser.exit(0)
 
 
+def read_secret_overrides_from_stdin():
+    """Read {"key": "value"} secret overrides from standard input, keeping values off the command line."""
+    if sys.stdin is None:
+        raise DeploymentError("--secret-overrides-stdin requires standard input.")
+    if sys.stdin.isatty():
+        print("Reading secret overrides from standard input as JSON; end with Ctrl-D.",
+              file=sys.stderr, flush=True)
+    try:
+        overrides = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        # The JSON error message can quote the input, which holds secrets.
+        raise DeploymentError("--secret-overrides-stdin requires a JSON object on standard input.") from None
+    if not isinstance(overrides, dict) or not all(isinstance(value, str) for value in overrides.values()):
+        raise DeploymentError("--secret-overrides-stdin requires a JSON object with string values.")
+    if any(key not in SECRET_KEYS for key in overrides):
+        raise DeploymentError("Unsupported secret key; supported keys: " + ", ".join(SECRET_KEYS))
+    return overrides
+
+
 def parse_input_parameters():
     """Parse bounded CLI options and collect supported secret overrides without logging values."""
     parser = DeploymentArgumentParser(
@@ -100,6 +119,11 @@ def parse_input_parameters():
         "--secret-override", action="append", default=[], metavar="key=value",
         help="Repeatable; last value wins. Supported keys: " + ", ".join(SECRET_KEYS),
     )
+    parser.add_argument(
+        "--secret-overrides-stdin", action="store_true",
+        help="Also read secret overrides from standard input as a JSON object of key: value, so values "
+             "never appear on the command line; a --secret-override for the same key wins",
+    )
     parser.add_argument("--list-options", action=ListOptionsAction,
                         help="Print the supported options, choices, defaults and help as JSON, then exit")
     parameters = parser.parse_args()
@@ -111,6 +135,9 @@ def parse_input_parameters():
         if key not in SECRET_KEYS:
             raise DeploymentError("Unsupported secret key; supported keys: " + ", ".join(SECRET_KEYS))
         overrides[key] = value
+    if parameters.secret_overrides_stdin:
+        overrides = {**read_secret_overrides_from_stdin(), **overrides}
+    del parameters.secret_overrides_stdin
     parameters.secret_overrides = overrides
     del parameters.secret_override
     return parameters

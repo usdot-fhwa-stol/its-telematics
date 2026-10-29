@@ -44,11 +44,20 @@ function optionsFromListing(listing) {
   const mapped = new Set([...builtIn.DEPLOY_TO.map((option) => option.scriptTarget), 'cloud']);
   const unmapped = target.choices.filter((value) => !mapped.has(value));
 
+  // Secret overrides are offered only when the script can read them from
+  // standard input; --secret-override alone would put them on the command line.
+  const byName = (name) => listing.options.find((entry) => entry && entry.name === name);
+  const secretOption = byName('--secret-override');
+  const secretKeys = byName('--secret-overrides-stdin') && secretOption && Array.isArray(secretOption.keys)
+    ? secretOption.keys.filter((key) => typeof key === 'string')
+    : [];
+
   return {
     TARGETS: targets,
     DEPLOY_TO: deployTo,
     ENVIRONMENTS: withLabels(environment.choices, builtIn.ENVIRONMENTS, environment.default),
     USE_CASES: withLabels(useCase.choices, builtIn.USE_CASES, useCase.default),
+    SECRET_KEYS: secretKeys,
     source: 'setup.py',
     notice: unmapped.length
       ? `setup.py also accepts --target ${unmapped.join(', ')}, which this app cannot configure yet.`
@@ -78,6 +87,7 @@ async function loadScriptOptions({ repoRoot, python = 'python3' }) {
   } catch (error) {
     return {
       ...builtIn,
+      SECRET_KEYS: [],
       source: 'built-in',
       notice: `setup.py could not list its options (${describeFailure(error)}), so the form uses the app's built-in list.`,
     };

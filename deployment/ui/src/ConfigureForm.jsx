@@ -29,6 +29,8 @@ export const EMPTY_PARAMS = {
   remoteIo: '',
   remoteUser: '',
   keyPath: '',
+  // Held in memory only: never saved and never on the command line.
+  secretOverrides: {},
 };
 
 function Section({ title, note, children }) {
@@ -85,6 +87,8 @@ export default function ConfigureForm({
     if (keyPath) onChange({ ...params, keyPath });
   };
 
+  const secrets = params.secretOverrides || {};
+  const overrideCount = Object.values(secrets).filter(Boolean).length;
   const isOnPrem = params.target === 'on-premise';
   const isLocal = isOnPrem && params.deployTo === 'local';
   const isRemote = isOnPrem && params.deployTo === 'remote';
@@ -184,13 +188,39 @@ export default function ConfigureForm({
       )}
 
       <Divider />
-      <Section title="Secret overrides" note="Not available yet">
-        <Typography variant="body2" color="text.secondary">
-          Every run overwrites telematic_system/.env and the secret files in telematic_system/secrets/, using
-          the .example files. Overrides will be added once setup.py reads them from environment variables:
-          today it only takes them as command-line arguments, which any user on this machine can read.
-        </Typography>
-      </Section>
+      {options.SECRET_KEYS.length > 0 ? (
+        <Section title="Secret overrides" note="Optional">
+          <Typography variant="body2" color="text.secondary">
+            Every run overwrites telematic_system/.env and the secret files in telematic_system/secrets/. An
+            empty field uses its .example file. Values you enter go to setup.py on standard input, never on the
+            command line, and the app does not save them.
+          </Typography>
+          <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
+            {options.SECRET_KEYS.map((key) => (
+              <TextField
+                key={key}
+                id={`secret-${key}`}
+                label={key}
+                type="password"
+                autoComplete="new-password"
+                value={secrets[key] || ''}
+                onChange={(event) => onChange({ ...params, secretOverrides: { ...secrets, [key]: event.target.value } })}
+                disabled={running}
+                placeholder={`${key}.txt.example`}
+                inputProps={{ style: { fontFamily: monoFont } }}
+              />
+            ))}
+          </Box>
+        </Section>
+      ) : (
+        <Section title="Secret overrides" note="Not available">
+          <Typography variant="body2" color="text.secondary">
+            Every run overwrites telematic_system/.env and the secret files in telematic_system/secrets/, using
+            the .example files. This setup.py cannot read overrides from standard input, and passing them as
+            command-line arguments would let any user on this machine read them.
+          </Typography>
+        </Section>
+      )}
 
       <Divider />
       <Section title="Command">
@@ -207,6 +237,7 @@ export default function ConfigureForm({
         </Box>
         <Typography variant="body2" color="text.secondary">
           Runs from {repoRoot}
+          {overrideCount > 0 && `. ${overrideCount === 1 ? '1 secret override goes' : `${overrideCount} secret overrides go`} to setup.py on standard input.`}
         </Typography>
       </Section>
 
