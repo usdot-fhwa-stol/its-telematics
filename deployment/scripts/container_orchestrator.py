@@ -2,15 +2,19 @@
 """Manage container images, manifests, and runtime services on the prepared host."""
 
 from datetime import datetime, timezone
+import json
 import shlex
+import time
 from pathlib import PurePosixPath
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 import yaml
 
 from ansible_runner import ALL_HOSTS, run_ad_hoc, run_shell
 from models import CommandResult, ExecutionContext, ROLE_DATABASE, ROLE_PROCESSING, ROLE_UI
 
+MAX_UPDATE_ATTEMPTS = 10
+STABILITY_SECONDS = 10
 COMPOSE_PROJECT = "deployment"
 ENV_RUNTIME_FILE = ".env"
 BIND_MOUNTED_FILES = ("scripts/database/init-databases.sh",)
@@ -45,6 +49,7 @@ class ContainerOrchestrator:
                 manifest reference, registry endpoints, startup timeout, and log tail length.
         """
         self.context = context
+        self.reporter: Callable[[str, int], None] = lambda message, depth: None
         self.inventory = context.inventory.inventory_file_path
         self.local_target = bool(context.target_profiles) and all(
             profile.is_local for profile in context.target_profiles
@@ -162,45 +167,117 @@ class ContainerOrchestrator:
                          f"cd {self._workspace_command_path()} && {self._compose} pull",
                          "Pull container images", timeout=PULL_TIMEOUT_SECONDS)
 
+    def log(self, message: str, depth: int = 1) -> None:
+        """Report a progress message to the pipeline output as it happens.
+
+        Args:
+            message: Text to show.
+            depth: 1 for a bullet under the running step, 2 for a nested bullet.
+        """
+        self.reporter(message, depth)
+
     def deploy_service(self) -> CommandResult:
-        """Bring down any running stack, start it on the latest images, wait for health checks, and return the Compose container status table.
+        """Bring down any running stack, start it on the latest images, and retry until every container is up.
+
+        Each phase is a separate remote command and is reported through self.log as it happens.
+        If containers are restarting or unhealthy, images are pulled and the stack is started again,
+        at most MAX_UPDATE_ATTEMPTS times.
 
         Returns:
-            CommandResult containing running container statuses, or the first startup/status failure.
+            CommandResult containing the Compose container status table, or the failure of a phase.
         """
+        step = "Deploy services"
         timeout = self.context.startup_timeout_seconds
         workspace = self._workspace_command_path()
+        up = f"{self._compose} up -d --pull always --wait --wait-timeout {timeout} --remove-orphans"
+
         if self.context.prune_volumes:
             # Volumes are removed even when nothing is running, so every deployment starts with fresh data.
-            reset = (f"echo 'Removing existing services and Docker volumes' && "
-                     f"{self._compose} down --volumes --remove-orphans")
+            self.log("Removing existing services and Docker volumes")
+            reset = f"{self._compose} down --volumes --remove-orphans"
         else:
             # Bring down any running stack first so containers restart on the freshly pulled images.
-            reset = (f"if [ -n \"$({self._compose} ps -q)\" ]; then "
-                     f"echo 'Running services detected; bringing them down'; "
-                     f"{self._compose} down --remove-orphans; fi")
-        script = (
-            f"cd {workspace} && {reset} && "
-            f"{self._compose} up -d --force-recreate --pull always --wait --wait-timeout {timeout} --remove-orphans"
-        )
-        deploy = run_shell(
-            self.inventory, ALL_HOSTS, script,
-            "Deploy services", timeout=timeout + 300,
-        )
-        if not deploy.success:
-            return deploy
+            self.log("Bringing down any running services")
+            reset = f"{self._compose} down --remove-orphans"
+        result = run_shell(self.inventory, ALL_HOSTS, f"cd {workspace} && {reset}", step, timeout=STEP_TIMEOUT_SECONDS)
+        if not result.success:
+            return result
 
-        status = run_shell(
-            self.inventory, ALL_HOSTS,
-            f"cd {self._workspace_command_path()} && {self._compose} ps",
-            "Read deployed container status", timeout=STEP_TIMEOUT_SECONDS,
-        )
+        self.log("Starting services")
+        result = run_shell(self.inventory, ALL_HOSTS, f"cd {workspace} && {up} --force-recreate",
+                           step, timeout=timeout + 300)
+        self._log_compose_output(result)
+
+        attempt = 0
+        while True:
+            problems = self._not_running()
+            if not problems:
+                time.sleep(STABILITY_SECONDS)  # catches containers that crash right after starting
+                problems = self._not_running()
+            if not problems:
+                self.log("All services are up and running")
+                break
+            self.log(f"Services not up yet (update attempt {attempt} of {MAX_UPDATE_ATTEMPTS})")
+            for problem in problems:
+                self.log(problem, depth=2)
+            if attempt >= MAX_UPDATE_ATTEMPTS:
+                status = run_shell(self.inventory, ALL_HOSTS, f"cd {workspace} && {self._compose} ps -a",
+                                   step, timeout=STEP_TIMEOUT_SECONDS)
+                return CommandResult(step, False, 1, status.stdout,
+                                     "Services still not up after the maximum update attempts:\n" + "\n".join(problems))
+            attempt += 1
+            self.log(f"Pulling updates and restarting (attempt {attempt} of {MAX_UPDATE_ATTEMPTS})")
+            run_shell(self.inventory, ALL_HOSTS, f"cd {workspace} && {self._compose} pull --ignore-pull-failures",
+                      step, timeout=PULL_TIMEOUT_SECONDS)
+            result = run_shell(self.inventory, ALL_HOSTS, f"cd {workspace} && {up}", step, timeout=timeout + 300)
+            self._log_compose_output(result)
+            time.sleep(5)
+
+        status = run_shell(self.inventory, ALL_HOSTS, f"cd {workspace} && {self._compose} ps",
+                           step, timeout=STEP_TIMEOUT_SECONDS)
         if not status.success:
-            return CommandResult(
-                deploy.step, False, status.exit_code or 1,
-                deploy.stdout, status.stderr or status.stdout,
-            )
-        return CommandResult(deploy.step, True, 0, status.stdout, status.stderr)
+            return CommandResult(step, False, status.exit_code or 1, status.stdout, status.stderr or status.stdout)
+        return CommandResult(step, True, 0, status.stdout, status.stderr)
+
+    def _log_compose_output(self, result: CommandResult) -> None:
+        """Report the container lifecycle lines of a Compose run, or its error when it failed."""
+        text = result.stdout if result.success else (result.stderr or result.stdout)
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith(("[WARNING]", "[DEPRECATION")):
+                continue
+            if result.success and "|" in line and ">>" in line:
+                continue  # Ansible host banner
+            self.log(line, depth=2)
+
+    def _not_running(self) -> List[str]:
+        """List containers of the project that are not running, restarting, or not healthy.
+
+        Returns:
+            One "host: container: status" entry per problem container; empty when all are up.
+        """
+        # `--format json` avoids Jinja-style braces, which Ansible would try to template.
+        result = run_shell(
+            self.inventory, ALL_HOSTS,
+            f"docker ps -a --filter label=com.docker.compose.project={COMPOSE_PROJECT} --format json",
+            "Check container status", timeout=STEP_TIMEOUT_SECONDS,
+        )
+        problems, host = [], ""
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if "|" in line and ">>" in line:
+                host = line.split("|")[0].strip()
+            elif line.startswith("{"):
+                try:
+                    container = json.loads(line)
+                except ValueError:
+                    continue
+                status = container.get("Status", "")
+                if container.get("State") != "running" or "unhealthy" in status or "health: starting" in status:
+                    problems.append(f"{host}: {container.get('Names', '?')}: {status}")
+        if not result.success:
+            problems.append(f"Could not read container status: {(result.stderr or result.stdout).strip()[-200:]}")
+        return problems
 
     def tear_down_stack(self) -> CommandResult:
         """Stop and remove the stack so a failed deployment leaves no containers running.

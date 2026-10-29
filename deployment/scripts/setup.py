@@ -7,6 +7,7 @@ from dataclasses import asdict
 import json
 import os
 from pathlib import Path
+import pwd
 import shutil
 import subprocess
 import sys
@@ -56,9 +57,30 @@ DISTRIBUTED_ROLES = {
 }
 
 
-AWS_CREDENTIALS_FILE = Path(
-    os.environ.get("AWS_SHARED_CREDENTIALS_FILE", Path.home() / ".aws" / "credentials")
-)
+def resolve_aws_credentials_file():
+    """Locate the shared AWS credentials file of the user who invoked the script.
+
+    Under "sudo python3 setup.py" HOME is /root, so the invoking user (SUDO_USER) is used instead.
+    AWS_SHARED_CREDENTIALS_FILE takes precedence when set.
+
+    Returns:
+        Path to the credentials file (it may not exist).
+    """
+    configured = os.environ.get("AWS_SHARED_CREDENTIALS_FILE")
+    if configured:
+        return Path(configured).expanduser()
+    invoking_user = os.environ.get("SUDO_USER")
+    if invoking_user and invoking_user != "root":
+        try:
+            return Path(pwd.getpwnam(invoking_user).pw_dir) / ".aws" / "credentials"
+        except KeyError:
+            pass
+    return Path.home() / ".aws" / "credentials"
+
+
+AWS_CREDENTIALS_FILE = resolve_aws_credentials_file()
+# Terraform and the AWS provider run as child processes; make them read the same file.
+os.environ.setdefault("AWS_SHARED_CREDENTIALS_FILE", str(AWS_CREDENTIALS_FILE))
 
 
 class DeploymentError(Exception):
@@ -273,6 +295,11 @@ def save_aws_default_profile(parameters: InputParameters):
         with os.fdopen(descriptor, "w") as handle:
             credentials.write(handle)
         os.chmod(AWS_CREDENTIALS_FILE, 0o600)
+        owner = os.environ.get("SUDO_USER")
+        if owner and os.geteuid() == 0 and owner != "root":
+            # Keep the file owned by the invoking user rather than root.
+            shutil.chown(AWS_CREDENTIALS_FILE, user=owner)
+            shutil.chown(AWS_CREDENTIALS_FILE.parent, user=owner)
     except OSError:
         raise DeploymentError("Could not save the AWS default profile; check file permissions.") from None
     print("AWS default profile: saved", flush=True)

@@ -2,7 +2,7 @@
 """Pipeline engine: runs the deployment steps in a fixed order and aggregates diagnostics on failure."""
 
 import sys
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Tuple
 
@@ -69,6 +69,8 @@ class TaskAutomationService:
         self.repo_root = repo_root
         self.manifest_reference = manifest_reference or DEFAULT_MANIFEST_REFERENCE
         self.options = options
+        self._print_lock = Lock()
+        self._line_open = True
         self.context: Optional[ExecutionContext] = None
         self.host_preparation: Optional[HostPreparationService] = None
         self.orchestrator: Optional[ContainerOrchestrator] = None
@@ -115,6 +117,8 @@ class TaskAutomationService:
         for name, action in self._plan():
             print(f"[{len(completed) + 1}] {name} ", end="", flush=True)
             stop_progress = Event()
+            self._line_open = True
+            self.orchestrator.reporter = self._report
             progress = Thread(target=self._show_progress, args=(stop_progress,), daemon=True)
             progress.start()
             try:
@@ -122,20 +126,33 @@ class TaskAutomationService:
             finally:
                 stop_progress.set()
                 progress.join()
+            if not self._line_open:
+                print(f"[{len(completed) + 1}] {name} ", end="", flush=True)
             if not result.success:
                 print(f" \033[31mFAILED\033[0m" if sys.stdout.isatty() else " FAILED", flush=True)
                 return self.collect_diagnostic_traces(result, tuple(completed))
             print(f" \033[32mOK\033[0m" if sys.stdout.isatty() else " OK", flush=True)
             if result.stdout.strip() and name in ("Verify operating system", "Deploy services"):
+                if name == "Deploy services":
+                    print("    - Container status:", flush=True)
                 print(result.stdout.strip(), flush=True)
             completed.append(name)
         return TaskExecutionResult(True, tuple(completed))
 
-    @staticmethod
-    def _show_progress(stop: Event):
-        """Print a dot every half-second until the current pipeline action completes."""
+    def _report(self, message: str, depth: int = 1) -> None:
+        """Print a progress bullet under the running step as soon as it is reported."""
+        with self._print_lock:
+            if self._line_open:
+                print(flush=True)
+                self._line_open = False
+            print("    " * (depth - 1) + "    - " + message, flush=True)
+
+    def _show_progress(self, stop: Event):
+        """Print a dot every half-second until the action completes or reports its first bullet."""
         while not stop.wait(0.5):
-            print(".", end="", flush=True)
+            with self._print_lock:
+                if self._line_open:
+                    print(".", end="", flush=True)
 
     def collect_diagnostic_traces(
         self, failed: CommandResult, completed_steps: Tuple[str, ...] = (),

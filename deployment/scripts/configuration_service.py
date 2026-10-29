@@ -82,13 +82,29 @@ def resolve_public_key(key_path, work_dir):
         raise ValueError("Cannot read the SSH key file.") from None
     if first_line.startswith(("ssh-", "ecdsa-", "sk-")):
         return key_path
+    # ssh-keygen rejects a key file that is group/world-readable and owned by the caller (as root under
+    # sudo), and the file may sit on a share that cannot be chmod-ed, so derive from a private copy.
     try:
+        private_copy = tempfile.NamedTemporaryFile(prefix="ssh_key_", delete=False)
+    except OSError:
+        raise ValueError("Cannot create a temporary file to derive the public key.") from None
+    try:
+        with private_copy:
+            os.chmod(private_copy.name, 0o600)
+            private_copy.write(key_path.read_bytes())
         result = subprocess.run(
-            ["ssh-keygen", "-y", "-f", str(key_path)],
+            ["ssh-keygen", "-y", "-f", private_copy.name],
             capture_output=True, text=True, stdin=subprocess.DEVNULL, check=False,
         )
-    except OSError:
+    except FileNotFoundError:
         raise ValueError("ssh-keygen is required to derive a public key from a private key.") from None
+    except OSError:
+        raise ValueError("Cannot read the SSH key file.") from None
+    finally:
+        try:
+            os.unlink(private_copy.name)
+        except OSError:
+            pass
     if result.returncode != 0 or not result.stdout.startswith(("ssh-", "ecdsa-", "sk-")):
         raise ValueError("Could not derive a public key; use an unencrypted private key or a .pub file.")
     work_dir.mkdir(parents=True, exist_ok=True)

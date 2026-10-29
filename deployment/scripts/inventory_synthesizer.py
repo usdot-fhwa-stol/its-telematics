@@ -5,6 +5,7 @@ import getpass
 import os
 import shlex
 import sys
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -154,8 +155,33 @@ class InventorySynthesizer:
                 key = key.with_suffix("")
             if not key.is_file() or not os.access(key, os.R_OK):
                 raise ValueError("The SSH private key must be an existing readable file.")
-            resolved_key = str(key.resolve())
+            resolved_key = self._private_key_copy(key.resolve())
         return TargetProfile(self.target, CONNECTION_SSH, address, user, resolved_key, role, private_ip)
+
+    @staticmethod
+    def _private_key_copy(key: Path) -> str:
+        """Return a key path that SSH will accept.
+
+        SSH silently ignores keys readable by group or others (for example a 0444 file on a shared
+        folder), which makes connections retry until timeout. Such keys are copied to a 0600 file in
+        a private per-user directory.
+
+        Args:
+            key: Resolved private key path.
+
+        Returns:
+            The original path when its permissions are strict enough, otherwise the private copy.
+        """
+        if not key.stat().st_mode & 0o077:
+            return str(key)
+        directory = Path(tempfile.gettempdir()) / f"its-telematics-ssh-{os.getuid()}"
+        directory.mkdir(mode=0o700, exist_ok=True)
+        copy = directory / key.name
+        copy.unlink(missing_ok=True)
+        descriptor = os.open(copy, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(key.read_bytes())
+        return str(copy)
 
     def _host_variables(self, target: TargetProfile) -> Dict[str, str]:
         """Build the Ansible host variables for one target.
