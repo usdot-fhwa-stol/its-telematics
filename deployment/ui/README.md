@@ -36,7 +36,7 @@ another checkout, set `TELEMATICS_REPO_ROOT=/path/to/repo`.
 | Environment | `--environment dev\|test\|prod` |
 | Target on-premise, This machine | `--target localhost` |
 | Target on-premise, Remote host | `--target remote --remote-io=<host> --remote-user=<user>` and, if chosen, `--key-path=<file>` |
-| Target cloud | `--target cloud` |
+| Target cloud | `--target cloud`, plus `--aws-region=<region> --centralized\|--distributed --key-path=<file>` when `setup.py` lists its cloud options |
 | Use case | `--use-case all\|core\|rsu_integration` |
 | Any secret override filled in | `--secret-overrides-stdin`, with the values as JSON on standard input |
 
@@ -73,8 +73,24 @@ until it quits or the form is cleared, and are never written to
 `telematic_system/secrets/*.txt` (mode 644) and `.env`, as it does for
 command-line overrides.
 
-For `localhost`, the app first warns that `local.setup.sh` edits `/etc/hosts`
-and deletes and recreates `/opt/grafana`, `/opt/apache2` and `/opt/influxdb2`.
+### Cloud
+
+The AWS fields appear only when `setup.py --list-options` lists `--aws-region`
+and `--key-path` (the cloud pipeline from PR #336). Otherwise target cloud runs
+`--target cloud` alone and the form says the pipeline is not built yet.
+
+- **Region** defaults to the script's `--aws-region` default.
+- **AWS profile** offers only `default` unless `setup.py` lists
+  `--aws-profile`. Then it lists every profile in the credentials and config
+  files, including SSO and role profiles, and sends `--aws-profile=<name>`.
+  `--aws-profile` is not in PR #336 yet; a patch for it is ready for the PR author.
+- **Topology** sends `--centralized` or `--distributed`; the labels name the
+  instance types from `setup.py`, which `electron/cliOptions.js` repeats.
+- **SSH key for the instances** is required. Terraform registers it as the
+  instances' key pair.
+
+Before a cloud run, the app lists the AWS resources Terraform creates and
+warns that they are billed until destroyed.
 
 ## Connecting to a server
 
@@ -99,9 +115,10 @@ server's pages load in a view below the app's strip.
 | `electron/cliBridge.js` | Validates the form, builds the arguments, runs `setup.py`, parses its output |
 | `electron/scriptOptions.js` | Reads the form's choices from `setup.py --list-options` |
 | `electron/cliOptions.js` | Labels for those choices, and the lists used when `setup.py` cannot list them |
+| `electron/awsCredentials.js` | Lists and checks AWS profiles for the cloud target, and adds the default profile |
 | `electron/settings.js` | Saved settings in `~/.config/Telematics Deploy/`: non-secret target fields (`targets.json`) and saved servers (`servers.json`) |
 | `electron/serverConnection.js` | Validates server addresses and checks that a server responds |
 | `electron/telematicsView.js` | The sandboxed view that shows a server's pages, and its navigation rules |
 | `electron/signInQueue.js` | Queues HTTP authentication challenges from the view for the sign-in dialog |
 | `electron/askpass.sh` | Password dialog for `sudo` |
-| `src/` | React screens: start screen, configure form, result page, server screen, the strip above a server's pages, and the sign-in dialog |
+| `src/` | React screens: start screen, configure form, AWS credentials dialog, result page, server screen, the strip above a server's pages, and the sign-in dialog |

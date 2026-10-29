@@ -10,6 +10,17 @@ const TARGETS = [
   { value: 'cloud', label: 'cloud: AWS (pipeline not built yet)' },
 ];
 
+// Used instead of the cloud label above when setup.py lists the cloud options
+// (--aws-region and --key-path, from PR #336).
+const CLOUD_TARGET_LABEL = 'cloud: AWS';
+
+// setup.py's --centralized and --distributed flags. The instance types are
+// setup.py's CENTRALIZED_ROLES and DISTRIBUTED_ROLES; update them together.
+const TOPOLOGIES = [
+  { value: 'centralized', label: 'Centralized: one m5n.8xlarge node runs the UI, processing and database' },
+  { value: 'distributed', label: 'Distributed: processing on m5n.8xlarge, UI on t2.2xlarge, database on t2.large' },
+];
+
 // How an on-premise deployment reaches its host. Maps to setup.py's
 // `localhost` and `remote` targets.
 const DEPLOY_TO = [
@@ -29,4 +40,4 @@ const USE_CASES = [
   { value: 'rsu_integration', label: 'rsu_integration: RSU Management Service and InfluxDB v3' },
 ];
 
-module.exports = { TARGETS, DEPLOY_TO, ENVIRONMENTS, USE_CASES };
+module.exports = { TARGETS, CLOUD_TARGET_LABEL, TOPOLOGIES, DEPLOY_TO, ENVIRONMENTS, USE_CASES };

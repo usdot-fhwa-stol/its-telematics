@@ -238,3 +238,93 @@ test('sends secret overrides on standard input only', async () => {
   assert.equal(echoed.env, false);
   assert.equal(JSON.stringify(result).includes('s3cret'), false);
 });
+
+// Options as scriptOptions.js builds them when setup.py lists its cloud options (PR #336).
+const builtIn = require('../electron/cliOptions');
+const cloudOptions = {
+  ...builtIn,
+  SECRET_KEYS: [],
+  CLOUD: {
+    defaultRegion: 'us-east-1',
+    defaultTopology: 'centralized',
+    TOPOLOGIES: builtIn.TOPOLOGIES,
+    PROFILES: [{ value: 'default', label: 'default' }],
+  },
+};
+
+function cloudFixture({ credentials = '[default]\naws_access_key_id = AKIAEXAMPLEKEYID0001\naws_secret_access_key = wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY\n' } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-ui-cloud-'));
+  const key = path.join(dir, 'telematics.pub');
+  fs.writeFileSync(key, 'ssh-ed25519 AAAA test\n');
+  const file = path.join(dir, 'credentials');
+  if (credentials !== null) fs.writeFileSync(file, credentials, { mode: 0o600 });
+  return {
+    params: {
+      target: 'cloud', environment: 'prod', useCase: 'all',
+      awsRegion: 'us-west-2', awsProfile: 'default', topology: 'distributed', keyPath: key,
+    },
+    env: { AWS_SHARED_CREDENTIALS_FILE: file, AWS_CONFIG_FILE: path.join(dir, 'config') },
+    key,
+  };
+}
+
+test('builds the cloud arguments, and never passes AWS access keys', () => {
+  const { params, env, key } = cloudFixture();
+  const args = buildArgs(validateParams(params, cloudOptions, { env }));
+  assert.deepEqual(args, [
+    '--environment', 'prod', '--target', 'cloud', '--use-case', 'all',
+    '--aws-region=us-west-2', '--distributed', `--key-path=${key}`,
+  ]);
+  assert.equal(args.some((arg) => /aws-(access|secret)/.test(arg) || arg.includes('AKIA')), false);
+});
+
+test('checks the cloud fields', () => {
+  const { params, env } = cloudFixture();
+  const errors = (overrides, fixtureEnv = env) => {
+    try {
+      validateParams({ ...params, ...overrides }, cloudOptions, { env: fixtureEnv });
+    } catch (error) {
+      return error.errors;
+    }
+    return [];
+  };
+  assert.deepEqual(errors({ awsRegion: 'us east 1' }), ['AWS region must not contain spaces or control characters.']);
+  assert.deepEqual(errors({ awsRegion: 'mars-1' }), ['AWS region must look like us-east-1.']);
+  assert.deepEqual(errors({ awsRegion: '' }), ['AWS region is required.']);
+  assert.deepEqual(errors({ topology: 'edge' }), ['Choose a topology.']);
+  assert.deepEqual(errors({ awsProfile: 'work' }), ['Choose an AWS profile.']);
+  assert.deepEqual(errors({ keyPath: '' }), ['Choose the SSH key for the instances.']);
+  assert.deepEqual(errors({ keyPath: '/no/such/key' }), ['SSH key file does not exist or is not readable.']);
+  assert.equal(validateParams({ ...params, awsRegion: 'us-gov-west-1' }, cloudOptions, { env }).awsRegion, 'us-gov-west-1');
+
+  const missing = cloudFixture({ credentials: null });
+  assert.deepEqual(errors({}, missing.env), ['Add AWS credentials for the default profile.']);
+});
+
+test('keeps the plain cloud command for a setup.py without cloud options', () => {
+  const { params } = cloudFixture();
+  assert.deepEqual(buildArgs(validateParams(params)), ['--environment', 'prod', '--target', 'cloud', '--use-case', 'all']);
+});
+
+test('passes the chosen profile when setup.py takes --aws-profile', () => {
+  const { params, env, key } = cloudFixture({ credentials: null });
+  fs.writeFileSync(env.AWS_CONFIG_FILE, '[default]\nsso_session = lab\n[profile lab-admin]\nsso_session = lab\n[profile empty]\nregion = x\n');
+  const named = { ...cloudOptions, CLOUD: { ...cloudOptions.CLOUD, namedProfiles: true } };
+  assert.deepEqual(buildArgs(validateParams(params, named, { env })).slice(6), [
+    '--aws-profile=default', '--aws-region=us-west-2', '--distributed', `--key-path=${key}`,
+  ]);
+  assert.equal(buildArgs(validateParams({ ...params, awsProfile: 'lab-admin' }, named, { env }))[6], '--aws-profile=lab-admin');
+  const errors = (awsProfile) => {
+    try {
+      validateParams({ ...params, awsProfile }, named, { env });
+    } catch (error) {
+      return error.errors;
+    }
+    return [];
+  };
+  assert.deepEqual(errors('empty'), ['The empty AWS profile has no credentials setup.py can use.']);
+  assert.deepEqual(errors('nope'), ['Choose an AWS profile.']);
+  // Without --aws-profile, the same SSO default profile is not enough.
+  assert.deepEqual(errors('default'), []);
+  assert.throws(() => validateParams(params, cloudOptions, { env }), /Add AWS credentials for the default profile/);
+});

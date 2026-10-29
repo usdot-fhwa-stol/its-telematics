@@ -8,11 +8,13 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const builtInOptions = require('./cliOptions');
+const { AWS_PROFILE, profileStatus } = require('./awsCredentials');
 
 const SETUP_SCRIPT = path.join('deployment', 'scripts', 'setup.py');
 const MAX_OUTPUT_CHARS = 1_000_000;
 const MAX_TEXT_LENGTH = 255;
 const MAX_SECRET_LENGTH = 4096;
+const AWS_REGION_PATTERN = /^[a-z]{2}(-[a-z]+)+-\d{1,2}$/;
 
 class ValidationError extends Error {
   constructor(errors) {
@@ -37,9 +39,58 @@ function checkText(value, label, errors) {
   return text;
 }
 
+function checkKeyPath(value, errors) {
+  const keyPath = String(value);
+  if (!path.isAbsolute(keyPath)) {
+    errors.push('SSH key must be an absolute path.');
+    return undefined;
+  }
+  try {
+    fs.accessSync(keyPath, fs.constants.R_OK);
+    if (fs.statSync(keyPath).isFile()) return keyPath;
+    errors.push('SSH key must be a file.');
+  } catch {
+    errors.push('SSH key file does not exist or is not readable.');
+  }
+  return undefined;
+}
+
+// The cloud fields exist only when setup.py lists its cloud options
+// (options.CLOUD). AWS access keys are never among them: setup.py reads the
+// default profile from the shared credentials file instead.
+function checkCloud(input, cloud, env, valid, errors) {
+  const profile = input.awsProfile || AWS_PROFILE;
+  if (cloud.namedProfiles) {
+    const status = typeof profile === 'string' ? profileStatus(env, { profile, namedProfiles: true }) : null;
+    if (status && status.ready) valid.awsProfile = profile;
+    else if (status && status.incomplete) errors.push(`The ${profile} AWS profile has no credentials setup.py can use.`);
+    else if (profile === AWS_PROFILE) errors.push('Add AWS credentials for the default profile.');
+    else errors.push('Choose an AWS profile.');
+  } else if (!cloud.PROFILES.some((option) => option.value === profile)) {
+    errors.push('Choose an AWS profile.');
+  } else if (!profileStatus(env).ready) {
+    errors.push('Add AWS credentials for the default profile.');
+  }
+  const errorCount = errors.length;
+  const region = checkText(input.awsRegion, 'AWS region', errors);
+  if (errors.length === errorCount) {
+    if (AWS_REGION_PATTERN.test(region)) valid.awsRegion = region;
+    else errors.push('AWS region must look like us-east-1.');
+  }
+  if (findOption(cloud.TOPOLOGIES, input.topology)) valid.topology = input.topology;
+  else errors.push('Choose a topology.');
+  if (input.keyPath) {
+    const keyPath = checkKeyPath(input.keyPath, errors);
+    if (keyPath) valid.keyPath = keyPath;
+  } else {
+    errors.push('Choose the SSH key for the instances.');
+  }
+}
+
 // Returns the values setup.py needs, or throws ValidationError listing every problem.
-// `options` are the lists the form showed (see scriptOptions.js).
-function validateParams(params, options = builtInOptions) {
+// `options` are the lists the form showed (see scriptOptions.js); `env` is
+// where the AWS credentials file is looked up, as setup.py does.
+function validateParams(params, options = builtInOptions, { env = process.env } = {}) {
   const { TARGETS, DEPLOY_TO, ENVIRONMENTS, USE_CASES } = options;
   const input = params && typeof params === 'object' ? params : {};
   const errors = [];
@@ -61,20 +112,12 @@ function validateParams(params, options = builtInOptions) {
       valid.remoteIo = checkText(input.remoteIo, 'Host address', errors);
       valid.remoteUser = checkText(input.remoteUser, 'SSH user', errors);
       if (input.keyPath) {
-        const keyPath = String(input.keyPath);
-        if (!path.isAbsolute(keyPath)) {
-          errors.push('SSH key must be an absolute path.');
-        } else {
-          try {
-            fs.accessSync(keyPath, fs.constants.R_OK);
-            if (!fs.statSync(keyPath).isFile()) errors.push('SSH key must be a file.');
-            else valid.keyPath = keyPath;
-          } catch {
-            errors.push('SSH key file does not exist or is not readable.');
-          }
-        }
+        const keyPath = checkKeyPath(input.keyPath, errors);
+        if (keyPath) valid.keyPath = keyPath;
       }
     }
+  } else if (input.target === 'cloud' && options.CLOUD) {
+    checkCloud(input, options.CLOUD, env, valid, errors);
   }
 
   const secretOverrides = checkSecretOverrides(input.secretOverrides, options.SECRET_KEYS || [], errors);
@@ -120,6 +163,12 @@ function buildArgs(valid) {
   if (valid.target === 'remote') {
     args.push(`--remote-io=${valid.remoteIo}`, `--remote-user=${valid.remoteUser}`);
     if (valid.keyPath) args.push(`--key-path=${valid.keyPath}`);
+  }
+  // Only with setup.py's cloud options. Never --aws-access-key-id or
+  // --aws-secret-access-key: setup.py reads the default profile instead.
+  if (valid.target === 'cloud' && valid.awsRegion) {
+    if (valid.awsProfile) args.push(`--aws-profile=${valid.awsProfile}`);
+    args.push(`--aws-region=${valid.awsRegion}`, `--${valid.topology}`, `--key-path=${valid.keyPath}`);
   }
   // The values themselves go to the script's standard input (runSetup).
   if (valid.secretOverrides) args.push('--secret-overrides-stdin');

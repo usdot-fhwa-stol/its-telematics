@@ -1,6 +1,7 @@
 'use strict';
 
 const { app, BrowserWindow, dialog, ipcMain, net } = require('electron');
+const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { ValidationError, validateParams, buildArgs, formatCommand, runSetup } = require('./cliBridge');
@@ -11,6 +12,7 @@ const {
 const { ServerAddressError, normalizeServerUrl, checkServer } = require('./serverConnection');
 const { configureTelematicsSession, createTelematicsView } = require('./telematicsView');
 const { createSignInQueue } = require('./signInQueue');
+const { AWS_PROFILE, CredentialsError, profileStatus, saveDefaultProfile } = require('./awsCredentials');
 
 // The repository whose deployment/ tree the app runs. During development the
 // app lives in <repo>/deployment/ui; TELEMATICS_REPO_ROOT points it elsewhere.
@@ -94,8 +96,19 @@ function validationResult(error) {
   throw error;
 }
 
+// How setup.py prepares this machine for --target localhost: PR #336 replaces
+// local.setup.sh with an Ansible playbook. The confirmation describes whichever
+// this checkout has.
+function hostPreparation() {
+  const exists = (...parts) => fs.existsSync(path.join(REPO_ROOT, 'deployment', ...parts));
+  if (exists('scripts', 'local.setup.sh')) return 'local.setup.sh';
+  if (exists('config', 'ansible', 'playbooks', 'host_preparation.yml')) return 'ansible';
+  return 'unknown';
+}
+
 handle('deploy:get-options', async () => ({
   options: await getScriptOptions(),
+  hostPreparation: hostPreparation(),
   saved: loadTargetSettings(app.getPath('userData')),
   repoRoot: REPO_ROOT,
 }));
@@ -111,11 +124,33 @@ handle('deploy:preview-command', async (params) => {
 
 handle('deploy:pick-key-file', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-    title: 'Choose SSH private key',
+    title: 'Choose SSH key',
     defaultPath: path.join(os.homedir(), '.ssh'),
     properties: ['openFile', 'showHiddenFiles'],
   });
   return canceled ? null : filePaths[0];
+});
+
+// The AWS default profile for the cloud target. The status never includes a
+// key, and saved keys go only to the credentials file, never to setup.py.
+async function awsProfileStatus(profile) {
+  const { CLOUD } = await getScriptOptions();
+  return profileStatus(process.env, {
+    profile: typeof profile === 'string' && profile ? profile : AWS_PROFILE,
+    namedProfiles: Boolean(CLOUD && CLOUD.namedProfiles),
+  });
+}
+
+handle('aws:profile-status', awsProfileStatus);
+
+handle('aws:save-profile', async (credentials) => {
+  try {
+    saveDefaultProfile(credentials);
+    return { status: await awsProfileStatus(AWS_PROFILE) };
+  } catch (error) {
+    if (error instanceof CredentialsError) return { error: error.message };
+    throw error;
+  }
 });
 
 handle('deploy:launch', async (params, { remember } = {}) => {

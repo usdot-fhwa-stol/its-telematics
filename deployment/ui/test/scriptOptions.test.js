@@ -96,3 +96,31 @@ test('offers secret overrides only when setup.py reads them from standard input'
   const older = fakeRepo('import sys\nsys.exit(2)\n');
   assert.deepEqual((await loadScriptOptions({ repoRoot: older })).SECRET_KEYS, []);
 });
+
+test('offers the cloud fields only when setup.py lists its cloud options', async () => {
+  const withCloud = listing();
+  withCloud.options.push(
+    { name: '--key-path', choices: null, default: '' },
+    { name: '--distributed', choices: null, default: false },
+    { name: '--centralized', choices: null, default: false },
+    { name: '--aws-access-key-id', choices: null, default: '' },
+    { name: '--aws-region', choices: null, default: 'us-east-1' },
+  );
+  const options = optionsFromListing(withCloud);
+  assert.equal(options.CLOUD.defaultRegion, 'us-east-1');
+  assert.equal(options.CLOUD.defaultTopology, 'centralized');
+  assert.deepEqual(values(options.CLOUD.TOPOLOGIES), ['centralized', 'distributed']);
+  assert.match(options.CLOUD.TOPOLOGIES[0].label, /\(default\)$/);
+  assert.deepEqual(values(options.CLOUD.PROFILES), ['default']);
+  assert.equal(options.TARGETS.find((option) => option.value === 'cloud').label, builtIn.CLOUD_TARGET_LABEL);
+
+  assert.equal(options.CLOUD.namedProfiles, false);
+  withCloud.options.push({ name: '--aws-profile', choices: null, default: null }, { name: '--volume-prune', choices: null, default: true });
+  assert.equal(optionsFromListing(withCloud).CLOUD.namedProfiles, true);
+  assert.equal(optionsFromListing(withCloud).prunesVolumes, true);
+  assert.equal(options.prunesVolumes, false);
+
+  assert.equal(optionsFromListing(listing()).CLOUD, null);
+  // This branch's setup.py has no cloud options yet.
+  assert.equal((await loadScriptOptions({ repoRoot: REPO_ROOT })).CLOUD, null);
+});

@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld('deployApi', {
   previewCommand: (params) => ipcRenderer.invoke('deploy:preview-command', params),
   pickKeyFile: () => ipcRenderer.invoke('deploy:pick-key-file'),
   launch: (params, launchOptions) => ipcRenderer.invoke('deploy:launch', params, launchOptions),
+  awsProfileStatus: (profile) => ipcRenderer.invoke('aws:profile-status', profile),
+  // credentials: { accessKeyId, secretAccessKey }. Written to the AWS credentials file only.
+  saveAwsProfile: (credentials) => ipcRenderer.invoke('aws:save-profile', credentials),
 
   listServers: () => ipcRenderer.invoke('servers:list'),
   connect: (address, connectOptions) => ipcRenderer.invoke('servers:connect', address, connectOptions),
