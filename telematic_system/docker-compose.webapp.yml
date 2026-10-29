@@ -45,13 +45,10 @@ services:
         - S3_BUCKET=${S3_BUCKET}
         - S3_REGION=${S3_REGION}
       command: bash -c 'wait-for-it ${MYSQL_HOST}:${MYSQL_PORT} && wait-for-it 127.0.0.1:3000 && /app/service.sh'
-<<<<<<< HEAD
-=======
       secrets:
         - mysql_password
         - source: grafana_htpasswd
           target: /opt/apache2/grafana_htpasswd
->>>>>>> 874e9f186e9bca422552912efefe54488ae32228
       volumes:
         - telematics_upload:/opt/telematics/upload
 
