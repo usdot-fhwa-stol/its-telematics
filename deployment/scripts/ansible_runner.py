@@ -41,7 +41,7 @@ def _run(command, step: str, env_overrides: Optional[Dict[str, str]] = None,
 
 def run_ad_hoc(
     inventory: Path, pattern: str, module: str, module_args, step: str,
-    become: bool = False, json_output: bool = False, timeout: Optional[int] = None,
+    become: bool = False, timeout: Optional[int] = None,
 ) -> CommandResult:
     """Run one Ansible module on the hosts matching a pattern.
 
@@ -52,7 +52,6 @@ def run_ad_hoc(
         module_args: Module arguments as a string or a dict (serialized to JSON); may be empty.
         step: Pipeline step name recorded in the result.
         become: Escalate privileges with --become.
-        json_output: Use the JSON stdout callback so the output can be parsed.
         timeout: Maximum runtime in seconds, or None for no limit.
 
     Returns:
@@ -63,8 +62,7 @@ def run_ad_hoc(
         command += ["-a", module_args if isinstance(module_args, str) else json.dumps(module_args)]
     if become:
         command.append("--become")
-    env = {"ANSIBLE_LOAD_CALLBACK_PLUGINS": "1", "ANSIBLE_STDOUT_CALLBACK": "json"} if json_output else None
-    return _run(command, step, env, timeout)
+    return _run(command, step, None, timeout)
 
 
 def run_shell(inventory: Path, pattern: str, command_line: str, step: str,

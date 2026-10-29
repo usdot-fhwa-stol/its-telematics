@@ -211,12 +211,6 @@ def validate_input_parameters(parameters: InputParameters):
     if parameters.target == TARGET_CLOUD and not parameters.key_path:
         errors.append("--key-path (SSH public key) is required for target cloud.")
     if parameters.target == TARGET_CLOUD:
-        if shutil.which("terraform") is None:
-            errors.append(
-                "Terraform is not installed or not in PATH. Install it from "
-                "https://developer.hashicorp.com/terraform/install (Ubuntu/Debian: add the HashiCorp apt "
-                "repository, then 'sudo apt-get install terraform') and rerun."
-            )
         has_key_id = bool(parameters.aws_access_key_id)
         has_secret = bool(parameters.aws_secret_access_key)
         if has_key_id != has_secret:
@@ -309,8 +303,8 @@ def save_aws_default_profile(parameters: InputParameters):
 def validate_host_prerequisites(parameters: InputParameters):
     """Check that the machine running this script can drive the deployment, before any state change.
 
-    Applies to every target. Ansible, PyYAML, and the host preparation playbook are needed on this
-    machine; remote and cloud targets also need the ssh client, and a localhost target needs root
+    Applies to every target. Ansible (installed here if missing), PyYAML, and the host preparation playbook are needed on this
+    machine; a cloud target also needs Terraform, which is installed here if missing; remote and cloud targets also need the ssh client, and a localhost target needs root
     or sudo privileges because Ansible then changes this machine. Sudo authentication is requested
     immediately before host preparation. The target operating system is
     verified later by the pipeline's OS check.
@@ -322,13 +316,16 @@ def validate_host_prerequisites(parameters: InputParameters):
         DeploymentError: Listing every missing prerequisite.
     """
     errors = []
-    for executable in ("ansible", "ansible-playbook"):
-        if shutil.which(executable) is None:
-            errors.append(f"{executable} is not installed or not in PATH; install Ansible on this machine.")
+    if shutil.which("ansible") is None or shutil.which("ansible-playbook") is None:
+        print("error: Ansible is not installed or not in PATH; installing it now.", file=sys.stderr, flush=True)
+        install_ansible()
     try:
         import yaml  # noqa: F401  (used by the container orchestrator to read compose manifests)
     except ImportError:
         errors.append("The PyYAML package is required; install it with 'pip install pyyaml'.")
+    if parameters.target == TARGET_CLOUD and shutil.which("terraform") is None:
+        print("error: Terraform is not installed or not in PATH; installing it now.", file=sys.stderr, flush=True)
+        install_terraform()
     if not HOST_PREPARATION_PLAYBOOK.is_file():
         errors.append(f"Host preparation playbook is missing: {HOST_PREPARATION_PLAYBOOK}")
 
@@ -341,6 +338,62 @@ def validate_host_prerequisites(parameters: InputParameters):
     if errors:
         raise DeploymentError("\nerror: ".join(errors))
     print("Host prerequisites validation: PASS", flush=True)
+
+
+def install_apt_packages(name, executables, steps, manual_url):
+    """Run apt installation steps through bash, then confirm the executables are in PATH.
+
+    Args:
+        name: Product name used in messages.
+        executables: Executables that must be in PATH after the install.
+        steps: Shell commands, each containing {sudo} where privileges are needed; joined with &&.
+        manual_url: Where the operator can find manual installation instructions.
+
+    Raises:
+        DeploymentError: If apt-get is unavailable, sudo is needed but missing, the install fails,
+            or an executable is still not in PATH afterwards.
+    """
+    manual = f"Install it manually from {manual_url} and rerun."
+    if shutil.which("apt-get") is None:
+        raise DeploymentError(f"Automatic {name} installation supports apt-based systems only. {manual}")
+    if os.geteuid() != 0 and shutil.which("sudo") is None:
+        raise DeploymentError(f"Installing {name} requires root privileges or sudo. {manual}")
+    sudo = "" if os.geteuid() == 0 else "sudo"
+    try:
+        run_command(["bash", "-c", " && ".join(step.format(sudo=sudo) for step in steps)])
+    except DeploymentError as error:
+        raise DeploymentError(f"{name} installation failed. {manual}", error.exit_code) from None
+    if any(shutil.which(executable) is None for executable in executables):
+        raise DeploymentError(f"{name} is still not in PATH after installation. {manual}")
+    print(f"{name} installation: OK", flush=True)
+
+
+def install_ansible():
+    """Install Ansible from the distribution's apt repositories on this Debian/Ubuntu machine."""
+    install_apt_packages(
+        "Ansible", ("ansible", "ansible-playbook"),
+        # --reinstall restores executables deleted from a package apt still considers installed.
+        ["{sudo} apt-get update", "{sudo} apt-get install -y --reinstall ansible-core ansible"],
+        "https://docs.ansible.com/ansible/latest/installation_guide/",
+    )
+
+
+def install_terraform():
+    """Install Terraform from the HashiCorp apt repository on this Debian/Ubuntu machine."""
+    install_apt_packages(
+        "Terraform", ("terraform",),
+        [
+            "{sudo} apt-get update",
+            "{sudo} apt-get install -y gnupg curl lsb-release ca-certificates",
+            "curl -fsSL https://apt.releases.hashicorp.com/gpg | {sudo} gpg --batch --yes --dearmor "
+            "-o /usr/share/keyrings/hashicorp.gpg",
+            'echo "deb [signed-by=/usr/share/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com '
+            '$(lsb_release -cs) main" | {sudo} tee /etc/apt/sources.list.d/hashicorp.list > /dev/null',
+            "{sudo} apt-get update",
+            "{sudo} apt-get install -y terraform",
+        ],
+        "https://developer.hashicorp.com/terraform/install",
+    )
 
 
 def run_command(command, env=None):
@@ -500,6 +553,7 @@ def display_troubleshooting_hints(failed_step, exit_code):
         "Provision cloud infrastructure": "Review the Terraform output above, AWS credentials and permissions, and that terraform is installed.",
         "Initialize execution context": "Review the resolved targets and inventory reference.",
         "Generate inventory": "Verify --remote-io, --remote-user, and that --key-path is a readable private key.",
+        "Execute deployment pipeline": "Review the diagnostic report and remediation hints printed above.",
         "Run automated deployment": "Review the failed pipeline step and its remediation hints above.",
         "Generate deployment configuration": "Review configuration layers, secret defaults/overrides, and file paths.",
     }

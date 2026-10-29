@@ -2,6 +2,7 @@
 """Prepare and validate the target operating system and container runtime before deployment."""
 
 import json
+import re
 import os
 from pathlib import Path
 import subprocess
@@ -65,12 +66,11 @@ class HostPreparationService:
         if not wait.success:
             return wait
         facts = run_ad_hoc(self.inventory, ALL_HOSTS, "ansible.builtin.setup",
-                           {"filter": "ansible_distribution*"}, step, json_output=True, timeout=120)
+                           {"filter": "ansible_distribution*"}, step, timeout=120)
         if not facts.success:
             return facts
-        try:
-            hosts = json.loads(facts.stdout[facts.stdout.index("{"):])["plays"][0]["tasks"][0]["hosts"]
-        except (ValueError, KeyError, IndexError):
+        hosts = self._parse_ad_hoc_results(facts.stdout)
+        if not hosts:
             return CommandResult(step, False, 1, facts.stdout, "Could not parse the gathered system facts.")
 
         problems, summary = [], []
@@ -87,6 +87,20 @@ class HostPreparationService:
             return CommandResult(step, False, 1, "\n".join(summary),
                                  f"Unsupported operating system ({supported} required): " + "; ".join(problems))
         return CommandResult(step, True, 0, "\n".join(summary))
+
+    @staticmethod
+    def _parse_ad_hoc_results(output: str) -> dict:
+        """Parse the default ad-hoc output ("host | SUCCESS => {json}") into a host -> result mapping.
+
+        This avoids a JSON stdout callback, which newer ansible-core releases no longer ship.
+        """
+        decoder, hosts = json.JSONDecoder(), {}
+        for match in re.finditer(r"^(\S+) \| \w+ => ", output, re.MULTILINE):
+            try:
+                hosts[match.group(1)], _ = decoder.raw_decode(output, match.end())
+            except ValueError:
+                return {}
+        return hosts
 
     def install_system_dependencies(self) -> CommandResult:
         """Install docker.io, the Compose plugin, and transport libraries, and add the deployment user to the docker group.
