@@ -111,8 +111,6 @@ services:
       - grafana_provisioning:/home/grafana/conf/provisioning
       - /home/ubuntu/.aws/credentials:/usr/share/grafana/.aws/credentials
     user: "472" #grafana user id
-<<<<<<< HEAD
-=======
 
 
 secrets:
@@ -128,4 +126,3 @@ volumes:
   grafana_logs:
   grafana_data:
   grafana_provisioning:
->>>>>>> 874e9f186e9bca422552912efefe54488ae32228
