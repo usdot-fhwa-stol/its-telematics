@@ -67,7 +67,7 @@ const setResponseHeaders = (req, res) => {
 };
 
 const requestListener = function (req, res) {
-  setResponseHeaders(res);
+  setResponseHeaders(req, res);
 
   if (req.method === HTTP_METHODS.POST) {
     if (!verifyToken(req)) {

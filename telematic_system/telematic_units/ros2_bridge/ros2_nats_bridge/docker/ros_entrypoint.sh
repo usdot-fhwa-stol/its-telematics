@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) 2022 LEIDOS.
+# Copyright (C) 2022-2026 LEIDOS.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License. You may obtain a copy of
@@ -16,6 +16,6 @@
 #
 
 set -e
-source /opt/ros/foxy/setup.bash
+source /opt/ros/humble/setup.bash
 source /ws/install/setup.bash
 ros2 launch ros2_nats_bridge ros2_nats_bridge_launch.py

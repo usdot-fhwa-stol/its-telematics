@@ -23,7 +23,7 @@ import tempfile
 import asyncio
 
 from unittest import TestCase
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock, AsyncMock, Mock
 from nats.aio.client import Client as NATS
 from influxdb_client import InfluxDBClient
 from aiounittest import AsyncTestCase
@@ -35,7 +35,6 @@ from rosbag2_processing_service.rosbag_processor import Rosbag2Parser
 import rosbag2_processing_service.main
 
 from nats.aio.client import Client
-import mock
 import mysql
 
 pytest_plugins = ('pytest_asyncio')
@@ -108,7 +107,7 @@ class ServiceManagerTestClass(AsyncTestCase):
 
     @pytest.mark.asyncio
     async def test_nats_connect(self):
-        mock_nats_client = mock.Mock(spec=Client)
+        mock_nats_client = Mock(spec=Client)
 
         config = Config()
         service_manager = ServiceManager(config)
