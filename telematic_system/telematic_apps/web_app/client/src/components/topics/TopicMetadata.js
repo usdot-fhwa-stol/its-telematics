@@ -17,7 +17,7 @@ export const DUMMY_units =
 [
   {
     unit_identifier: 'DOT-12',
-    unit_type: "Platform",
+    unit_type: "ros2",
     unit_name: "Black Pacifica",
     unit_topics: [{
       category: 'sample 1',
@@ -36,7 +36,7 @@ export const DUMMY_units =
   },
   {
     unit_identifier: 'DOT-13',
-    unit_type: "Platform",
+    unit_type: "ros2",
     unit_name: "White Pacifica",
     unit_topics: [{
       category: 'sample 1',
