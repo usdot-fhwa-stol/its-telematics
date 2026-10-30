@@ -27,13 +27,12 @@ export const DEFAULT_NA = 'N/A';
 export const PAST_EVENT = "Past";
 export const LIVE_EVENT = "Live";
 export const ACTIVE_EVENT = "Active";
-export const UNKNOW_EVENT = "Unknown";
-export const UNKNOW_DATE = "Unknown";
+export const UNKNOWN_EVENT = "Unknown";
+export const UNKNOWN_DATE = "Unknown";
 
 export const VALID_UNIT_TYPES = {
-    CAV_VEHICLE: "Platform",
+    ROS2_VEHICLE: "ros2",
+    KAFKA_INFRASTRUCTURE: "kafka",
     V2XHUB_INFRASTRUCTURE: "V2xHub",
-    CLOUD_INFRASTRUCTURE: "Cloud",
-    STREETS_INFRASTRUCTURE: "Streets",
-    NON_CAV_VEHICLE: "Messenger"
+    CLOUD_INFRASTRUCTURE: "Cloud"
 }

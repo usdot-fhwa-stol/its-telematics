@@ -239,7 +239,7 @@ test('sends secret overrides on standard input only', async () => {
   assert.equal(JSON.stringify(result).includes('s3cret'), false);
 });
 
-// Options as scriptOptions.js builds them when setup.py lists its cloud options (PR #336).
+// Options as scriptOptions.js builds them when setup.py lists its cloud options.
 const builtIn = require('../electron/cliOptions');
 const cloudOptions = {
   ...builtIn,

@@ -155,9 +155,7 @@ function AwsCredentialsStatus({ status, onAdd, disabled }) {
   );
 }
 
-// What --target localhost does to this machine, from the host preparation in
-// this checkout: local.setup.sh, or the Ansible playbook that replaces it in
-// PR #336 (deployment/config/ansible/playbooks/host_preparation.yml).
+
 function LocalhostSteps({ hostPreparation, prunesVolumes }) {
   if (hostPreparation === 'local.setup.sh') {
     return (
@@ -216,7 +214,7 @@ export default function ConfigureForm({
   const isOnPrem = params.target === 'on-premise';
   const isLocal = isOnPrem && params.deployTo === 'local';
   const isRemote = isOnPrem && params.deployTo === 'remote';
-  // The cloud fields need setup.py's cloud options (PR #336).
+  // The cloud fields need setup.py's cloud options.
   const isCloud = params.target === 'cloud' && Boolean(options.CLOUD);
 
   useEffect(() => {

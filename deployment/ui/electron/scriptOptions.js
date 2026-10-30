@@ -28,7 +28,7 @@ function withLabels(choices, known, defaultValue) {
   });
 }
 
-// The cloud fields need setup.py's cloud options (PR #336); without them the
+// The cloud fields need setup.py's cloud options; without them the
 // form shows no cloud fields. Access keys are never offered: setup.py
 // takes them only on the command line, so the app uses the default profile.
 function cloudOptions(byName) {
@@ -82,7 +82,7 @@ function optionsFromListing(listing) {
     USE_CASES: withLabels(useCase.choices, builtIn.USE_CASES, useCase.default),
     SECRET_KEYS: secretKeys,
     CLOUD: cloud,
-    // Whether a run removes the stack's Docker volumes (setup.py's --volume-prune default, PR #336).
+    // Whether a run removes the stack's Docker volumes (setup.py's --volume-prune default).
     prunesVolumes: byName('--volume-prune')?.default === true,
     source: 'setup.py',
     notice: unmapped.length

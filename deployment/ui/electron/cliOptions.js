@@ -11,7 +11,7 @@ const TARGETS = [
 ];
 
 // Used instead of the cloud label above when setup.py lists the cloud options
-// (--aws-region and --key-path, from PR #336).
+// (--aws-region and --key-path).
 const CLOUD_TARGET_LABEL = 'cloud: AWS';
 
 // setup.py's --centralized and --distributed flags. The instance types are

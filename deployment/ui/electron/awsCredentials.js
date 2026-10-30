@@ -5,7 +5,7 @@
 // the app never passes them. Instead it checks the shared AWS files the way
 // setup.py does, and can add the default profile to the credentials file.
 //
-// setup.py from PR #336 reads only the default profile's access keys from the
+// setup.py reads only the default profile's access keys from the
 // credentials file. With --aws-profile (namedProfiles), it also accepts any
 // profile from the config file, including SSO and role profiles.
 

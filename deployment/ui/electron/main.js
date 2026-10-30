@@ -96,9 +96,8 @@ function validationResult(error) {
   throw error;
 }
 
-// How setup.py prepares this machine for --target localhost: PR #336 replaces
-// local.setup.sh with an Ansible playbook. The confirmation describes whichever
-// this checkout has.
+// How setup.py prepares this machine for --target localhost: local.setup.sh or
+// an Ansible playbook. The confirmation describes whichever this checkout has.
 function hostPreparation() {
   const exists = (...parts) => fs.existsSync(path.join(REPO_ROOT, 'deployment', ...parts));
   if (exists('scripts', 'local.setup.sh')) return 'local.setup.sh';
