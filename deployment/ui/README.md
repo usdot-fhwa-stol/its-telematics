@@ -29,7 +29,7 @@ npm test        # CLI_Bridge unit tests
 The app runs `setup.py` from the repository that contains it. To point it at
 another checkout, set `TELEMATICS_REPO_ROOT=/path/to/repo`.
 
-## How the form becomes a command
+## Configuring Deployment
 
 | Form | setup.py argument |
 | --- | --- |
@@ -45,45 +45,23 @@ For example, on-premise / This machine / dev / core runs:
 ```bash
 ./deployment/scripts/setup.py --environment dev --target localhost --use-case core
 ```
+The choices come from `setup.py` itself.
 
-The command is shown on the form before Launch. `electron/cliBridge.js` checks
-every value against the choices the form showed and starts the script without
-a shell, so a value cannot add another option or command. Free-text values use
-`--flag=value` for the same reason.
-
-The choices come from `setup.py` itself. At startup the app runs
-`setup.py --list-options`, which prints each option's choices, default and
-help as JSON and exits without checking or changing the host.
-`electron/cliOptions.js` only adds labels, such as "core: NATS, messaging
-server, databases, web app"; a new choice in `setup.py` shows up with its plain
-value. If the script cannot list its options (an older `setup.py`), the form
-uses the lists in `cliOptions.js` and says so. `npm test` runs the real
-listing and fails if it no longer matches those labels.
 
 ### Secret overrides
 
 The form has a password field for each key `setup.py` lists for
-`--secret-override`, shown only when the script also lists
-`--secret-overrides-stdin`. An empty field uses its `.example` file. Filled
-fields are sent to `setup.py` as a JSON object on standard input, so the values
-never appear on the command line (`ps`), in the child's environment, in the
-command shown on the form, or in the result. They stay in the app's memory
-until it quits or the form is cleared, and are never written to
-`targets.json`. `setup.py` itself writes them to
-`telematic_system/secrets/*.txt` (mode 644) and `.env`, as it does for
-command-line overrides.
+`--secret-override`. An empty field uses its `.example` file. 
 
 ### Cloud
 
 The AWS fields appear only when `setup.py --list-options` lists `--aws-region`
-and `--key-path` (the cloud pipeline from PR #336). Otherwise target cloud runs
-`--target cloud` alone and the form shows no cloud fields.
+and `--key-path`.
 
 - **Region** defaults to the script's `--aws-region` default.
 - **AWS profile** offers only `default` unless `setup.py` lists
   `--aws-profile`. Then it lists every profile in the credentials and config
   files, including SSO and role profiles, and sends `--aws-profile=<name>`.
-  `--aws-profile` is not in PR #336 yet; a patch for it is ready for the PR author.
 - **Topology** sends `--centralized` or `--distributed`; the labels name the
   instance types from `setup.py`, which `electron/cliOptions.js` repeats.
 - **SSH key for the instances** is required. Terraform registers it as the
@@ -95,16 +73,11 @@ warns that they are billed until destroyed.
 ## Connecting to a server
 
 The user enters the web UI's address (`10.0.0.5:8888` becomes
-`http://10.0.0.5:8888/`) or picks a saved server. The app requests that address
-with a 5-second timeout; any reply below HTTP 500 counts as reachable. Then the
+`http://10.0.0.5:8888/`) or picks a saved server. Then the
 server's pages load in a view below the app's strip.
 
-- The view is remote content: it is sandboxed, gets no preload and cannot reach
-  `window.deployApi`. It also denies permission requests such as camera or
-  notifications.
-- Top-level navigation stays on the server's origin. Links to other sites open
-  in the user's browser. Iframes, such as the embedded Grafana dashboards, are
-  not affected.
+The app uses the scheme in the address, assumes `http://` if there is none, and
+loads the final address if the server redirects. A bare address on a server that only accepts HTTPS and doesn't redirect will fail.
 
 ## Layout
 
