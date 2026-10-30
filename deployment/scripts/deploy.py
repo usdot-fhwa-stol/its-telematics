@@ -3,7 +3,9 @@
 
 import argparse
 import configparser
+import contextlib
 from dataclasses import asdict
+import io
 import json
 import os
 from pathlib import Path
@@ -112,6 +114,71 @@ class DeploymentArgumentParser(argparse.ArgumentParser):
         self.exit(2, "error: invalid command-line input; review --help and supported values.\n")
 
 
+class ListOptionsAction(argparse.Action):
+    """Prints the supported options as JSON for tools such as the deployment UI, then exits."""
+
+    def __init__(self, option_strings, dest, **kwargs):
+        """Take no value, like --help, and leave no attribute on the parsed arguments."""
+        super().__init__(option_strings, dest, nargs=0, default=argparse.SUPPRESS, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Print the listing and exit, reporting the defaults a run would use."""
+        defaults = argparse.Namespace(**{
+            action.dest: action.default for action in parser._actions
+            if action.default is not argparse.SUPPRESS
+        })
+        # Omitted environment and target values are resolved during validation; reuse it so the
+        # listing reports the defaults a run would use. Its default notices are not printed.
+        with contextlib.redirect_stdout(io.StringIO()):
+            validate_input_parameters(defaults)
+        options = []
+        for action in parser._actions:
+            if action.default is argparse.SUPPRESS:
+                continue  # --help and --list-options
+            option = {
+                "name": action.option_strings[0],
+                "choices": list(action.choices) if action.choices else None,
+                "default": getattr(defaults, action.dest),
+                "repeatable": isinstance(action, argparse._AppendAction),
+                "metavar": action.metavar,
+                "help": action.help,
+            }
+            if action.dest == "secret_override":
+                option["keys"] = list(SECRET_KEYS)
+            options.append(option)
+        json.dump({"schema_version": 1, "description": parser.description, "options": options},
+                  sys.stdout, indent=2)
+        print(flush=True)
+        parser.exit(0)
+
+
+def read_secret_overrides_from_stdin():
+    """Read {"key": "value"} secret overrides from standard input, keeping values off the command line.
+
+    Returns:
+        Dict of secret key to value.
+
+    Raises:
+        DeploymentError: If standard input is missing, is not a JSON object of strings, or uses an
+            unsupported key.
+    """
+    if sys.stdin is None:
+        raise DeploymentError("--secret-overrides-stdin requires standard input.")
+    if sys.stdin.isatty():
+        print("Reading secret overrides from standard input as JSON; end with Ctrl-D.",
+              file=sys.stderr, flush=True)
+    try:
+        overrides = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        # The JSON error message can quote the input, which holds secrets.
+        raise DeploymentError("--secret-overrides-stdin requires a JSON object on standard input.") from None
+    if not isinstance(overrides, dict) or not all(isinstance(value, str) for value in overrides.values()):
+        raise DeploymentError("--secret-overrides-stdin requires a JSON object with string values.")
+    if any(key not in SECRET_KEYS for key in overrides):
+        raise DeploymentError("Unsupported secret key; supported keys: " + ", ".join(SECRET_KEYS))
+    return overrides
+
+
 def parse_input_parameters() -> InputParameters:
     """Parse bounded CLI options and collect supported secret overrides without logging values.
 
@@ -155,10 +222,17 @@ def parse_input_parameters() -> InputParameters:
         help="Repeatable; last value wins. Supported keys: " + ", ".join(SECRET_KEYS),
     )
     parser.add_argument(
+        "--secret-overrides-stdin", action="store_true",
+        help="Also read secret overrides from standard input as a JSON object of key: value, so values "
+             "never appear on the command line; a --secret-override for the same key wins",
+    )
+    parser.add_argument(
         "--volume-prune", action=argparse.BooleanOptionalAction, default=True,
         help="Remove the stack's Docker volumes before each deployment (default: enabled; "
              "use --no-volume-prune to keep existing data)",
     )
+    parser.add_argument("--list-options", action=ListOptionsAction,
+                        help="Print the supported options, choices, defaults and help as JSON, then exit")
     arguments = parser.parse_args()
     overrides = {}
     for override in arguments.secret_override:
@@ -168,6 +242,8 @@ def parse_input_parameters() -> InputParameters:
         if key not in SECRET_KEYS:
             raise DeploymentError("Unsupported secret key; supported keys: " + ", ".join(SECRET_KEYS))
         overrides[key] = value
+    if arguments.secret_overrides_stdin:
+        overrides = {**read_secret_overrides_from_stdin(), **overrides}
     parameters = InputParameters(
         aws_region=arguments.aws_region,
         target=arguments.target,
