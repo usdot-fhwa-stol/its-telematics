@@ -14,7 +14,7 @@ services:
     network_mode: host
     environment:
       # Server and logging
-      - rsu_server_port=${rsu_server_port}
+      - rsu_server_port=${rsu_server_port:-8083}
       - logging_level_com_telematic_telematic_rsu_management_service=${logging_level_com_telematic_telematic_rsu_management_service}
       # MySQL - the service owns the "rsm" database, so the URL is its own variable;
       # credentials come from the shared MySQL block.

@@ -78,13 +78,14 @@ services:
         max-size: "10m"
         max-file: "1"
     network_mode: host
+    user: root
     environment:
-      # Reverse-proxy targets - deployment specific, no counterpart in telematic.env.
-      - CLIENT_LOCAL_URL=http://127.0.0.1:8082/
-      - GRAFANA_LOCAL_URL=http://127.0.0.1:3000/
-      - TOPICSERVICE_LOCAL_URL=http://127.0.0.1:8080/
-      - UISERVICE_LOCAL_URL=http://127.0.0.1:9010/
-      - UISERVICE_LOCAL_UPLOAD_URL=http://127.0.0.1:9011/
+      # Reverse-proxy targets; default to this host, overridden in .env for distributed deployments.
+      - CLIENT_LOCAL_URL=${CLIENT_LOCAL_URL:-http://127.0.0.1:8082/}
+      - GRAFANA_LOCAL_URL=${GRAFANA_LOCAL_URL:-http://127.0.0.1:3000/}
+      - TOPICSERVICE_LOCAL_URL=${TOPICSERVICE_LOCAL_URL:-http://127.0.0.1:8080/}
+      - UISERVICE_LOCAL_URL=${UISERVICE_LOCAL_URL:-http://127.0.0.1:9010/}
+      - UISERVICE_LOCAL_UPLOAD_URL=${UISERVICE_LOCAL_UPLOAD_URL:-http://127.0.0.1:9011/}
     depends_on:
       - grafana
       - web_client
@@ -104,6 +105,14 @@ services:
         max-size: "10m"
         max-file: "1"
     network_mode: host
+    environment:
+      - GF_DATABASE_TYPE=mysql
+      - GF_DATABASE_HOST=${MYSQL_HOST}:${MYSQL_PORT}
+      - GF_DATABASE_NAME=${MYSQL_DATABASE}
+      - GF_DATABASE_USER=${MYSQL_USER}
+      - GF_DATABASE_PASSWORD=${MYSQL_PASSWORD}
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
     volumes:
       - grafana_logs:/var/log/grafana
       - ./telematic_apps/grafana/grafana.ini:/etc/grafana/grafana.ini
@@ -111,6 +120,15 @@ services:
       - grafana_provisioning:/home/grafana/conf/provisioning
       - /home/ubuntu/.aws/credentials:/usr/share/grafana/.aws/credentials
     user: "472" #grafana user id
+    depends_on:
+      mysqldb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
 
 
 secrets:
