@@ -40,6 +40,7 @@ function headline(result) {
   return `setup.py exited with code ${result.exitCode}`;
 }
 
+// TODO: Remove once the integration is complete in TELE-783.
 function nextStep(result) {
   if (result.target !== 'localhost') {
     return 'setup.py generates configuration only for this target. Deploying to remote and cloud hosts is not built yet.';
