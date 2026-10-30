@@ -20,6 +20,13 @@ services:
     volumes:
       - mysql-datavolume:/var/lib/mysql
       - ./scripts/database/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+    healthcheck:
+      # TCP ping only succeeds on the real server, not the socket-only temporary init server
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
       
   influxdb:
     image:  influxdb:latest
