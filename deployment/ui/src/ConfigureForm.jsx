@@ -274,7 +274,7 @@ export default function ConfigureForm({
         <OptionSelect
           id="use-case" label="Use case" value={params.useCase} options={options.USE_CASES}
           onChange={set('useCase')} disabled={running}
-          helperText="Decides which services come up."
+          helperText="Decides which services come up (full or partial)."
         />
       </Section>
 
