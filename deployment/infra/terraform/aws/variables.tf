@@ -13,12 +13,18 @@ variable "public_key_path" {
   type        = string
 }
 
+variable "vpc_cidr" {
+  description = "CIDR block of the telematics VPC; the public subnet is carved from it."
+  type        = string
+  default     = "10.20.0.0/16"
+}
+
 variable "name_prefix" {
   type    = string
   default = "telematics"
 }
 
-# Empty ami_id / subnet_id trigger auto-discovery (Ubuntu 22.04 LTS / default VPC subnet).
+# Empty ami_id / subnet_id trigger auto-discovery (Ubuntu 22.04 LTS / telematics VPC public subnet).
 variable "nodes" {
   description = "Node role => hardware profile."
   type = map(object({
