@@ -263,18 +263,18 @@ export default function ConfigureForm({
           <OptionSelect
             id="target" label="Target" value={params.target} options={options.TARGETS}
             onChange={pickTarget} disabled={running}
-            helperText="From deployment/targets/. Remote targets ask for connection details below."
+            helperText="Remote targets ask for connection details below."
           />
           <OptionSelect
             id="environment" label="Environment" value={params.environment} options={options.ENVIRONMENTS}
             onChange={set('environment')} disabled={running}
-            helperText="From deployment/environment/. Picks the image organization and tag."
+            helperText="Picks the image organization and tag."
           />
         </Box>
         <OptionSelect
           id="use-case" label="Use case" value={params.useCase} options={options.USE_CASES}
           onChange={set('useCase')} disabled={running}
-          helperText="From deployment/use_cases/. Decides which services come up."
+          helperText="Decides which services come up."
         />
       </Section>
 
@@ -366,8 +366,7 @@ export default function ConfigureForm({
       {options.SECRET_KEYS.length > 0 ? (
         <Section title="Secret overrides" note="Optional">
           <Typography variant="body2" color="text.secondary">
-            Every run overwrites telematic_system/.env and the secret files in telematic_system/secrets/. An
-            empty field uses its .example file.
+            Overwrites secret files. An empty field uses defaults.
           </Typography>
           <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
             {options.SECRET_KEYS.map((key) => (
