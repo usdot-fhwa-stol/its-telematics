@@ -18,7 +18,7 @@ const HEADINGS = {
   start: ['Telematics Deploy', 'Deploy a new Telematics instance, or connect to one that is already running.'],
   configure: ['Configure deployment', 'Pick the target, environment and use case, then launch setup.py.'],
   result: ['Result', 'Output of the last run of setup.py.'],
-  servers: ['Connect to a server', 'Enter a server address or pick a saved server. The app checks that it responds first.'],
+  servers: ['Connect to a server', 'Enter a server address or pick a saved server.'],
 };
 
 export default function App() {

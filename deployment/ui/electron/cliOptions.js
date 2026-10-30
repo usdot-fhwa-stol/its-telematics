@@ -25,7 +25,7 @@ const TOPOLOGIES = [
 // `localhost` and `remote` targets.
 const DEPLOY_TO = [
   { value: 'local', label: 'This machine', scriptTarget: 'localhost' },
-  { value: 'remote', label: 'Remote host (SSH)', scriptTarget: 'remote' },
+  { value: 'remote', label: 'Remote machine', scriptTarget: 'remote' },
 ];
 
 const ENVIRONMENTS = [
@@ -35,9 +35,9 @@ const ENVIRONMENTS = [
 ];
 
 const USE_CASES = [
-  { value: 'all', label: 'all: core and rsu_integration' },
-  { value: 'core', label: 'core: NATS, messaging server, databases, web app' },
-  { value: 'rsu_integration', label: 'rsu_integration: RSU Management Service and InfluxDB v3' },
+  { value: 'all', label: 'all services: core and rsu_integration' },
+  { value: 'core', label: 'core services only: NATS, messaging server, databases, web app' },
+  { value: 'rsu_integration', label: 'rsu_integration services only: RSU Management Service and InfluxDB v3' },
 ];
 
 module.exports = { TARGETS, CLOUD_TARGET_LABEL, TOPOLOGIES, DEPLOY_TO, ENVIRONMENTS, USE_CASES };

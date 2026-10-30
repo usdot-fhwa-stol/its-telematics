@@ -362,25 +362,12 @@ export default function ConfigureForm({
         </>
       )}
 
-      {params.target === 'cloud' && !isCloud && (
-        <>
-          <Divider />
-          <Section title="AWS">
-            <Alert severity="info">
-              The cloud pipeline is not built yet. setup.py accepts --target cloud and generates the cloud
-              configuration only. AWS profile, region and key pair fields will be added with the pipeline.
-            </Alert>
-          </Section>
-        </>
-      )}
-
       <Divider />
       {options.SECRET_KEYS.length > 0 ? (
         <Section title="Secret overrides" note="Optional">
           <Typography variant="body2" color="text.secondary">
             Every run overwrites telematic_system/.env and the secret files in telematic_system/secrets/. An
-            empty field uses its .example file. Values you enter go to setup.py on standard input, never on the
-            command line, and the app does not save them.
+            empty field uses its .example file.
           </Typography>
           <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
             {options.SECRET_KEYS.map((key) => (
@@ -422,12 +409,10 @@ export default function ConfigureForm({
         >
           {ready ? preview.command : 'Fill in the required fields to see the command.'}
         </Box>
-        {overrideCount > 0 && (
-          <Typography variant="body2" color="text.secondary">
-            {overrideCount === 1 ? '1 secret override goes' : `${overrideCount} secret overrides go`} to setup.py on
-            standard input.
-          </Typography>
-        )}
+        <Typography variant="body2" color="text.secondary">
+          Runs on this computer, from the repository the app is in.
+          {overrideCount > 0 && ` ${overrideCount === 1 ? '1 secret override goes' : `${overrideCount} secret overrides go`} to setup.py on standard input.`}
+        </Typography>
       </Section>
 
       {running && (

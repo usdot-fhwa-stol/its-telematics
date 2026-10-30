@@ -77,7 +77,7 @@ command-line overrides.
 
 The AWS fields appear only when `setup.py --list-options` lists `--aws-region`
 and `--key-path` (the cloud pipeline from PR #336). Otherwise target cloud runs
-`--target cloud` alone and the form says the pipeline is not built yet.
+`--target cloud` alone and the form shows no cloud fields.
 
 - **Region** defaults to the script's `--aws-region` default.
 - **AWS profile** offers only `default` unless `setup.py` lists
@@ -121,4 +121,5 @@ server's pages load in a view below the app's strip.
 | `electron/telematicsView.js` | The sandboxed view that shows a server's pages, and its navigation rules |
 | `electron/signInQueue.js` | Queues HTTP authentication challenges from the view for the sign-in dialog |
 | `electron/askpass.sh` | Password dialog for `sudo` |
+| `electron/icon.png` | Application icon (214 x 214 px) |
 | `src/` | React screens: start screen, configure form, AWS credentials dialog, result page, server screen, the strip above a server's pages, and the sign-in dialog |

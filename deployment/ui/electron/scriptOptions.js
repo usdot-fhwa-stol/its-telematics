@@ -29,7 +29,7 @@ function withLabels(choices, known, defaultValue) {
 }
 
 // The cloud fields need setup.py's cloud options (PR #336); without them the
-// form keeps its "not built yet" note. Access keys are never offered: setup.py
+// form shows no cloud fields. Access keys are never offered: setup.py
 // takes them only on the command line, so the app uses the default profile.
 function cloudOptions(byName) {
   const region = byName('--aws-region');

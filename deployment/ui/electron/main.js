@@ -54,6 +54,7 @@ function createWindow() {
     minHeight: 560,
     backgroundColor: '#0f1218',
     title: 'Telematics Deploy',
+    icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
