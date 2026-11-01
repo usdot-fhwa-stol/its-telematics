@@ -1,0 +1,4 @@
+[submodule "telematics-v2x-radio-unit"]
+	path = telematics-v2x-radio-unit
+	url = https://github.com/usdot-fhwa-stol/telematics-v2x-radio-unit.git
+	branch = develop
