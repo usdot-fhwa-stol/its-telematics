@@ -1,6 +1,6 @@
 'use strict';
 
-// CLI_Bridge: turns the form's params into a setup.py command and runs it.
+// CLI_Bridge: turns the form's params into a deploy.py command and runs it.
 // The renderer is never trusted: every value is checked here before a
 // process starts, and the script is spawned without a shell.
 
@@ -10,7 +10,7 @@ const path = require('node:path');
 const builtInOptions = require('./cliOptions');
 const { AWS_PROFILE, profileStatus } = require('./awsCredentials');
 
-const SETUP_SCRIPT = path.join('deployment', 'scripts', 'setup.py');
+const DEPLOY_SCRIPT = path.join('deployment', 'scripts', 'deploy.py');
 const MAX_OUTPUT_CHARS = 1_000_000;
 const MAX_TEXT_LENGTH = 255;
 const MAX_SECRET_LENGTH = 4096;
@@ -55,15 +55,15 @@ function checkKeyPath(value, errors) {
   return undefined;
 }
 
-// The cloud fields exist only when setup.py lists its cloud options
-// (options.CLOUD). AWS access keys are never among them: setup.py reads the
+// The cloud fields exist only when deploy.py lists its cloud options
+// (options.CLOUD). AWS access keys are never among them: deploy.py reads the
 // default profile from the shared credentials file instead.
 function checkCloud(input, cloud, env, valid, errors) {
   const profile = input.awsProfile || AWS_PROFILE;
   if (cloud.namedProfiles) {
     const status = typeof profile === 'string' ? profileStatus(env, { profile, namedProfiles: true }) : null;
     if (status && status.ready) valid.awsProfile = profile;
-    else if (status && status.incomplete) errors.push(`The ${profile} AWS profile has no credentials setup.py can use.`);
+    else if (status && status.incomplete) errors.push(`The ${profile} AWS profile has no credentials deploy.py can use.`);
     else if (profile === AWS_PROFILE) errors.push('Add AWS credentials for the default profile.');
     else errors.push('Choose an AWS profile.');
   } else if (!cloud.PROFILES.some((option) => option.value === profile)) {
@@ -87,9 +87,9 @@ function checkCloud(input, cloud, env, valid, errors) {
   }
 }
 
-// Returns the values setup.py needs, or throws ValidationError listing every problem.
+// Returns the values deploy.py needs, or throws ValidationError listing every problem.
 // `options` are the lists the form showed (see scriptOptions.js); `env` is
-// where the AWS credentials file is looked up, as setup.py does.
+// where the AWS credentials file is looked up, as deploy.py does.
 function validateParams(params, options = builtInOptions, { env = process.env } = {}) {
   const { TARGETS, DEPLOY_TO, ENVIRONMENTS, USE_CASES } = options;
   const input = params && typeof params === 'object' ? params : {};
@@ -122,6 +122,8 @@ function validateParams(params, options = builtInOptions, { env = process.env } 
 
   const secretOverrides = checkSecretOverrides(input.secretOverrides, options.SECRET_KEYS || [], errors);
   if (Object.keys(secretOverrides).length) valid.secretOverrides = secretOverrides;
+  // Only when the script lists --volume-prune, whose --no- form keeps the data.
+  if (input.keepData === true && options.prunesVolumes) valid.keepData = true;
 
   if (errors.length) throw new ValidationError(errors);
   return {
@@ -139,7 +141,7 @@ function checkSecretOverrides(overrides, secretKeys, errors) {
   for (const [key, value] of Object.entries(overrides)) {
     if (typeof value !== 'string' || value === '') continue;
     if (!secretKeys.includes(key)) {
-      errors.push(`setup.py does not accept a secret override for ${key}.`);
+      errors.push(`deploy.py does not accept a secret override for ${key}.`);
     } else if (value.length > MAX_SECRET_LENGTH) {
       errors.push(`The ${key} override must be ${MAX_SECRET_LENGTH} characters or fewer.`);
     } else if (/[\u0000-\u001f\u007f]/.test(value)) {
@@ -164,14 +166,15 @@ function buildArgs(valid) {
     args.push(`--remote-io=${valid.remoteIo}`, `--remote-user=${valid.remoteUser}`);
     if (valid.keyPath) args.push(`--key-path=${valid.keyPath}`);
   }
-  // Only with setup.py's cloud options. Never --aws-access-key-id or
-  // --aws-secret-access-key: setup.py reads the default profile instead.
+  // Only with deploy.py's cloud options. Never --aws-access-key-id or
+  // --aws-secret-access-key: deploy.py reads the default profile instead.
   if (valid.target === 'cloud' && valid.awsRegion) {
     if (valid.awsProfile) args.push(`--aws-profile=${valid.awsProfile}`);
     args.push(`--aws-region=${valid.awsRegion}`, `--${valid.topology}`, `--key-path=${valid.keyPath}`);
   }
-  // The values themselves go to the script's standard input (runSetup).
+  // The values themselves go to the script's standard input (runDeploy).
   if (valid.secretOverrides) args.push('--secret-overrides-stdin');
+  if (valid.keepData) args.push('--no-volume-prune');
   return args;
 }
 
@@ -181,10 +184,24 @@ function shellQuote(arg) {
 
 // Display only: the command as a user would type it from the repository root.
 function formatCommand(args) {
-  return ['./' + SETUP_SCRIPT.split(path.sep).join('/'), ...args].map(shellQuote).join(' ');
+  return ['./' + DEPLOY_SCRIPT.split(path.sep).join('/'), ...args].map(shellQuote).join(' ');
 }
 
-// Picks the known markers out of setup.py and configuration_service.py output.
+// The pipeline prints "[3] Verify registry connectivity ..... OK". A step
+// still running has no status yet; it is either the unfinished last line
+// (`partial`) or a line cut short by the step's "    - " progress bullets.
+const STEP_LINE = /^\[(\d+)\] (.+?)[ .]*(OK|FAILED)?$/;
+
+function parseSteps(lines, partial = '') {
+  const steps = new Map();
+  for (const text of [...lines.map((line) => line.text), partial]) {
+    const match = text.match(STEP_LINE);
+    if (match) steps.set(Number(match[1]), { name: match[2], status: match[3] || 'running' });
+  }
+  return [...steps.values()];
+}
+
+// Picks the known markers out of deploy.py and configuration_service.py output.
 function parseOutput(lines) {
   const summary = {
     checks: [],
@@ -196,10 +213,35 @@ function parseOutput(lines) {
     errors: [],
     deploymentContext: null,
     manifestReference: null,
+    // deploy.py's ExecutionSummary: overall_status, ui_url, active_services, diagnostics.
+    execution: null,
+    uiUrl: null,
+    steps: parseSteps(lines),
   };
-  for (const { text } of lines) {
+  // deploy.py prints its ExecutionSummary as indented JSON, from "{" to "}".
+  const blocks = { stdout: null, stderr: null };
+  for (const { stream, text } of lines) {
+    if (blocks[stream] !== null) {
+      blocks[stream].push(text);
+      if (text === '}') {
+        try {
+          const value = JSON.parse(blocks[stream].join('\n'));
+          if (value && 'overall_status' in value) summary.execution = value;
+        } catch {
+          // Not JSON; leave it in the log only.
+        }
+        blocks[stream] = null;
+      }
+      continue;
+    }
+    if (text === '{') {
+      blocks[stream] = [text];
+      continue;
+    }
     let match;
-    if ((match = text.match(/^(.+?): (PASS|FAIL)$/))) {
+    if ((match = text.match(/^Open the UI: (https?:\/\/\S+)$/))) {
+      summary.uiUrl = match[1];
+    } else if ((match = text.match(/^(.+?): (PASS|FAIL)$/))) {
       summary.checks.push({ name: match[1], status: match[2] });
     } else if ((match = text.match(/^Configured (\S+) from (.+)\.$/))) {
       summary.configuredSecrets.push({ key: match[1], source: match[2] });
@@ -226,13 +268,13 @@ function parseOutput(lines) {
   return summary;
 }
 
-// Starts setup.py. Returns the child process, a promise for the result, and
-// stop() to end the run.
-function runSetup(valid, { repoRoot, python = 'python3', askpassPath, env = process.env }) {
+// Starts deploy.py. Returns the child process, a promise for the result, and
+// stop() to end the run. `extraEnv` adds variables such as the password
+// helper's (sudoPassword.js). `onOutput` gets each chunk's new lines and the
+// steps so far, while the run is going.
+function runDeploy(valid, { repoRoot, python = 'python3', extraEnv = {}, env = process.env, onOutput }) {
   const args = buildArgs(valid);
-  const childEnv = { ...env, PYTHONUNBUFFERED: '1' };
-  // sudo has no terminal here, so it asks through this graphical helper.
-  if (askpassPath) childEnv.SUDO_ASKPASS = askpassPath;
+  const childEnv = { ...env, ...extraEnv, PYTHONUNBUFFERED: '1' };
 
   const startedAt = new Date().toISOString();
   const lines = [];
@@ -253,9 +295,9 @@ function runSetup(valid, { repoRoot, python = 'python3', askpassPath, env = proc
 
   // `detached` starts the script in its own session with no controlling
   // terminal. Without it, an app launched from a terminal passes that terminal
-  // on, and sudo prompts there instead of opening the askpass dialog. It also
+  // on, and sudo prompts there instead of running SUDO_ASKPASS. It also
   // makes the script the leader of a process group that stop() can end.
-  const child = spawn(python, [path.join(repoRoot, SETUP_SCRIPT), ...args], {
+  const child = spawn(python, [path.join(repoRoot, DEPLOY_SCRIPT), ...args], {
     cwd: repoRoot,
     env: childEnv,
     stdio: [valid.secretOverrides ? 'pipe' : 'ignore', 'pipe', 'pipe'],
@@ -268,7 +310,7 @@ function runSetup(valid, { repoRoot, python = 'python3', askpassPath, env = proc
     child.stdin.end(JSON.stringify(valid.secretOverrides));
   }
 
-  // Ends setup.py and everything it started (sudo, local.setup.sh).
+  // Ends deploy.py and everything it started (Ansible, Docker Compose).
   const stop = () => {
     if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
     try {
@@ -283,7 +325,9 @@ function runSetup(valid, { repoRoot, python = 'python3', askpassPath, env = proc
     child[stream].on('data', (chunk) => {
       const parts = (pending[stream] + chunk).split(/\r?\n/);
       pending[stream] = parts.pop();
+      const before = lines.length;
       parts.forEach((text) => addLine(stream, text));
+      if (onOutput) onOutput({ lines: lines.slice(before), steps: parseSteps(lines, pending.stdout) });
     });
   }
 
@@ -319,11 +363,12 @@ function runSetup(valid, { repoRoot, python = 'python3', askpassPath, env = proc
 }
 
 module.exports = {
-  SETUP_SCRIPT,
+  DEPLOY_SCRIPT,
   ValidationError,
   validateParams,
   buildArgs,
   formatCommand,
+  parseSteps,
   parseOutput,
-  runSetup,
+  runDeploy,
 };

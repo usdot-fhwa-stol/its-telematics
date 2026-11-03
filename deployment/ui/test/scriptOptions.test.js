@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 const builtIn = require('../electron/cliOptions');
-const { SETUP_SCRIPT, ValidationError, validateParams } = require('../electron/cliBridge');
+const { DEPLOY_SCRIPT, ValidationError, validateParams } = require('../electron/cliBridge');
 const { optionsFromListing, loadScriptOptions } = require('../electron/scriptOptions');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
@@ -27,14 +27,14 @@ function listing({ environments = ['dev', 'test', 'prod'], targets = ['localhost
 
 function fakeRepo(script) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-ui-options-'));
-  fs.mkdirSync(path.join(root, path.dirname(SETUP_SCRIPT)), { recursive: true });
-  fs.writeFileSync(path.join(root, SETUP_SCRIPT), script);
+  fs.mkdirSync(path.join(root, path.dirname(DEPLOY_SCRIPT)), { recursive: true });
+  fs.writeFileSync(path.join(root, DEPLOY_SCRIPT), script);
   return root;
 }
 
-test('the real setup.py lists the choices the app has labels for', async () => {
+test('the real deploy.py lists the choices the app has labels for', async () => {
   const options = await loadScriptOptions({ repoRoot: REPO_ROOT });
-  assert.equal(options.source, 'setup.py', options.notice);
+  assert.equal(options.source, 'deploy.py', options.notice);
   assert.equal(options.notice, null);
   assert.deepEqual(values(options.ENVIRONMENTS), values(builtIn.ENVIRONMENTS));
   assert.deepEqual(values(options.USE_CASES), values(builtIn.USE_CASES));
@@ -43,14 +43,14 @@ test('the real setup.py lists the choices the app has labels for', async () => {
   assert.equal(options.ENVIRONMENTS.find((option) => option.value === 'prod').label, 'prod (default)');
 });
 
-test('follows choices added to or removed from setup.py', () => {
+test('follows choices added to or removed from deploy.py', () => {
   const options = optionsFromListing(listing({ environments: ['dev', 'staging'], useCases: ['core'] }));
   assert.deepEqual(options.ENVIRONMENTS, [{ value: 'dev', label: 'dev' }, { value: 'staging', label: 'staging' }]);
   assert.deepEqual(values(options.USE_CASES), ['core']);
-  assert.match(options.USE_CASES[0].label, /^core: /);
+  assert.match(options.USE_CASES[0].label, /^core services only: /);
 });
 
-test('offers only the targets setup.py accepts', () => {
+test('offers only the targets deploy.py accepts', () => {
   const localOnly = optionsFromListing(listing({ targets: ['localhost'] }));
   assert.deepEqual(values(localOnly.TARGETS), ['on-premise']);
   assert.deepEqual(values(localOnly.DEPLOY_TO), ['local']);
@@ -71,7 +71,7 @@ test('rejects a listing in another format', () => {
   assert.throws(() => optionsFromListing({ schema_version: 1, options: [] }), /no choices for --environment/);
 });
 
-test('falls back to the built-in lists for an older setup.py', async () => {
+test('falls back to the built-in lists for an older deploy.py', async () => {
   const older = fakeRepo('import sys\nsys.exit(2)\n');
   const options = await loadScriptOptions({ repoRoot: older });
   assert.equal(options.source, 'built-in');
@@ -82,7 +82,7 @@ test('falls back to the built-in lists for an older setup.py', async () => {
   assert.match((await loadScriptOptions({ repoRoot: noisy })).notice, /not JSON/);
 });
 
-test('offers secret overrides only when setup.py reads them from standard input', async () => {
+test('offers secret overrides only when deploy.py reads them from standard input', async () => {
   const real = await loadScriptOptions({ repoRoot: REPO_ROOT });
   assert.deepEqual(real.SECRET_KEYS, ['mysql_password', 'mysql_root_password', 'grafana_secret_key', 'influx_admin_token']);
 
@@ -97,7 +97,7 @@ test('offers secret overrides only when setup.py reads them from standard input'
   assert.deepEqual((await loadScriptOptions({ repoRoot: older })).SECRET_KEYS, []);
 });
 
-test('offers the cloud fields only when setup.py lists its cloud options', async () => {
+test('offers the cloud fields only when deploy.py lists its cloud options', async () => {
   const withCloud = listing();
   withCloud.options.push(
     { name: '--key-path', choices: null, default: '' },
@@ -121,6 +121,19 @@ test('offers the cloud fields only when setup.py lists its cloud options', async
   assert.equal(options.prunesVolumes, false);
 
   assert.equal(optionsFromListing(listing()).CLOUD, null);
-  // This branch's setup.py has no cloud options yet.
-  assert.equal((await loadScriptOptions({ repoRoot: REPO_ROOT })).CLOUD, null);
+});
+
+test('the real deploy.py lists its cloud options and --volume-prune', async () => {
+  const real = await loadScriptOptions({ repoRoot: REPO_ROOT });
+  assert.equal(real.source, 'deploy.py', real.notice);
+  assert.equal(real.CLOUD.defaultRegion, 'us-east-1');
+  assert.deepEqual(values(real.CLOUD.TOPOLOGIES), ['centralized', 'distributed']);
+  assert.equal(real.prunesVolumes, true);
+});
+
+test('says why the script could not list its options', async () => {
+  const crashing = fakeRepo('import sys\nprint("Traceback (most recent call last):", file=sys.stderr)\n'
+    + 'print("AttributeError: module \'argparse\' has no attribute \'BooleanOptionalAction\'", file=sys.stderr)\nsys.exit(1)\n');
+  assert.match((await loadScriptOptions({ repoRoot: crashing })).notice,
+    /exited with code 1: AttributeError: module 'argparse' has no attribute 'BooleanOptionalAction'/);
 });

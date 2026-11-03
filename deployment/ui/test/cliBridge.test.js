@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 const {
-  ValidationError, validateParams, buildArgs, formatCommand, parseOutput, runSetup,
+  ValidationError, validateParams, buildArgs, formatCommand, parseSteps, parseOutput, runDeploy,
 } = require('../electron/cliBridge');
 
 const localCore = { target: 'on-premise', deployTo: 'local', environment: 'dev', useCase: 'core' };
@@ -30,7 +30,7 @@ test('builds the README examples for this machine', () => {
 
 test('formats the command as typed from the repository root', () => {
   assert.equal(formatCommand(buildArgs(validateParams(localCore))),
-    './deployment/scripts/setup.py --environment dev --target localhost --use-case core');
+    './deployment/scripts/deploy.py --environment dev --target localhost --use-case core');
 });
 
 test('maps cloud and ignores remote fields for it', () => {
@@ -52,7 +52,7 @@ test('reports every missing field at once', () => {
     ['Host address is required.', 'SSH user is required.']);
 });
 
-test('rejects values outside the setup.py choices', () => {
+test('rejects values outside the deploy.py choices', () => {
   assert.deepEqual(errorsFor({ ...localCore, environment: 'staging' }), ['Choose an environment.']);
   assert.deepEqual(errorsFor({ ...localCore, target: 'localhost' }), ['Choose a target.']);
   assert.deepEqual(errorsFor({ ...localCore, deployTo: 'elsewhere' }), ['Choose where to deploy.']);
@@ -79,7 +79,7 @@ test('checks the SSH key file', () => {
   assert.equal(buildArgs(validateParams({ ...remote, keyPath: key })).at(-1), `--key-path=${key}`);
 });
 
-test('parses the markers setup.py prints', () => {
+test('parses the markers deploy.py prints', () => {
   const lines = [
     'Host prerequisites validation: PASS',
     'Configured mysql_password from example default.',
@@ -103,12 +103,63 @@ test('parses the markers setup.py prints', () => {
   assert.equal(summary.hint, 'Verify Docker daemon access.');
 });
 
-// A stand-in setup.py that echoes what it received.
+// Output of deploy.py's pipeline, as TaskAutomationService prints it.
+const pipelineLines = (stream, summaryJson, extra = []) => [
+  ...['[1] Verify operating system .. OK', '[2] Install system dependencies ... OK', '[3] Deploy services ',
+    '    - Bringing down any running services', '[3] Deploy services ..  OK', ...extra]
+    .map((text) => ({ stream: 'stdout', text })),
+  ...JSON.stringify(summaryJson, null, 2).split('\n').map((text) => ({ stream, text })),
+];
+
+test('parses the pipeline steps and the summary of a successful run', () => {
+  const lines = pipelineLines('stdout',
+    { overall_status: 'SUCCESS', elapsed_time_seconds: 81.2, active_services: ['nats', 'web_client'], ui_url: 'http://localhost/', diagnostics: null },
+    []);
+  lines.push({ stream: 'stdout', text: '' }, { stream: 'stdout', text: 'Open the UI: http://localhost/' });
+  const summary = parseOutput(lines);
+  assert.deepEqual(summary.steps, [
+    { name: 'Verify operating system', status: 'OK' },
+    { name: 'Install system dependencies', status: 'OK' },
+    { name: 'Deploy services', status: 'OK' },
+  ]);
+  assert.equal(summary.execution.overall_status, 'SUCCESS');
+  assert.deepEqual(summary.execution.active_services, ['nats', 'web_client']);
+  assert.equal(summary.uiUrl, 'http://localhost/');
+});
+
+test('parses the diagnostics of a failed run', () => {
+  const lines = pipelineLines('stderr', {
+    overall_status: 'FAILED', elapsed_time_seconds: 3, active_services: [], ui_url: null,
+    diagnostics: { failed_task_id: 'Pull container images', exit_code: 1, error_stderr: 'manifest unknown', container_logs: null, remediation_hints: ['Check registry rate limits.'] },
+  }, ['[4] Pull container images ..... FAILED']);
+  const summary = parseOutput(lines);
+  assert.deepEqual(summary.steps.at(-1), { name: 'Pull container images', status: 'FAILED' });
+  assert.equal(summary.execution.diagnostics.failed_task_id, 'Pull container images');
+  assert.deepEqual(summary.execution.diagnostics.remediation_hints, ['Check registry rate limits.']);
+  assert.equal(summary.uiUrl, null);
+});
+
+test('shows the step that is still running', () => {
+  const done = [{ stream: 'stdout', text: '[1] Verify operating system . OK' }];
+  assert.deepEqual(parseSteps(done, '[2] Install system dependencies ....'), [
+    { name: 'Verify operating system', status: 'OK' },
+    { name: 'Install system dependencies', status: 'running' },
+  ]);
+});
+
+test('keeps the data only when the script lists --volume-prune', () => {
+  const listed = { ...require('../electron/cliOptions'), SECRET_KEYS: [], prunesVolumes: true };
+  assert.equal(buildArgs(validateParams({ ...localCore, keepData: true }, listed)).at(-1), '--no-volume-prune');
+  assert.equal(buildArgs(validateParams({ ...localCore, keepData: false }, listed)).includes('--no-volume-prune'), false);
+  assert.equal(buildArgs(validateParams({ ...localCore, keepData: true })).includes('--no-volume-prune'), false);
+});
+
+// A stand-in deploy.py that echoes what it received.
 function fakeRepo(exitCode = 0) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-ui-repo-'));
   const scripts = path.join(root, 'deployment', 'scripts');
   fs.mkdirSync(scripts, { recursive: true });
-  fs.writeFileSync(path.join(scripts, 'setup.py'), [
+  fs.writeFileSync(path.join(scripts, 'deploy.py'), [
     'import json, os, sys',
     'try:',
     '    os.close(os.open("/dev/tty", os.O_RDWR))',
@@ -123,13 +174,16 @@ function fakeRepo(exitCode = 0) {
   return root;
 }
 
-test('runs setup.py without a shell, from the repository root', async () => {
+test('runs deploy.py without a shell, from the repository root', async () => {
   const repoRoot = fakeRepo();
   const valid = validateParams({
     target: 'on-premise', deployTo: 'remote', environment: 'dev', useCase: 'core',
     remoteIo: '$(touch${IFS}pwned)', remoteUser: 'ubuntu',
   });
-  const result = await runSetup(valid, { repoRoot, askpassPath: '/opt/askpass.sh' }).done;
+  const outputs = [];
+  const result = await runDeploy(valid, {
+    repoRoot, extraEnv: { SUDO_ASKPASS: '/opt/askpass.py' }, onOutput: (output) => outputs.push(output),
+  }).done;
 
   assert.equal(result.ok, true);
   assert.equal(result.exitCode, 0);
@@ -139,34 +193,35 @@ test('runs setup.py without a shell, from the repository root', async () => {
     '--remote-io=$(touch${IFS}pwned)', '--remote-user=ubuntu',
   ]);
   assert.equal(echoed.cwd, fs.realpathSync(repoRoot));
-  assert.equal(echoed.askpass, '/opt/askpass.sh');
-  // With a terminal, sudo would prompt there instead of opening the dialog.
+  assert.equal(echoed.askpass, '/opt/askpass.py');
+  assert.ok(outputs.flatMap((output) => output.lines).some((line) => line.text === 'problem'));
+  // With a terminal, sudo would prompt there instead of running SUDO_ASKPASS.
   assert.equal(echoed.tty, false);
   assert.equal(fs.existsSync(path.join(repoRoot, 'pwned')), false);
   assert.ok(result.lines.some((line) => line.stream === 'stderr' && line.text === 'problem'));
   assert.ok(result.lines.some((line) => line.text === 'no trailing newline'));
   assert.equal(result.command,
-    "./deployment/scripts/setup.py --environment dev --target remote --use-case core '--remote-io=$(touch${IFS}pwned)' --remote-user=ubuntu");
+    "./deployment/scripts/deploy.py --environment dev --target remote --use-case core '--remote-io=$(touch${IFS}pwned)' --remote-user=ubuntu");
 });
 
 test('reports a failing exit code', async () => {
-  const result = await runSetup(validateParams(localCore), { repoRoot: fakeRepo(3) }).done;
+  const result = await runDeploy(validateParams(localCore), { repoRoot: fakeRepo(3) }).done;
   assert.equal(result.ok, false);
   assert.equal(result.exitCode, 3);
 });
 
-test('stop() ends setup.py and the processes it started', async () => {
+test('stop() ends deploy.py and the processes it started', async () => {
   const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-ui-repo-'));
   const scripts = path.join(repoRoot, 'deployment', 'scripts');
   fs.mkdirSync(scripts, { recursive: true });
-  fs.writeFileSync(path.join(scripts, 'setup.py'), [
+  fs.writeFileSync(path.join(scripts, 'deploy.py'), [
     'import subprocess, sys',
     'helper = subprocess.Popen(["sleep", "30"])',
     'print(helper.pid, flush=True)',
     'helper.wait()',
   ].join('\n'));
 
-  const run = runSetup(validateParams(localCore), { repoRoot });
+  const run = runDeploy(validateParams(localCore), { repoRoot });
   const helperPid = await new Promise((resolve) => {
     run.child.stdout.once('data', (chunk) => resolve(Number(String(chunk).trim())));
   });
@@ -180,7 +235,7 @@ test('stop() ends setup.py and the processes it started', async () => {
 });
 
 test('reports a missing Python', async () => {
-  const result = await runSetup(validateParams(localCore), { repoRoot: fakeRepo(), python: 'no-such-python3' }).done;
+  const result = await runDeploy(validateParams(localCore), { repoRoot: fakeRepo(), python: 'no-such-python3' }).done;
   assert.equal(result.ok, false);
   assert.equal(result.spawnError, 'no-such-python3 was not found. Install Python 3 and try again.');
 });
@@ -212,7 +267,7 @@ test('rejects secret overrides the script cannot take, without echoing values', 
     return '';
   };
   assert.match(errors({ influx_admin_token: 'hunter2' }, secretOptions), /does not accept a secret override for influx_admin_token/);
-  // A setup.py without --secret-overrides-stdin lists no keys.
+  // A deploy.py without --secret-overrides-stdin lists no keys.
   assert.match(errors({ mysql_password: 'hunter2' }, undefined), /does not accept/);
   assert.match(errors({ mysql_password: 'two\nlines' }, secretOptions), /line breaks/);
   assert.match(errors({ mysql_password: 'x'.repeat(4097) }, secretOptions), /4096 characters/);
@@ -222,14 +277,14 @@ test('rejects secret overrides the script cannot take, without echoing values', 
 test('sends secret overrides on standard input only', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-ui-repo-'));
   fs.mkdirSync(path.join(root, 'deployment', 'scripts'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'deployment', 'scripts', 'setup.py'), [
+  fs.writeFileSync(path.join(root, 'deployment', 'scripts', 'deploy.py'), [
     'import json, os, sys',
     'with open("received-stdin", "w") as received:',
     '    received.write(sys.stdin.read())',
     'print(json.dumps({"argv": sys.argv[1:], "env": any("s3cret" in value for value in os.environ.values())}))',
   ].join('\n'));
   const valid = validateParams({ ...localCore, secretOverrides: { mysql_password: 's3cret"\\' } }, secretOptions);
-  const run = runSetup(valid, { repoRoot: root });
+  const run = runDeploy(valid, { repoRoot: root });
   assert.equal(run.child.spawnargs.some((arg) => arg.includes('s3cret')), false);
   const result = await run.done;
   const echoed = JSON.parse(result.lines[0].text);
@@ -239,7 +294,7 @@ test('sends secret overrides on standard input only', async () => {
   assert.equal(JSON.stringify(result).includes('s3cret'), false);
 });
 
-// Options as scriptOptions.js builds them when setup.py lists its cloud options.
+// Options as scriptOptions.js builds them when deploy.py lists its cloud options.
 const builtIn = require('../electron/cliOptions');
 const cloudOptions = {
   ...builtIn,
@@ -301,12 +356,12 @@ test('checks the cloud fields', () => {
   assert.deepEqual(errors({}, missing.env), ['Add AWS credentials for the default profile.']);
 });
 
-test('keeps the plain cloud command for a setup.py without cloud options', () => {
+test('keeps the plain cloud command for a deploy.py without cloud options', () => {
   const { params } = cloudFixture();
   assert.deepEqual(buildArgs(validateParams(params)), ['--environment', 'prod', '--target', 'cloud', '--use-case', 'all']);
 });
 
-test('passes the chosen profile when setup.py takes --aws-profile', () => {
+test('passes the chosen profile when deploy.py takes --aws-profile', () => {
   const { params, env, key } = cloudFixture({ credentials: null });
   fs.writeFileSync(env.AWS_CONFIG_FILE, '[default]\nsso_session = lab\n[profile lab-admin]\nsso_session = lab\n[profile empty]\nregion = x\n');
   const named = { ...cloudOptions, CLOUD: { ...cloudOptions.CLOUD, namedProfiles: true } };
@@ -322,7 +377,7 @@ test('passes the chosen profile when setup.py takes --aws-profile', () => {
     }
     return [];
   };
-  assert.deepEqual(errors('empty'), ['The empty AWS profile has no credentials setup.py can use.']);
+  assert.deepEqual(errors('empty'), ['The empty AWS profile has no credentials deploy.py can use.']);
   assert.deepEqual(errors('nope'), ['Choose an AWS profile.']);
   // Without --aws-profile, the same SSO default profile is not enough.
   assert.deepEqual(errors('default'), []);

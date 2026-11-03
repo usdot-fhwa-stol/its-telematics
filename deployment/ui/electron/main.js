@@ -1,10 +1,9 @@
 'use strict';
 
 const { app, BrowserWindow, dialog, ipcMain, net } = require('electron');
-const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { ValidationError, validateParams, buildArgs, formatCommand, runSetup } = require('./cliBridge');
+const { ValidationError, validateParams, buildArgs, formatCommand, runDeploy } = require('./cliBridge');
 const { loadScriptOptions } = require('./scriptOptions');
 const {
   loadTargetSettings, saveTargetSettings, listServers, rememberServer, touchServer, forgetServer,
@@ -13,13 +12,13 @@ const { ServerAddressError, normalizeServerUrl, checkServer } = require('./serve
 const { configureTelematicsSession, createTelematicsView } = require('./telematicsView');
 const { createSignInQueue } = require('./signInQueue');
 const { AWS_PROFILE, CredentialsError, profileStatus, saveDefaultProfile } = require('./awsCredentials');
+const { passwordNeeded, checkPassword, startPasswordServer } = require('./sudoPassword');
 
 // The repository whose deployment/ tree the app runs. During development the
 // app lives in <repo>/deployment/ui; TELEMATICS_REPO_ROOT points it elsewhere.
 const REPO_ROOT = process.env.TELEMATICS_REPO_ROOT
   ? path.resolve(process.env.TELEMATICS_REPO_ROOT)
   : path.resolve(__dirname, '..', '..', '..');
-const ASKPASS = path.join(__dirname, 'askpass.sh');
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 
 let mainWindow = null;
@@ -27,7 +26,7 @@ let telematicsView = null;
 let activeRun = null;
 let scriptOptions = null;
 
-// The form's choices, read once from `setup.py --list-options`.
+// The form's choices, read once from `deploy.py --list-options`.
 function getScriptOptions() {
   if (!scriptOptions) scriptOptions = loadScriptOptions({ repoRoot: REPO_ROOT });
   return scriptOptions;
@@ -96,18 +95,8 @@ function validationResult(error) {
   throw error;
 }
 
-// How setup.py prepares this machine for --target localhost: local.setup.sh or
-// an Ansible playbook. The confirmation describes whichever this checkout has.
-function hostPreparation() {
-  const exists = (...parts) => fs.existsSync(path.join(REPO_ROOT, 'deployment', ...parts));
-  if (exists('scripts', 'local.setup.sh')) return 'local.setup.sh';
-  if (exists('config', 'ansible', 'playbooks', 'host_preparation.yml')) return 'ansible';
-  return 'unknown';
-}
-
 handle('deploy:get-options', async () => ({
   options: await getScriptOptions(),
-  hostPreparation: hostPreparation(),
   saved: loadTargetSettings(app.getPath('userData')),
   repoRoot: REPO_ROOT,
 }));
@@ -131,7 +120,7 @@ handle('deploy:pick-key-file', async () => {
 });
 
 // The AWS default profile for the cloud target. The status never includes a
-// key, and saved keys go only to the credentials file, never to setup.py.
+// key, and saved keys go only to the credentials file, never to deploy.py.
 async function awsProfileStatus(profile) {
   const { CLOUD } = await getScriptOptions();
   return profileStatus(process.env, {
@@ -152,7 +141,13 @@ handle('aws:save-profile', async (credentials) => {
   }
 });
 
-handle('deploy:launch', async (params, { remember } = {}) => {
+// The administrator password for a localhost run (sudoPassword.js). The
+// confirmation dialog asks for it only when sudo needs one.
+handle('deploy:sudo-status', async () => ({ passwordNeeded: await passwordNeeded() }));
+
+handle('deploy:check-sudo-password', async (password) => ({ error: await checkPassword(password) }));
+
+handle('deploy:launch', async (params, { remember, sudoPassword } = {}) => {
   const options = await getScriptOptions();
   if (activeRun) return { validationErrors: ['A run is already in progress.'] };
   let valid;
@@ -161,16 +156,23 @@ handle('deploy:launch', async (params, { remember } = {}) => {
   } catch (error) {
     return validationResult(error);
   }
-  if (remember) saveTargetSettings(app.getPath('userData'), params);
-
-  activeRun = runSetup(valid, {
-    repoRoot: REPO_ROOT,
-    askpassPath: valid.target === 'localhost' ? ASKPASS : undefined,
-  });
+  const passwordServer = valid.target === 'localhost' && typeof sudoPassword === 'string' && sudoPassword
+    ? startPasswordServer(sudoPassword)
+    : null;
   try {
+    if (passwordServer) await passwordServer.listening;
+    if (remember) saveTargetSettings(app.getPath('userData'), params);
+    activeRun = runDeploy(valid, {
+      repoRoot: REPO_ROOT,
+      extraEnv: passwordServer ? passwordServer.env : {},
+      onOutput: (output) => {
+        if (mainWindow) mainWindow.webContents.send('deploy:output', output);
+      },
+    });
     return await activeRun.done;
   } finally {
     activeRun = null;
+    if (passwordServer) passwordServer.close();
   }
 });
 

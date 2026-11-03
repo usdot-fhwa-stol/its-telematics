@@ -33,24 +33,22 @@ function Mono({ children, color }) {
 
 function headline(result) {
   const { summary } = result;
+  const failedTask = summary.execution?.diagnostics?.failed_task_id;
   if (result.spawnError) return result.spawnError;
-  if (result.ok) return 'Configuration generated';
+  if (result.ok) return 'Deployment finished';
+  if (failedTask) return `Failed at step: ${failedTask}`;
   if (summary.failedStep) return `Failed at step: ${summary.failedStep}`;
-  if (result.signal) return `setup.py was stopped (${result.signal})`;
-  return `setup.py exited with code ${result.exitCode}`;
+  if (result.signal) return `deploy.py was stopped (${result.signal})`;
+  return `deploy.py exited with code ${result.exitCode}`;
 }
 
-// TODO: Remove once the integration is complete in TELE-783.
-function nextStep(result) {
-  if (result.target !== 'localhost') {
-    return 'setup.py generates configuration only for this target. Deploying to remote and cloud hosts is not built yet.';
-  }
-  return 'The stack is not started yet. From telematic_system/, run docker compose up -d. COMPOSE_PROFILES in the generated .env selects the services for this use case.';
-}
+const STEP_STATUS = { OK: 'done', FAILED: 'failed', running: 'did not finish' };
 
-export default function ResultPage({ result, onBack }) {
+export default function ResultPage({ result, onBack, onOpenServer }) {
   const [copied, setCopied] = useState(false);
   const { summary } = result;
+  const diagnostics = summary.execution?.diagnostics;
+  const uiUrl = result.ok ? summary.execution?.ui_url || summary.uiUrl : null;
   const seconds = Math.round((Date.parse(result.finishedAt) - Date.parse(result.startedAt)) / 1000);
   const output = result.lines.map((line) => line.text).join('\n');
 
@@ -68,9 +66,58 @@ export default function ResultPage({ result, onBack }) {
           {summary.hint && <Box sx={{ mt: 1 }}>{summary.hint}</Box>}
         </Alert>
 
+        {uiUrl && (
+          <Field label="Web UI">
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Box component="code" sx={{ fontFamily: monoFont }}>{uiUrl}</Box>
+              <Button variant="contained" onClick={() => onOpenServer(uiUrl)}>Open in app</Button>
+            </Stack>
+            {summary.execution?.active_services?.length > 0 && (
+              <Typography variant="body2" color="text.secondary">
+                Running: {summary.execution.active_services.join(', ')}
+              </Typography>
+            )}
+          </Field>
+        )}
+
         {summary.errors.length > 0 && (
           <Field label="Errors">
             <Mono color="error.light">{summary.errors.join('\n')}</Mono>
+          </Field>
+        )}
+
+        {diagnostics && (
+          <>
+            <Field label={`Why ${diagnostics.failed_task_id} failed`}>
+              <Mono color="error.light">{diagnostics.error_stderr}</Mono>
+            </Field>
+            {diagnostics.remediation_hints?.length > 0 && (
+              <Field label="What to check">
+                <Box component="ul" sx={{ m: 0, pl: 2.5, lineHeight: 1.9 }}>
+                  {diagnostics.remediation_hints.map((hint) => <li key={hint}>{hint}</li>)}
+                </Box>
+              </Field>
+            )}
+            {diagnostics.container_logs?.log_payload && (
+              <Field label="Container logs">
+                <Mono color="text.secondary">{diagnostics.container_logs.log_payload}</Mono>
+              </Field>
+            )}
+          </>
+        )}
+
+        {summary.steps.length > 0 && (
+          <Field label="Pipeline steps">
+            <Box component="ol" sx={{ m: 0, pl: 3, lineHeight: 1.9 }}>
+              {summary.steps.map((step) => (
+                <li key={step.name}>
+                  {step.name}:{' '}
+                  <Box component="strong" sx={{ color: step.status === 'FAILED' ? 'error.main' : 'inherit' }}>
+                    {STEP_STATUS[step.status]}
+                  </Box>
+                </li>
+              ))}
+            </Box>
           </Field>
         )}
 
@@ -79,7 +126,7 @@ export default function ResultPage({ result, onBack }) {
         </Field>
 
         {(summary.checks.length > 0 || summary.configuredSecrets.length > 0 || summary.generatedEnv) && (
-          <Field label="What setup.py reported">
+          <Field label="What deploy.py reported">
             <Box component="ul" sx={{ m: 0, pl: 2.5, lineHeight: 1.9 }}>
               {summary.checks.map((check) => (
                 <li key={check.name}>{check.name}: <strong>{check.status}</strong></li>
@@ -89,12 +136,6 @@ export default function ResultPage({ result, onBack }) {
               ))}
               {summary.generatedEnv && <li>Generated <code>{summary.generatedEnv}</code></li>}
             </Box>
-          </Field>
-        )}
-
-        {result.ok && (
-          <Field label="Next step">
-            <Typography variant="body2" color="text.secondary">{nextStep(result)}</Typography>
           </Field>
         )}
 

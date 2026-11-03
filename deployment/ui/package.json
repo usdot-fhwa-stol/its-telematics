@@ -3,7 +3,7 @@
   "productName": "Telematics Deploy",
   "version": "0.1.0",
   "private": true,
-  "description": "Desktop UI that collects deployment inputs and runs deployment/scripts/setup.py",
+  "description": "Desktop UI that collects deployment inputs and runs deployment/scripts/deploy.py",
   "main": "electron/main.js",
   "scripts": {
     "dev": "node scripts/run-app.mjs",

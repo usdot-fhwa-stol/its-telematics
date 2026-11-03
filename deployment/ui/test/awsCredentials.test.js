@@ -20,7 +20,7 @@ function awsDir({ credentials, config } = {}) {
   return env;
 }
 
-test('finds the credentials file the way setup.py does', () => {
+test('finds the credentials file the way deploy.py does', () => {
   assert.equal(credentialsFile({}), path.join(os.homedir(), '.aws', 'credentials'));
   assert.equal(credentialsFile({ AWS_SHARED_CREDENTIALS_FILE: '~/keys/aws' }), path.join(os.homedir(), 'keys', 'aws'));
 });
@@ -36,7 +36,7 @@ test('reports whether the default profile has access keys, without the keys', ()
   const incomplete = profileStatus(awsDir({ credentials: `[default]\naws_access_key_id = ${KEY_ID}\n` }));
   assert.deepEqual([incomplete.ready, incomplete.incomplete], [false, true]);
 
-  // `aws configure sso` writes the default profile to the config file, which setup.py does not read.
+  // `aws configure sso` writes the default profile to the config file, which deploy.py does not read.
   const sso = profileStatus(awsDir({ config: '[default]\nsso_session = lab\n' }));
   assert.deepEqual([sso.ready, sso.incomplete, sso.inConfigFile], [false, false, true]);
 });
@@ -74,7 +74,7 @@ const NAMED = {
     + '[profile partial]\ncredential_process = /bin/creds\n',
 };
 
-test('lists the profiles setup.py --aws-profile accepts, default first', () => {
+test('lists the profiles deploy.py --aws-profile accepts, default first', () => {
   assert.deepEqual(listProfiles(awsDir(NAMED)), [
     { name: 'default', kind: 'sso', ready: true },
     { name: 'keys', kind: 'keys', ready: true },
@@ -84,7 +84,7 @@ test('lists the profiles setup.py --aws-profile accepts, default first', () => {
   ]);
 });
 
-test('accepts an SSO default profile only when setup.py takes --aws-profile', () => {
+test('accepts an SSO default profile only when deploy.py takes --aws-profile', () => {
   const env = awsDir(NAMED);
   assert.equal(profileStatus(env).ready, false);
   const named = profileStatus(env, { profile: 'default', namedProfiles: true });

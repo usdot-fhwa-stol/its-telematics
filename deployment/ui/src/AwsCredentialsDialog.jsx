@@ -12,8 +12,8 @@ import { monoFont } from './theme';
 
 const api = window.deployApi;
 
-// Adds the AWS default profile to the shared credentials file, which setup.py
-// reads for the cloud target. The keys never go to setup.py itself, whose
+// Adds the AWS default profile to the shared credentials file, which deploy.py
+// reads for the cloud target. The keys never go to deploy.py itself, whose
 // --aws-access-key-id and --aws-secret-access-key would show them in ps.
 export default function AwsCredentialsDialog({ open, file, onClose, onSaved }) {
   const [accessKeyId, setAccessKeyId] = useState('');
@@ -60,7 +60,7 @@ export default function AwsCredentialsDialog({ open, file, onClose, onSaved }) {
         <Stack spacing={2}>
           <DialogContentText>
             The app adds a [default] profile to <span style={{ fontFamily: monoFont }}>{file}</span>, readable
-            only by you, as setup.py does with --aws-access-key-id. The keys are not passed to setup.py or saved
+            only by you, as deploy.py does with --aws-access-key-id. The keys are not passed to deploy.py or saved
             anywhere else. Other AWS tools that use the default profile will use these keys too.
           </DialogContentText>
           {error && <Alert severity="error">{error}</Alert>}

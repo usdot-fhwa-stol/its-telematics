@@ -1,11 +1,11 @@
 'use strict';
 
-// The AWS profile that setup.py uses for the cloud target. setup.py accepts
+// The AWS profile that deploy.py uses for the cloud target. deploy.py accepts
 // access keys on its command line, where any user can read them with ps, so
 // the app never passes them. Instead it checks the shared AWS files the way
-// setup.py does, and can add the default profile to the credentials file.
+// deploy.py does, and can add the default profile to the credentials file.
 //
-// setup.py reads only the default profile's access keys from the
+// deploy.py reads only the default profile's access keys from the
 // credentials file. With --aws-profile (namedProfiles), it also accepts any
 // profile from the config file, including SSO and role profiles.
 
@@ -15,7 +15,7 @@ const path = require('node:path');
 
 const AWS_PROFILE = 'default';
 const ACCESS_KEYS = ['aws_access_key_id', 'aws_secret_access_key'];
-// Config-file settings that supply credentials, as in setup.py's AWS_CONFIG_CREDENTIAL_SOURCES.
+// Config-file settings that supply credentials, as in deploy.py's AWS_CONFIG_CREDENTIAL_SOURCES.
 const CONFIG_SOURCES = [
   ['sso_session', 'sso'], ['sso_start_url', 'sso'], ['role_arn', 'role'],
   ['credential_process', 'process'], ['web_identity_token_file', 'role'],
@@ -30,7 +30,7 @@ function expandHome(file) {
   return file === '~' || file.startsWith('~/') ? path.join(os.homedir(), file.slice(1)) : file;
 }
 
-// Same lookup as setup.py: AWS_SHARED_CREDENTIALS_FILE, else ~/.aws/credentials.
+// Same lookup as deploy.py: AWS_SHARED_CREDENTIALS_FILE, else ~/.aws/credentials.
 function credentialsFile(env = process.env) {
   return path.resolve(expandHome(env.AWS_SHARED_CREDENTIALS_FILE || path.join(os.homedir(), '.aws', 'credentials')));
 }
@@ -73,7 +73,7 @@ function readSections(file) {
 const hasKeys = (options) => ACCESS_KEYS.every((key) => options.has(key));
 
 // Every profile in the credentials and config files, with how it gets
-// credentials (keys, sso, role, process), or kind null when setup.py's
+// credentials (keys, sso, role, process), or kind null when deploy.py's
 // --aws-profile would reject it. Names only, never values.
 function listProfiles(env = process.env) {
   const kinds = new Map();
@@ -85,7 +85,7 @@ function listProfiles(env = process.env) {
     add(name, hasKeys(options) ? 'keys' : null);
   }
   for (const [section, options] of readSections(configFile(env)) || []) {
-    // setup.py reads the default profile from [default] only, as the AWS CLI does.
+    // deploy.py reads the default profile from [default] only, as the AWS CLI does.
     const name = section === AWS_PROFILE ? section
       : section.startsWith('profile ') && section !== `profile ${AWS_PROFILE}` ? section.slice(8) : null;
     if (name === null) continue; // sso-session and services sections
@@ -122,15 +122,15 @@ function profileStatus(env = process.env, { profile = AWS_PROFILE, namedProfiles
     profiles: null,
     ready,
     kind: ready ? 'keys' : null,
-    // A [default] section without both keys: setup.py would not use it, and the app won't edit it.
+    // A [default] section without both keys: deploy.py would not use it, and the app won't edit it.
     incomplete: Boolean(options) && !ready,
     // A default profile set up with `aws configure sso` lives in the config file;
-    // setup.py without --aws-profile does not look there.
+    // deploy.py without --aws-profile does not look there.
     inConfigFile: Boolean(config && config.has(AWS_PROFILE)),
   };
 }
 
-// Adds the default profile to the credentials file, as setup.py would with
+// Adds the default profile to the credentials file, as deploy.py would with
 // --aws-access-key-id and --aws-secret-access-key. Refuses to change an
 // existing default profile. Messages never include a key.
 function saveDefaultProfile(credentials, env = process.env) {
