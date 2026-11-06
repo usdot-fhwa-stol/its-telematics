@@ -2,6 +2,7 @@
 """Manage container images, manifests, and runtime services on the prepared host."""
 
 import json
+import os
 import shlex
 import time
 from pathlib import PurePosixPath
@@ -16,7 +17,9 @@ MAX_UPDATE_ATTEMPTS = 10
 STABILITY_SECONDS = 10
 COMPOSE_PROJECT = "deployment"
 ENV_RUNTIME_FILE = ".env"
-BIND_MOUNTED_FILES = ("scripts/database/init-databases.sh",)
+# Compose secrets the web server writes at runtime (Grafana logins). Created empty when missing and
+# never copied over, so logins already on the host survive a redeploy.
+RUNTIME_SECRET_FILES = ("secrets/grafana_htpasswd",)
 # Cross-node settings: variable -> (role of the node running the service, value template).
 # {ip} is the role node's private IP (or address). Services default to this host in .env, so a
 # variable is rewritten only on nodes that do not run the service themselves.
@@ -107,20 +110,29 @@ class ContainerOrchestrator:
                                  timeout=STEP_TIMEOUT_SECONDS)
             if not created.success:
                 return created
+        # A bind mount whose source was missing makes Docker create a root-owned directory in its place;
+        # clear any such directory so the file can be copied there.
+        paths = " ".join(shlex.quote(f"{self.workspace}/{destination}") for _, destination, _ in transfers)
+        cleared = run_shell(self.inventory, ALL_HOSTS,
+                            f'for path in {paths}; do [ ! -d "$path" ] || sudo -n rm -rf "$path"; done',
+                            step, timeout=STEP_TIMEOUT_SECONDS)
+        if not cleared.success:
+            return cleared
         for source, destination, mode in transfers:
-            if destination in BIND_MOUNTED_FILES:
-                # A missing bind-mount source makes Docker create a root-owned directory in its place; clear it.
-                cleared = run_shell(self.inventory, ALL_HOSTS,
-                                    f"[ ! -d {shlex.quote(f'{self.workspace}/{destination}')} ] || "
-                                    f"sudo -n rm -rf {shlex.quote(f'{self.workspace}/{destination}')}",
-                                    step, timeout=STEP_TIMEOUT_SECONDS)
-                if not cleared.success:
-                    return cleared
             copied = run_ad_hoc(self.inventory, ALL_HOSTS, "ansible.builtin.copy",
                                 {"src": str(source), "dest": f"{self.workspace}/{destination}", "mode": mode},
                                 step, timeout=STEP_TIMEOUT_SECONDS)
             if not copied.success:
                 return copied
+        for secret in RUNTIME_SECRET_FILES:
+            path = shlex.quote(f"{self.workspace}/{secret}")
+            # A missing source makes Docker fail the mount, or create a root-owned directory in its place.
+            created = run_shell(self.inventory, ALL_HOSTS,
+                                f"{{ [ ! -d {path} ] || sudo -n rm -rf {path}; }} && "
+                                f"{{ [ -f {path} ] || install -m 0666 /dev/null {path}; }}",
+                                step, timeout=STEP_TIMEOUT_SECONDS)
+            if not created.success:
+                return created
         for host, overrides in self._service_endpoint_overrides().items():
             for variable, value in overrides.items():
                 configured = run_ad_hoc(
@@ -341,23 +353,54 @@ class ContainerOrchestrator:
         transfers = [(runtime_env, ENV_RUNTIME_FILE, "0600")]
 
         manifests = [root / path for path in reference["compose_manifest_paths"]]
+        workspace_root = manifests[0].parent
+        parsed = []
         for manifest in manifests:
             transfers.append((manifest, manifest.name, "0644"))
-            for entry in (yaml.safe_load(manifest.read_text()) or {}).get("include", []):
+            document = yaml.safe_load(manifest.read_text()) or {}
+            parsed.append((manifest, document))
+            for entry in document.get("include", []):
                 path = entry.get("path") if isinstance(entry, dict) else entry
                 if not isinstance(path, str):
                     raise ValueError(f"Unsupported include entry in {manifest.name}")
-                transfers.append((manifest.parent / path, path, "0644"))
+                included = manifest.parent / path
+                transfers.append((included, path, "0644"))
+                parsed.append((included, yaml.safe_load(included.read_text()) or {}))
 
         # Compose resolves ./secrets/*.txt relative to the manifest directory.
         for secret in sorted((manifests[0].parent / "secrets").glob("*.txt")):
             transfers.append((secret, f"secrets/{secret.name}", "0644"))
 
-        # Files that compose bind-mounts from the workspace; they must exist on the target host.
-        for script in BIND_MOUNTED_FILES:
-            transfers.append((manifests[0].parent / script, script, "0755"))
+        # Files that compose bind-mounts from the workspace (./...); they must exist on the target host.
+        for manifest, document in parsed:
+            for source in _relative_bind_mounts(document):
+                local = (manifest.parent / source).resolve()
+                if local.is_file():
+                    mode = "0755" if local.suffix == ".sh" or os.access(local, os.X_OK) else "0644"
+                    transfers.append((local, str(local.relative_to(workspace_root.resolve())), mode))
 
         for source, _, _ in transfers:
             if not source.is_file():
                 raise ValueError(f"Missing file {source}; run the configuration step first")
         return transfers
+
+
+def _relative_bind_mounts(document: dict) -> List[str]:
+    """Return the relative (./ or ../) bind-mount sources of every service in a compose document.
+
+    Args:
+        document: A parsed compose manifest.
+
+    Returns:
+        Source paths as written in the manifest, relative to its directory.
+    """
+    sources = []
+    for service in (document.get("services") or {}).values():
+        for volume in (service or {}).get("volumes") or []:
+            if isinstance(volume, dict):
+                source = volume.get("source") if volume.get("type") == "bind" else None
+            else:
+                source = str(volume).split(":", 1)[0]
+            if isinstance(source, str) and source.startswith(("./", "../")):
+                sources.append(source)
+    return sources
