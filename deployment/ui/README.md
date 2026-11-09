@@ -10,7 +10,7 @@ An Electron app with two paths, chosen on its start screen:
 
 ## Requirements
 
-- Ubuntu 22.04 or newer with a desktop session
+- Ubuntu 22.04 or 24.04 with a desktop session
 - Node.js 22.12 or newer (Electron 40 and later will not install on Node 20)
 - Python 3.9 or newer (`python3` on `PATH`), as `deploy.py` needs. Ubuntu
   20.04 ships Python 3.8, which `deploy.py` does not run on.
@@ -55,26 +55,6 @@ commit and whether there were uncommitted changes.
   package could be unsafe), or run
   `sudo apt install ./telematics-deploy-<version>-amd64.deb`. It pulls in
   `python3` and `sudo`, and adds Telematics Deploy to the app menu.
-- To update, install the newer .deb the same way. To remove it, use App
-  Center or `sudo apt remove telematics-deploy`; the deployment files in
-  `~/.local/share/telematics-deploy/` stay.
-
-### Where the packaged app keeps its files
-
-The app's own files are read-only, but `deploy.py` writes `.env`, secrets and
-Terraform state next to its scripts. So on first start the packaged app copies
-its bundled deployment files to `~/.local/share/telematics-deploy/` (or
-`$XDG_DATA_HOME/telematics-deploy/`) and runs `deploy.py` there.
-
-A newer version of the app replaces the bundled files there and removes those
-it no longer ships. It never touches files `deploy.py` generated: `.env`,
-`secrets/*.txt`, `terraform.tfstate`, `terraform.tfvars.json` and the
-Terraform provider cache stay. Edits to bundled files in that folder are
-overwritten by the next version. `TELEMATICS_REPO_ROOT` still points a packaged
-app at a checkout instead.
-
-`electron/askpass.py` is shipped outside the app's asar archive
-(`asarUnpack`), because sudo and Ansible execute it.
 
 ## Configuring Deployment
 
