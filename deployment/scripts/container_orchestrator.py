@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Manage container images, manifests, and runtime services on the prepared host."""
 
+import grp
 import json
 import os
+import pwd
 import shlex
 import time
 from pathlib import PurePosixPath
-from typing import Callable, List, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import yaml
 
@@ -37,7 +39,40 @@ SERVICE_ENDPOINTS = {
     "INFLUXDB3_IP": (ROLE_DATABASE, "{ip}"),
 }
 PULL_TIMEOUT_SECONDS = 1800
+# A dropped connection (for example a registry CDN reset) fails `docker compose pull` part way.
+# Layers already downloaded are kept, so a later attempt only fetches what is missing.
+PULL_ATTEMPTS = 3
+PULL_RETRY_DELAYS_SECONDS = (10, 30)  # wait before attempt 2, attempt 3
 STEP_TIMEOUT_SECONDS = 300
+DOCKER_GROUP = "docker"
+
+
+def pending_docker_group_user() -> Optional[str]:
+    """Return this user's name if they joined the docker group after this process started.
+
+    The host preparation playbook adds the deployment user to the docker group, but a process
+    keeps the groups it started with, so on a machine prepared during this run the Docker commands
+    that follow would be refused the Docker socket until the user logs in again. `sudo -u <user>`
+    starts the command with the user's current groups instead. (Ansible's become cannot do this:
+    it skips sudo when the become user is the connection user.)
+
+    Returns:
+        The user name when /etc/group lists the user in the docker group but this process is not in
+        it; None when running as root, when the process already has the group, or when the user is
+        not in it.
+    """
+    if os.geteuid() == 0:
+        return None
+    try:
+        group = grp.getgrnam(DOCKER_GROUP)
+    except KeyError:
+        return None
+    if group.gr_gid == os.getegid() or group.gr_gid in os.getgroups():
+        return None
+    user = pwd.getpwuid(os.getuid())
+    if user.pw_name in group.gr_mem or user.pw_gid == group.gr_gid:
+        return user.pw_name
+    return None
 
 
 class ContainerOrchestrator:
@@ -63,6 +98,24 @@ class ContainerOrchestrator:
         self._compose = (
             f"docker compose --project-name {COMPOSE_PROJECT} --env-file {ENV_RUNTIME_FILE}"
         )
+
+    def _docker_shell(self, command_line: str, step: str, timeout: int) -> CommandResult:
+        """Run a Docker command line on every host, with the docker group on a just-prepared localhost.
+
+        Args:
+            command_line: Command executed through ansible.builtin.shell.
+            step: Pipeline step name recorded in the result.
+            timeout: Maximum runtime in seconds.
+
+        Returns:
+            CommandResult of the ansible invocation. On localhost, when this process does not have the
+            docker group yet (see pending_docker_group_user), the command runs through
+            `sudo -u <user>`, which needs no password because the target user is the invoking user.
+        """
+        user = pending_docker_group_user() if self.local_target else None
+        if user:
+            command_line = f"sudo -u {shlex.quote(user)} -- /bin/sh -c {shlex.quote(command_line)}"
+        return run_shell(self.inventory, ALL_HOSTS, command_line, step, timeout=timeout)
 
     def _workspace_command_path(self) -> str:
         """Return the shell-safe workspace path for the local or remote target."""
@@ -129,7 +182,7 @@ class ContainerOrchestrator:
             # A missing source makes Docker fail the mount, or create a root-owned directory in its place.
             created = run_shell(self.inventory, ALL_HOSTS,
                                 f"{{ [ ! -d {path} ] || sudo -n rm -rf {path}; }} && "
-                                f"{{ [ -f {path} ] || install -m 0666 /dev/null {path}; }}",
+                                f"{{ [ -f {path} ] || install -m 0644 /dev/null {path}; }}",
                                 step, timeout=STEP_TIMEOUT_SECONDS)
             if not created.success:
                 return created
@@ -171,12 +224,25 @@ class ContainerOrchestrator:
     def pull_managed_images(self) -> CommandResult:
         """Pre-fetch the latest images so startup does not time out on downloads.
 
+        A failed pull is retried up to PULL_ATTEMPTS times in total, waiting
+        PULL_RETRY_DELAYS_SECONDS between attempts, so a brief network interruption does not fail
+        the deployment.
+
         Returns:
-            CommandResult of docker compose pull on every host.
+            CommandResult of the last docker compose pull on every host.
         """
-        return run_shell(self.inventory, ALL_HOSTS,
-                         f"cd {self._workspace_command_path()} && {self._compose} pull",
-                         "Pull container images", timeout=PULL_TIMEOUT_SECONDS)
+        command_line = f"cd {self._workspace_command_path()} && {self._compose} pull"
+        attempt = 1
+        while True:
+            result = self._docker_shell(command_line, "Pull container images", timeout=PULL_TIMEOUT_SECONDS)
+            if result.success or attempt >= PULL_ATTEMPTS:
+                return result
+            delay = PULL_RETRY_DELAYS_SECONDS[min(attempt, len(PULL_RETRY_DELAYS_SECONDS)) - 1]
+            reason = (result.stderr or result.stdout).strip().splitlines()
+            self.log(f"Pull failed{': ' + reason[-1][-200:] if reason else ''}")
+            attempt += 1
+            self.log(f"Retrying in {delay} s (attempt {attempt} of {PULL_ATTEMPTS})")
+            time.sleep(delay)
 
     def log(self, message: str, depth: int = 1) -> None:
         """Report a progress message to the pipeline output as it happens.
@@ -210,14 +276,17 @@ class ContainerOrchestrator:
             # Bring down any running stack first so containers restart on the freshly pulled images.
             self.log("Bringing down any running services")
             reset = f"{self._compose} down --remove-orphans"
-        result = run_shell(self.inventory, ALL_HOSTS, f"cd {workspace} && {reset}", step, timeout=STEP_TIMEOUT_SECONDS)
+        result = self._docker_shell(f"cd {workspace} && {reset}", step, timeout=STEP_TIMEOUT_SECONDS)
         if not result.success:
             return result
 
         self.log("Starting services")
-        result = run_shell(self.inventory, ALL_HOSTS, f"cd {workspace} && {up} --force-recreate",
-                           step, timeout=timeout + 300)
+        result = self._docker_shell(f"cd {workspace} && {up} --force-recreate", step, timeout=timeout + 300)
         self._log_compose_output(result)
+        if not result.success and self._container_count() == 0:
+            # Nothing was created (for example a missing bind-mount source), so pulling and retrying cannot help.
+            return CommandResult(step, False, result.exit_code or 1, result.stdout,
+                                 "docker compose up started no containers:\n" + (result.stderr or result.stdout).strip())
 
         attempt = 0
         while True:
@@ -232,20 +301,19 @@ class ContainerOrchestrator:
             for problem in problems:
                 self.log(problem, depth=2)
             if attempt >= MAX_UPDATE_ATTEMPTS:
-                status = run_shell(self.inventory, ALL_HOSTS, f"cd {workspace} && {self._compose} ps -a",
-                                   step, timeout=STEP_TIMEOUT_SECONDS)
+                status = self._docker_shell(f"cd {workspace} && {self._compose} ps -a",
+                                            step, timeout=STEP_TIMEOUT_SECONDS)
                 return CommandResult(step, False, 1, status.stdout,
                                      "Services still not up after the maximum update attempts:\n" + "\n".join(problems))
             attempt += 1
             self.log(f"Pulling updates and restarting (attempt {attempt} of {MAX_UPDATE_ATTEMPTS})")
-            run_shell(self.inventory, ALL_HOSTS, f"cd {workspace} && {self._compose} pull --ignore-pull-failures",
-                      step, timeout=PULL_TIMEOUT_SECONDS)
-            result = run_shell(self.inventory, ALL_HOSTS, f"cd {workspace} && {up}", step, timeout=timeout + 300)
+            self._docker_shell(f"cd {workspace} && {self._compose} pull --ignore-pull-failures",
+                               step, timeout=PULL_TIMEOUT_SECONDS)
+            result = self._docker_shell(f"cd {workspace} && {up}", step, timeout=timeout + 300)
             self._log_compose_output(result)
             time.sleep(5)
 
-        status = run_shell(self.inventory, ALL_HOSTS, f"cd {workspace} && {self._compose} ps",
-                           step, timeout=STEP_TIMEOUT_SECONDS)
+        status = self._docker_shell(f"cd {workspace} && {self._compose} ps", step, timeout=STEP_TIMEOUT_SECONDS)
         if not status.success:
             return CommandResult(step, False, status.exit_code or 1, status.stdout, status.stderr or status.stdout)
         return CommandResult(step, True, 0, status.stdout, status.stderr)
@@ -261,31 +329,48 @@ class ContainerOrchestrator:
                 continue  # Ansible host banner
             self.log(line, depth=2)
 
-    def _not_running(self) -> List[str]:
-        """List containers of the project that are not running, restarting, or not healthy.
+    def _project_containers(self) -> Tuple[CommandResult, List[Tuple[str, dict]]]:
+        """List every container of the project on every host.
 
         Returns:
-            One "host: container: status" entry per problem container; empty when all are up.
+            The docker ps CommandResult and one (host, container) pair per container found.
         """
         # `--format json` avoids Jinja-style braces, which Ansible would try to template.
-        result = run_shell(
-            self.inventory, ALL_HOSTS,
+        result = self._docker_shell(
             f"docker ps -a --filter label=com.docker.compose.project={COMPOSE_PROJECT} --format json",
             "Check container status", timeout=STEP_TIMEOUT_SECONDS,
         )
-        problems, host = [], ""
+        containers, host = [], ""
         for line in result.stdout.splitlines():
             line = line.strip()
             if "|" in line and ">>" in line:
                 host = line.split("|")[0].strip()
             elif line.startswith("{"):
                 try:
-                    container = json.loads(line)
+                    containers.append((host, json.loads(line)))
                 except ValueError:
                     continue
-                status = container.get("Status", "")
-                if container.get("State") != "running" or "unhealthy" in status or "health: starting" in status:
-                    problems.append(f"{host}: {container.get('Names', '?')}: {status}")
+        return result, containers
+
+    def _container_count(self) -> int:
+        """Return how many containers of the project exist on all hosts together."""
+        return len(self._project_containers()[1])
+
+    def _not_running(self) -> List[str]:
+        """List containers of the project that are not running, restarting, or not healthy.
+
+        Returns:
+            One "host: container: status" entry per problem container, or one entry if the project has
+            no containers at all; empty when all are up.
+        """
+        result, containers = self._project_containers()
+        problems = []
+        for host, container in containers:
+            status = container.get("Status", "")
+            if container.get("State") != "running" or "unhealthy" in status or "health: starting" in status:
+                problems.append(f"{host}: {container.get('Names', '?')}: {status}")
+        if result.success and not containers:
+            problems.append(f"No containers of the {COMPOSE_PROJECT} project exist.")
         if not result.success:
             problems.append(f"Could not read container status: {(result.stderr or result.stdout).strip()[-200:]}")
         return problems
@@ -296,8 +381,7 @@ class ContainerOrchestrator:
         Returns:
             CommandResult of docker compose down; its stdout is a one-line summary.
         """
-        result = run_shell(
-            self.inventory, ALL_HOSTS,
+        result = self._docker_shell(
             f"cd {self._workspace_command_path()} && {self._compose} down --remove-orphans",
             "Tear down failed deployment", timeout=STEP_TIMEOUT_SECONDS,
         )
@@ -320,7 +404,7 @@ class ContainerOrchestrator:
             f'--filter health=starting); do '
             f'echo "=== container $c"; docker logs --tail {lines} --timestamps "$c" 2>&1; done'
         )
-        result = run_shell(self.inventory, ALL_HOSTS, script, "Capture error logs", timeout=STEP_TIMEOUT_SECONDS)
+        result = self._docker_shell(script, "Capture error logs", timeout=STEP_TIMEOUT_SECONDS)
         body = result.stdout.strip() or result.stderr.strip() or "No failing containers were found."
         return LogTrace.from_text("containers", body)
 
@@ -330,8 +414,7 @@ class ContainerOrchestrator:
         Returns:
             CommandResult of docker container prune for the deployment project.
         """
-        return run_shell(
-            self.inventory, ALL_HOSTS,
+        return self._docker_shell(
             f"docker container prune --force --filter label=com.docker.compose.project={COMPOSE_PROJECT}",
             "Remove orphaned containers", timeout=STEP_TIMEOUT_SECONDS,
         )

@@ -6,10 +6,10 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 const {
-  ValidationError, validateParams, buildArgs, formatCommand, parseSteps, parseOutput, runDeploy,
+  ValidationError, validateParams, buildArgs, formatCommand, parseSteps, parseOutput, parseInventory, runDeploy,
 } = require('../electron/cliBridge');
 
-const localCore = { target: 'on-premise', deployTo: 'local', environment: 'dev', useCase: 'core' };
+const localCore = { target: 'on-premise', environment: 'dev', useCase: 'core' };
 
 function errorsFor(params) {
   try {
@@ -33,50 +33,25 @@ test('formats the command as typed from the repository root', () => {
     './deployment/scripts/deploy.py --environment dev --target localhost --use-case core');
 });
 
-test('maps cloud and ignores remote fields for it', () => {
+test('maps cloud and ignores fields from other targets', () => {
   const valid = validateParams({ target: 'cloud', environment: 'prod', useCase: 'all', remoteIo: 'x' });
   assert.deepEqual(buildArgs(valid), ['--environment', 'prod', '--target', 'cloud', '--use-case', 'all']);
 });
 
-test('passes remote values as --flag=value so they cannot become options', () => {
-  const valid = validateParams({
-    target: 'on-premise', deployTo: 'remote', environment: 'test', useCase: 'all',
-    remoteIo: '-h', remoteUser: 'ubuntu',
-  });
-  assert.deepEqual(buildArgs(valid).slice(-2), ['--remote-io=-h', '--remote-user=ubuntu']);
+test('on-premise always deploys to this machine, even with old remote settings', () => {
+  const stale = { ...localCore, deployTo: 'remote', remoteIo: '10.0.0.5', remoteUser: 'ubuntu', keyPath: '/no/such/key' };
+  assert.deepEqual(buildArgs(validateParams(stale)),
+    ['--environment', 'dev', '--target', 'localhost', '--use-case', 'core']);
 });
 
 test('reports every missing field at once', () => {
   assert.deepEqual(errorsFor({}), ['Choose a target.', 'Choose an environment.', 'Choose a use case.']);
-  assert.deepEqual(errorsFor({ ...localCore, deployTo: 'remote' }),
-    ['Host address is required.', 'SSH user is required.']);
 });
 
 test('rejects values outside the deploy.py choices', () => {
   assert.deepEqual(errorsFor({ ...localCore, environment: 'staging' }), ['Choose an environment.']);
   assert.deepEqual(errorsFor({ ...localCore, target: 'localhost' }), ['Choose a target.']);
-  assert.deepEqual(errorsFor({ ...localCore, deployTo: 'elsewhere' }), ['Choose where to deploy.']);
-});
-
-test('rejects spaces and control characters in free text', () => {
-  const remote = { ...localCore, deployTo: 'remote', remoteUser: 'ubuntu' };
-  assert.deepEqual(errorsFor({ ...remote, remoteIo: 'host --target cloud' }),
-    ['Host address must not contain spaces or control characters.']);
-  assert.deepEqual(errorsFor({ ...remote, remoteIo: 'host\n--x' }),
-    ['Host address must not contain spaces or control characters.']);
-});
-
-test('checks the SSH key file', () => {
-  const remote = { ...localCore, deployTo: 'remote', remoteIo: '10.0.0.5', remoteUser: 'ubuntu' };
-  assert.deepEqual(errorsFor({ ...remote, keyPath: 'id_rsa' }), ['SSH key must be an absolute path.']);
-  assert.deepEqual(errorsFor({ ...remote, keyPath: '/no/such/key' }),
-    ['SSH key file does not exist or is not readable.']);
-  assert.deepEqual(errorsFor({ ...remote, keyPath: os.tmpdir() }), ['SSH key must be a file.']);
-
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-ui-'));
-  const key = path.join(dir, 'id_ed25519');
-  fs.writeFileSync(key, 'key', { mode: 0o600 });
-  assert.equal(buildArgs(validateParams({ ...remote, keyPath: key })).at(-1), `--key-path=${key}`);
+  assert.deepEqual(errorsFor({ ...localCore, target: 'remote' }), ['Choose a target.']);
 });
 
 test('parses the markers deploy.py prints', () => {
@@ -147,6 +122,74 @@ test('shows the step that is still running', () => {
   ]);
 });
 
+// What a cloud run prints before the numbered pipeline starts.
+const cloudLines = (extra = []) => [
+  'error: Terraform is not installed or not in PATH; installing it now.',
+  'Terraform installation: OK',
+  'Host prerequisites validation: PASS',
+  'Generated Terraform variables: /repo/deployment/targets/cloud/terraform.tfvars.json',
+  'Proposed infrastructure changes:',
+  '  create aws_instance.node["all-0"]',
+  'Applying the plan.',
+  ...extra,
+].map((text) => ({ stream: 'stdout', text }));
+
+test('gives the cloud stages before the pipeline steps of their own', () => {
+  assert.deepEqual(parseSteps(cloudLines()), [
+    { name: 'Install Terraform', status: 'OK' },
+    { name: 'Plan AWS infrastructure', status: 'OK' },
+    { name: 'Create AWS infrastructure', status: 'running' },
+  ]);
+  const provisioned = cloudLines([
+    'Ansible inventory: /repo/deployment/targets/cloud/inventory.ini',
+    '[1] Verify operating system .. OK',
+  ]);
+  assert.deepEqual(parseSteps(provisioned).slice(2), [
+    { name: 'Create AWS infrastructure', status: 'OK' },
+    { name: 'Verify operating system', status: 'OK' },
+  ]);
+  const failed = parseOutput(cloudLines([
+    'Provisioning failed; destroying the created resources.',
+    'Rollback complete: all created resources were destroyed.',
+    'error: Terraform apply failed: UnauthorizedOperation',
+    'Deployment failed at step: Provision cloud infrastructure',
+    'Exit code: 2',
+    'Hint: Review the Terraform output above.',
+    'Deployment failed at step: Execute deployment pipeline',
+    'Exit code: 2',
+    'Hint: Review the diagnostic report and remediation hints printed above.',
+  ]));
+  assert.deepEqual(failed.steps.at(-1), { name: 'Create AWS infrastructure', status: 'FAILED' });
+  assert.equal(failed.failedStep, 'Provision cloud infrastructure');
+  assert.equal(failed.hint, 'Review the Terraform output above.');
+  assert.equal(failed.rollback, 'complete');
+  // The install notice is not an error.
+  assert.deepEqual(failed.errors, ['Terraform apply failed: UnauthorizedOperation']);
+});
+
+test('reads a failed rollback and its clean-up command', () => {
+  const summary = parseOutput(cloudLines([
+    'Rollback FAILED. Remove leftovers manually: terraform -chdir=/repo/deployment/infra/terraform/aws destroy -var-file=/v.json',
+  ]));
+  assert.equal(summary.rollback, 'failed');
+  assert.equal(summary.rollbackCommand, 'terraform -chdir=/repo/deployment/infra/terraform/aws destroy -var-file=/v.json');
+});
+
+test('lists each instance of the inventory once', () => {
+  const inventory = [
+    '[ui]',
+    '3.1.2.3 role="all" private_ip="10.20.0.5" ansible_user="ubuntu" ansible_ssh_private_key_file="/k"',
+    '',
+    '[processing]',
+    '3.1.2.3 role="all" private_ip="10.20.0.5" ansible_user="ubuntu" ansible_ssh_private_key_file="/k"',
+    '4.5.6.7 role="processing" private_ip="10.20.0.6" ansible_user="ubuntu"',
+  ].join('\n');
+  assert.deepEqual(parseInventory(inventory), [
+    { address: '3.1.2.3', role: 'all', privateIp: '10.20.0.5' },
+    { address: '4.5.6.7', role: 'processing', privateIp: '10.20.0.6' },
+  ]);
+});
+
 test('keeps the data only when the script lists --volume-prune', () => {
   const listed = { ...require('../electron/cliOptions'), SECRET_KEYS: [], prunesVolumes: true };
   assert.equal(buildArgs(validateParams({ ...localCore, keepData: true }, listed)).at(-1), '--no-volume-prune');
@@ -176,10 +219,11 @@ function fakeRepo(exitCode = 0) {
 
 test('runs deploy.py without a shell, from the repository root', async () => {
   const repoRoot = fakeRepo();
-  const valid = validateParams({
-    target: 'on-premise', deployTo: 'remote', environment: 'dev', useCase: 'core',
-    remoteIo: '$(touch${IFS}pwned)', remoteUser: 'ubuntu',
-  });
+  // A free-text value with shell syntax; validateParams would reject this key path, so it is built directly.
+  const valid = {
+    environment: 'dev', target: 'cloud', useCase: 'core',
+    awsRegion: 'us-east-1', topology: 'centralized', keyPath: '/keys/$(touch${IFS}pwned)',
+  };
   const outputs = [];
   const result = await runDeploy(valid, {
     repoRoot, extraEnv: { SUDO_ASKPASS: '/opt/askpass.py' }, onOutput: (output) => outputs.push(output),
@@ -189,8 +233,8 @@ test('runs deploy.py without a shell, from the repository root', async () => {
   assert.equal(result.exitCode, 0);
   const echoed = JSON.parse(result.lines.find((line) => line.stream === 'stdout').text);
   assert.deepEqual(echoed.argv, [
-    '--environment', 'dev', '--target', 'remote', '--use-case', 'core',
-    '--remote-io=$(touch${IFS}pwned)', '--remote-user=ubuntu',
+    '--environment', 'dev', '--target', 'cloud', '--use-case', 'core',
+    '--aws-region=us-east-1', '--centralized', '--key-path=/keys/$(touch${IFS}pwned)',
   ]);
   assert.equal(echoed.cwd, fs.realpathSync(repoRoot));
   assert.equal(echoed.askpass, '/opt/askpass.py');
@@ -201,7 +245,7 @@ test('runs deploy.py without a shell, from the repository root', async () => {
   assert.ok(result.lines.some((line) => line.stream === 'stderr' && line.text === 'problem'));
   assert.ok(result.lines.some((line) => line.text === 'no trailing newline'));
   assert.equal(result.command,
-    "./deployment/scripts/deploy.py --environment dev --target remote --use-case core '--remote-io=$(touch${IFS}pwned)' --remote-user=ubuntu");
+    "./deployment/scripts/deploy.py --environment dev --target cloud --use-case core --aws-region=us-east-1 --centralized '--key-path=/keys/$(touch${IFS}pwned)'");
 });
 
 test('reports a failing exit code', async () => {

@@ -135,7 +135,8 @@ export default function App() {
         onBack={() => setResult(null)}
         onOpenServer={(url) => {
           setScreen('servers');
-          connect(url, { remember: true, name: result.target === 'localhost' ? 'This machine' : '' });
+          const names = { localhost: 'This machine', cloud: `AWS ${result.awsRegion || ''}`.trim() };
+          connect(url, { remember: true, name: names[result.target] || '' });
         }}
       />
     );

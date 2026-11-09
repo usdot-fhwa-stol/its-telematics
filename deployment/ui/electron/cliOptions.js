@@ -6,7 +6,7 @@
 // script cannot list them, for example an older deploy.py.
 
 const TARGETS = [
-  { value: 'on-premise', label: 'on-premise: this machine or a host on your network' },
+  { value: 'on-premise', label: 'on-premise: this machine' },
   { value: 'cloud', label: 'cloud: AWS (pipeline not built yet)' },
 ];
 
@@ -21,12 +21,12 @@ const TOPOLOGIES = [
   { value: 'distributed', label: 'Distributed: processing on m5n.8xlarge, UI on t2.2xlarge, database on t2.large' },
 ];
 
-// How an on-premise deployment reaches its host. Maps to deploy.py's
-// `localhost` and `remote` targets.
-const DEPLOY_TO = [
-  { value: 'local', label: 'This machine', scriptTarget: 'localhost' },
-  { value: 'remote', label: 'Remote machine', scriptTarget: 'remote' },
-];
+// deploy.py's target for on-premise: the app deploys only to the machine it runs on.
+const ON_PREMISE_TARGET = 'localhost';
+
+// deploy.py targets the app leaves out on purpose, so it does not offer them or
+// mention them as missing. `remote` (another host over SSH) is out of scope for now.
+const OMITTED_TARGETS = ['remote'];
 
 const ENVIRONMENTS = [
   { value: 'dev', label: 'dev' },
@@ -40,4 +40,6 @@ const USE_CASES = [
   { value: 'rsu_integration', label: 'rsu_integration services only: RSU Management Service and InfluxDB v3' },
 ];
 
-module.exports = { TARGETS, CLOUD_TARGET_LABEL, TOPOLOGIES, DEPLOY_TO, ENVIRONMENTS, USE_CASES };
+module.exports = {
+  TARGETS, CLOUD_TARGET_LABEL, TOPOLOGIES, ON_PREMISE_TARGET, OMITTED_TARGETS, ENVIRONMENTS, USE_CASES,
+};

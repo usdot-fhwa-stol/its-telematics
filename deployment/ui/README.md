@@ -14,7 +14,7 @@ An Electron app with two paths, chosen on its start screen:
 - Node.js 22.12 or newer (Electron 40 and later will not install on Node 20)
 - Python 3.9 or newer (`python3` on `PATH`), as `deploy.py` needs. Ubuntu
   20.04 ships Python 3.8, which `deploy.py` does not run on.
-- For the This machine target: an account that can use `sudo`. `deploy.py`
+- For the on-premise target: an account that can use `sudo`. `deploy.py`
   installs Ansible with apt if it is missing.
 
 ## Run
@@ -35,14 +35,13 @@ another checkout, set `TELEMATICS_REPO_ROOT=/path/to/repo`.
 | Form | deploy.py argument |
 | --- | --- |
 | Environment | `--environment dev\|test\|prod` |
-| Target on-premise, This machine | `--target localhost` |
-| Target on-premise, Remote host | `--target remote --remote-io=<host> --remote-user=<user>` and, if chosen, `--key-path=<file>` |
+| Target on-premise (this machine) | `--target localhost` |
 | Target cloud | `--target cloud`, plus `--aws-region=<region> --centralized\|--distributed --key-path=<file>` when `deploy.py` lists its cloud options |
 | Use case | `--use-case all\|core\|rsu_integration` |
 | Any secret override filled in | `--secret-overrides-stdin`, with the values as JSON on standard input |
 | Keep existing data | `--no-volume-prune` |
 
-For example, on-premise / This machine / dev / core runs:
+For example, on-premise / dev / core runs:
 
 ```bash
 ./deployment/scripts/deploy.py --environment dev --target localhost --use-case core

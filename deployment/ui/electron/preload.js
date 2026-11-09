@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('deployApi', {
   pickKeyFile: () => ipcRenderer.invoke('deploy:pick-key-file'),
   // launchOptions: { remember, sudoPassword }. The password is used for this run only.
   launch: (params, launchOptions) => ipcRenderer.invoke('deploy:launch', params, launchOptions),
-  sudoStatus: () => ipcRenderer.invoke('deploy:sudo-status'),
+  sudoStatus: (target) => ipcRenderer.invoke('deploy:sudo-status', target),
   checkSudoPassword: (password) => ipcRenderer.invoke('deploy:check-sudo-password', password),
   // Returns a function that removes the listener. Each call gets { lines, steps } of the run.
   onDeployOutput: (callback) => {

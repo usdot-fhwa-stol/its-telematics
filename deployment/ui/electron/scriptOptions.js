@@ -56,16 +56,13 @@ function optionsFromListing(listing) {
   const useCase = listedOption(listing, '--use-case');
   const target = listedOption(listing, '--target');
 
-  // The form groups deploy.py's localhost and remote targets under on-premise.
-  const deployTo = builtIn.DEPLOY_TO.filter((option) => target.choices.includes(option.scriptTarget));
+  // On-premise is deploy.py's localhost target.
   const byName = (name) => listing.options.find((entry) => entry && entry.name === name);
   const cloud = cloudOptions(byName);
   const targets = builtIn.TARGETS
-    .filter((option) => (
-      option.value === 'on-premise' ? deployTo.length > 0 : target.choices.includes(option.value)
-    ))
+    .filter((option) => target.choices.includes(option.value === 'on-premise' ? builtIn.ON_PREMISE_TARGET : option.value))
     .map((option) => (cloud && option.value === 'cloud' ? { ...option, label: builtIn.CLOUD_TARGET_LABEL } : option));
-  const mapped = new Set([...builtIn.DEPLOY_TO.map((option) => option.scriptTarget), 'cloud']);
+  const mapped = new Set([builtIn.ON_PREMISE_TARGET, 'cloud', ...builtIn.OMITTED_TARGETS]);
   const unmapped = target.choices.filter((value) => !mapped.has(value));
 
   // Secret overrides are offered only when the script can read them from
@@ -77,7 +74,6 @@ function optionsFromListing(listing) {
 
   return {
     TARGETS: targets,
-    DEPLOY_TO: deployTo,
     ENVIRONMENTS: withLabels(environment.choices, builtIn.ENVIRONMENTS, environment.default),
     USE_CASES: withLabels(useCase.choices, builtIn.USE_CASES, useCase.default),
     SECRET_KEYS: secretKeys,

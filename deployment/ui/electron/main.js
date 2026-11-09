@@ -12,7 +12,7 @@ const { ServerAddressError, normalizeServerUrl, checkServer } = require('./serve
 const { configureTelematicsSession, createTelematicsView } = require('./telematicsView');
 const { createSignInQueue } = require('./signInQueue');
 const { AWS_PROFILE, CredentialsError, profileStatus, saveDefaultProfile } = require('./awsCredentials');
-const { passwordNeeded, checkPassword, startPasswordServer } = require('./sudoPassword');
+const { passwordNeeded, checkPassword, startPasswordServer, cloudInstalls } = require('./sudoPassword');
 
 // The repository whose deployment/ tree the app runs. During development the
 // app lives in <repo>/deployment/ui; TELEMATICS_REPO_ROOT points it elsewhere.
@@ -141,9 +141,11 @@ handle('aws:save-profile', async (credentials) => {
   }
 });
 
-// The administrator password for a localhost run (sudoPassword.js). The
-// confirmation dialog asks for it only when sudo needs one.
-handle('deploy:sudo-status', async () => ({ passwordNeeded: await passwordNeeded() }));
+handle('deploy:sudo-status', async (target) => {
+  if (target !== 'cloud') return { passwordNeeded: await passwordNeeded(), installs: [] };
+  const installs = cloudInstalls();
+  return { passwordNeeded: installs.length > 0 && await passwordNeeded(), installs };
+});
 
 handle('deploy:check-sudo-password', async (password) => ({ error: await checkPassword(password) }));
 
@@ -156,8 +158,9 @@ handle('deploy:launch', async (params, { remember, sudoPassword } = {}) => {
   } catch (error) {
     return validationResult(error);
   }
-  const passwordServer = valid.target === 'localhost' && typeof sudoPassword === 'string' && sudoPassword
-    ? startPasswordServer(sudoPassword)
+  const usesPassword = valid.target === 'localhost' || valid.target === 'cloud';
+  const passwordServer = usesPassword && typeof sudoPassword === 'string' && sudoPassword
+    ? startPasswordServer(sudoPassword, { ansibleBecome: valid.target === 'localhost' })
     : null;
   try {
     if (passwordServer) await passwordServer.listening;

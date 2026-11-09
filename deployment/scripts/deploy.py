@@ -14,6 +14,8 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 
 from configuration_service import generate_terraform_variables, DEFAULT_AWS_REGION
 from models import (
@@ -24,6 +26,7 @@ from models import (
     ROLE_DATABASE,
     ROLE_PROCESSING,
     ROLE_UI,
+    SYSTEM_DIR,
     TARGET_CLOUD,
     TARGET_LOCALHOST,
     TARGET_REMOTE,
@@ -565,6 +568,79 @@ def provision_cloud_infrastructure(parameters: InputParameters):
     return inventory, synthesizer.target_profiles
 
 
+LOCALHOST_UI_FALLBACK = "http://localhost/"
+UI_PROBE_TIMEOUT_SECONDS = 2
+UI_PROBE_ROUNDS = 5
+UI_PROBE_DELAY_SECONDS = 3
+
+
+def allowed_client_urls(env_file=None):
+    """Return the http(s) origins in ALLOW_CLIENT_URL, in order, each with a trailing slash.
+
+    Args:
+        env_file: The runtime .env to read; defaults to the one the deployment generated.
+
+    Returns:
+        The origins, or an empty list if the file or the setting is missing.
+    """
+    try:
+        lines = Path(env_file or SYSTEM_DIR / ".env").read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return []
+    for line in lines:
+        key, _, value = line.partition("=")
+        if key.strip() == "ALLOW_CLIENT_URL":
+            entries = (entry.strip().strip('"') for entry in value.split(" #")[0].strip().strip('"').split(","))
+            return [entry.rstrip("/") + "/" for entry in entries if entry.startswith(("http://", "https://"))]
+    return []
+
+
+def ui_answers(url, timeout=UI_PROBE_TIMEOUT_SECONDS):
+    """Return whether a web server answers at url with any HTTP response.
+
+    An error status such as 401 still counts: the server is up. Proxy settings are ignored, since
+    the addresses are on this machine.
+    """
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open(urllib.request.Request(url, method="GET"), timeout=timeout):
+            return True
+    except urllib.error.HTTPError:
+        return True
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+
+
+def localhost_ui_url(env_file=None, answers=ui_answers, rounds=UI_PROBE_ROUNDS, delay=UI_PROBE_DELAY_SECONDS):
+    """Return the web UI address of a localhost deployment.
+
+    The candidates are the ALLOW_CLIENT_URL origins (the web server accepts browser requests only
+    from these), then http://localhost/. Which one serves the UI depends on the Apache image: the prod
+    images answer at http://local.cav-telematics.com:8888, the develop images on port 80. Each is
+    tried with a short HTTP request; Apache may still be starting, so the candidates are tried for a
+    few rounds.
+
+    Args:
+        env_file: The runtime .env to read; defaults to the one the deployment generated.
+        answers: Function that reports whether a URL answers.
+        rounds: How many times to try the candidates.
+        delay: Seconds to wait between rounds.
+
+    Returns:
+        The first candidate that answers, or, if none does, the first candidate.
+    """
+    candidates = allowed_client_urls(env_file)
+    if LOCALHOST_UI_FALLBACK not in candidates:
+        candidates.append(LOCALHOST_UI_FALLBACK)
+    for attempt in range(rounds):
+        if attempt:
+            time.sleep(delay)
+        for url in candidates:
+            if answers(url):
+                return url
+    return candidates[0]
+
+
 def execute_deployment_pipeline(parameters: InputParameters):
     """Run every deployment stage for the selected target, in order.
 
@@ -599,9 +675,11 @@ def execute_deployment_pipeline(parameters: InputParameters):
     result = run_step("Run automated deployment", automation.dispatch_automation_plan)
     ui_url = None
     if result.success:
-        ui_hosts = inventory.target_groups.get("ui") or [target_profiles[0].address]
-        host = "localhost" if parameters.target == TARGET_LOCALHOST else ui_hosts[0]
-        ui_url = f"http://{host}/"
+        if parameters.target == TARGET_LOCALHOST:
+            ui_url = localhost_ui_url()
+        else:
+            ui_hosts = inventory.target_groups.get("ui") or [target_profiles[0].address]
+            ui_url = f"http://{ui_hosts[0]}/"
     summary = result.summarize(time.monotonic() - started, ui_url)
     if not result.success:
         print(summary.to_json(), file=sys.stderr, flush=True)

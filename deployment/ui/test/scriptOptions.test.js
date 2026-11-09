@@ -39,7 +39,6 @@ test('the real deploy.py lists the choices the app has labels for', async () => 
   assert.deepEqual(values(options.ENVIRONMENTS), values(builtIn.ENVIRONMENTS));
   assert.deepEqual(values(options.USE_CASES), values(builtIn.USE_CASES));
   assert.deepEqual(values(options.TARGETS), values(builtIn.TARGETS));
-  assert.deepEqual(values(options.DEPLOY_TO), values(builtIn.DEPLOY_TO));
   assert.equal(options.ENVIRONMENTS.find((option) => option.value === 'prod').label, 'prod (default)');
 });
 
@@ -53,15 +52,17 @@ test('follows choices added to or removed from deploy.py', () => {
 test('offers only the targets deploy.py accepts', () => {
   const localOnly = optionsFromListing(listing({ targets: ['localhost'] }));
   assert.deepEqual(values(localOnly.TARGETS), ['on-premise']);
-  assert.deepEqual(values(localOnly.DEPLOY_TO), ['local']);
+  assert.deepEqual(values(optionsFromListing(listing({ targets: ['remote', 'cloud'] })).TARGETS), ['cloud']);
 
+  // remote is left out on purpose, so only other unknown targets are mentioned.
+  assert.equal(optionsFromListing(listing()).notice, null);
   const extra = optionsFromListing(listing({ targets: ['localhost', 'remote', 'cloud', 'edge'] }));
-  assert.match(extra.notice, /--target edge/);
+  assert.match(extra.notice, /accepts --target edge, which/);
 });
 
 test('validates against the listed choices', () => {
   const options = optionsFromListing(listing({ environments: ['dev'] }));
-  const params = { target: 'on-premise', deployTo: 'local', environment: 'prod', useCase: 'core' };
+  const params = { target: 'on-premise', environment: 'prod', useCase: 'core' };
   assert.throws(() => validateParams(params, options), ValidationError);
   assert.equal(validateParams({ ...params, environment: 'dev' }, options).environment, 'dev');
 });

@@ -8,6 +8,8 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const builtInOptions = require('./cliOptions');
+
+const { ON_PREMISE_TARGET } = builtInOptions;
 const { AWS_PROFILE, profileStatus } = require('./awsCredentials');
 
 const DEPLOY_SCRIPT = path.join('deployment', 'scripts', 'deploy.py');
@@ -91,7 +93,7 @@ function checkCloud(input, cloud, env, valid, errors) {
 // `options` are the lists the form showed (see scriptOptions.js); `env` is
 // where the AWS credentials file is looked up, as deploy.py does.
 function validateParams(params, options = builtInOptions, { env = process.env } = {}) {
-  const { TARGETS, DEPLOY_TO, ENVIRONMENTS, USE_CASES } = options;
+  const { TARGETS, ENVIRONMENTS, USE_CASES } = options;
   const input = params && typeof params === 'object' ? params : {};
   const errors = [];
 
@@ -99,24 +101,10 @@ function validateParams(params, options = builtInOptions, { env = process.env } 
   if (!findOption(ENVIRONMENTS, input.environment)) errors.push('Choose an environment.');
   if (!findOption(USE_CASES, input.useCase)) errors.push('Choose a use case.');
 
-  let scriptTarget = 'cloud';
+  // On-premise deploys to this machine only.
+  const scriptTarget = input.target === 'on-premise' ? ON_PREMISE_TARGET : 'cloud';
   const valid = {};
-  if (input.target === 'on-premise') {
-    const deployTo = findOption(DEPLOY_TO, input.deployTo);
-    if (!deployTo) {
-      errors.push('Choose where to deploy.');
-    } else {
-      scriptTarget = deployTo.scriptTarget;
-    }
-    if (input.deployTo === 'remote') {
-      valid.remoteIo = checkText(input.remoteIo, 'Host address', errors);
-      valid.remoteUser = checkText(input.remoteUser, 'SSH user', errors);
-      if (input.keyPath) {
-        const keyPath = checkKeyPath(input.keyPath, errors);
-        if (keyPath) valid.keyPath = keyPath;
-      }
-    }
-  } else if (input.target === 'cloud' && options.CLOUD) {
+  if (input.target === 'cloud' && options.CLOUD) {
     checkCloud(input, options.CLOUD, env, valid, errors);
   }
 
@@ -162,10 +150,6 @@ function buildArgs(valid) {
     '--target', valid.target,
     '--use-case', valid.useCase,
   ];
-  if (valid.target === 'remote') {
-    args.push(`--remote-io=${valid.remoteIo}`, `--remote-user=${valid.remoteUser}`);
-    if (valid.keyPath) args.push(`--key-path=${valid.keyPath}`);
-  }
   // Only with deploy.py's cloud options. Never --aws-access-key-id or
   // --aws-secret-access-key: deploy.py reads the default profile instead.
   if (valid.target === 'cloud' && valid.awsRegion) {
@@ -192,13 +176,56 @@ function formatCommand(args) {
 // (`partial`) or a line cut short by the step's "    - " progress bullets.
 const STEP_LINE = /^\[(\d+)\] (.+?)[ .]*(OK|FAILED)?$/;
 
+const CLOUD_STAGES = [
+  { name: 'Install Terraform', start: /^error: Terraform is not installed/, end: /^Terraform installation: OK$/ },
+  { name: 'Plan AWS infrastructure', start: /^Generated Terraform variables: /, end: /^Proposed infrastructure changes:$/ },
+  { name: 'Create AWS infrastructure', start: /^Applying the plan\.$/, end: /^Ansible inventory: / },
+];
+const RUN_FAILED = /^Deployment failed at step: /;
+
 function parseSteps(lines, partial = '') {
+  const texts = [...lines.map((line) => line.text), partial];
+  const failed = texts.some((text) => RUN_FAILED.test(text));
+  const stages = [];
+  for (const stage of CLOUD_STAGES) {
+    const start = texts.findIndex((text) => stage.start.test(text));
+    if (start === -1) continue;
+    const ended = texts.slice(start + 1).some((text) => stage.end.test(text));
+    stages.push({ name: stage.name, status: ended ? 'OK' : failed ? 'FAILED' : 'running' });
+  }
   const steps = new Map();
-  for (const text of [...lines.map((line) => line.text), partial]) {
+  for (const text of texts) {
     const match = text.match(STEP_LINE);
     if (match) steps.set(Number(match[1]), { name: match[2], status: match[3] || 'running' });
   }
-  return [...steps.values()];
+  return [...stages, ...steps.values()];
+}
+
+// deploy.py's Ansible inventory: one "<address> role=\"…\" private_ip=\"…\" …"
+// line per host and group. A centralized node is listed once per group.
+function parseInventory(text) {
+  const hosts = new Map();
+  for (const line of text.split('\n')) {
+    const match = line.match(/^(\S+)\s+(.*)$/);
+    if (!match || match[1].startsWith('[') || hosts.has(match[1])) continue;
+    const vars = Object.fromEntries([...match[2].matchAll(/(\w+)="([^"]*)"/g)].map((entry) => [entry[1], entry[2]]));
+    hosts.set(match[1], { address: match[1], role: vars.role || '', privateIp: vars.private_ip || '' });
+  }
+  return [...hosts.values()];
+}
+
+// The EC2 instances of a cloud run, from the inventory it printed it wrote.
+// An inventory from an earlier run is never read: the path must come from
+// this run's output and lie inside the repository.
+function readCloudInstances(summary, repoRoot) {
+  if (!summary.inventoryPath) return [];
+  const file = path.resolve(repoRoot, summary.inventoryPath);
+  if (!file.startsWith(path.resolve(repoRoot) + path.sep)) return [];
+  try {
+    return parseInventory(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return [];
+  }
 }
 
 // Picks the known markers out of deploy.py and configuration_service.py output.
@@ -216,6 +243,12 @@ function parseOutput(lines) {
     // deploy.py's ExecutionSummary: overall_status, ui_url, active_services, diagnostics.
     execution: null,
     uiUrl: null,
+    // Cloud runs: the inventory deploy.py wrote once the instances existed,
+    // and what happened to them when provisioning failed.
+    inventoryPath: null,
+    sshCommand: null,
+    rollback: null,
+    rollbackCommand: null,
     steps: parseSteps(lines),
   };
   // deploy.py prints its ExecutionSummary as indented JSON, from "{" to "}".
@@ -247,14 +280,28 @@ function parseOutput(lines) {
       summary.configuredSecrets.push({ key: match[1], source: match[2] });
     } else if ((match = text.match(/^Generated runtime configuration: (.+)$/))) {
       summary.generatedEnv = match[1];
+    } else if ((match = text.match(/^Ansible inventory: (.+)$/))) {
+      summary.inventoryPath = match[1];
+    } else if ((match = text.match(/^SSH debug connection: (ssh .+)$/))) {
+      summary.sshCommand = match[1];
+    } else if (text.startsWith('Rollback complete')) {
+      summary.rollback = 'complete';
+    } else if ((match = text.match(/^Rollback FAILED\. Remove leftovers manually: (.+)$/))) {
+      summary.rollback = 'failed';
+      summary.rollbackCommand = match[1];
+    } else if (text.startsWith('Rollback could not run')) {
+      summary.rollback = 'failed';
+    // A failed stage is reported again by each stage around it, ending with
+    // "Execute deployment pipeline"; the first report names the stage itself.
     } else if ((match = text.match(/^Deployment failed at step: (.+)$/))) {
-      summary.failedStep = match[1];
+      summary.failedStep = summary.failedStep || match[1];
     } else if ((match = text.match(/^Exit code: (-?\d+)$/))) {
-      summary.reportedExitCode = Number(match[1]);
+      summary.reportedExitCode = summary.reportedExitCode ?? Number(match[1]);
     } else if ((match = text.match(/^Hint: (.+)$/))) {
-      summary.hint = match[1];
+      summary.hint = summary.hint || match[1];
     } else if ((match = text.match(/^error: (.+)$/))) {
-      summary.errors.push(match[1]);
+      // "error: Terraform is not installed …; installing it now." is a notice.
+      if (!match[1].endsWith('installing it now.')) summary.errors.push(match[1]);
     } else if (text.startsWith('{')) {
       try {
         const value = JSON.parse(text);
@@ -337,6 +384,7 @@ function runDeploy(valid, { repoRoot, python = 'python3', extraEnv = {}, env = p
         if (pending[stream]) addLine(stream, pending[stream]);
         pending[stream] = '';
       }
+      const summary = parseOutput(lines);
       resolve({
         ok: exitCode === 0,
         exitCode,
@@ -348,7 +396,9 @@ function runDeploy(valid, { repoRoot, python = 'python3', extraEnv = {}, env = p
         startedAt,
         finishedAt: new Date().toISOString(),
         lines,
-        summary: parseOutput(lines),
+        summary,
+        instances: valid.target === 'cloud' ? readCloudInstances(summary, repoRoot) : [],
+        awsRegion: valid.awsRegion || null,
       });
     };
     child.on('error', (error) => {
@@ -370,5 +420,6 @@ module.exports = {
   formatCommand,
   parseSteps,
   parseOutput,
+  parseInventory,
   runDeploy,
 };

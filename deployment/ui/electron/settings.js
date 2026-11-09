@@ -9,7 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const REMEMBERED_FIELDS = [
-  'environment', 'useCase', 'deployTo', 'remoteIo', 'remoteUser', 'keyPath', 'awsRegion', 'awsProfile', 'topology',
+  'environment', 'useCase', 'keyPath', 'awsRegion', 'awsProfile', 'topology',
 ];
 
 function readJson(file, fallback) {
