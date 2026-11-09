@@ -76,12 +76,6 @@ function CloudInstances({ result }) {
         {result.ok ? 'These instances' : 'The instances were created and'} keep running, and AWS charges for them,
         until you stop or terminate them in the AWS console (EC2, Instances, names starting with telematics-).
       </Alert>
-      {summary.sshCommand && (
-        <>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Connect to the first instance:</Typography>
-          <Mono>{summary.sshCommand}</Mono>
-        </>
-      )}
     </Field>
   );
 }

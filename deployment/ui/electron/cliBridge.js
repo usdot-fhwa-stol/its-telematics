@@ -246,7 +246,6 @@ function parseOutput(lines) {
     // Cloud runs: the inventory deploy.py wrote once the instances existed,
     // and what happened to them when provisioning failed.
     inventoryPath: null,
-    sshCommand: null,
     rollback: null,
     rollbackCommand: null,
     steps: parseSteps(lines),
@@ -282,8 +281,6 @@ function parseOutput(lines) {
       summary.generatedEnv = match[1];
     } else if ((match = text.match(/^Ansible inventory: (.+)$/))) {
       summary.inventoryPath = match[1];
-    } else if ((match = text.match(/^SSH debug connection: (ssh .+)$/))) {
-      summary.sshCommand = match[1];
     } else if (text.startsWith('Rollback complete')) {
       summary.rollback = 'complete';
     } else if ((match = text.match(/^Rollback FAILED\. Remove leftovers manually: (.+)$/))) {

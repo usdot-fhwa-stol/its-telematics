@@ -59,9 +59,8 @@ export default function AwsCredentialsDialog({ open, file, onClose, onSaved }) {
       <DialogContent>
         <Stack spacing={2}>
           <DialogContentText>
-            The app adds a [default] profile to <span style={{ fontFamily: monoFont }}>{file}</span>, readable
-            only by you, as deploy.py does with --aws-access-key-id. The keys are not passed to deploy.py or saved
-            anywhere else. Other AWS tools that use the default profile will use these keys too.
+            The app adds a default profile to <span style={{ fontFamily: monoFont }}>{file}</span>, readable. The keys are not passed or saved
+            anywhere else.
           </DialogContentText>
           {error && <Alert severity="error">{error}</Alert>}
           <TextField
