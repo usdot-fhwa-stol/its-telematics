@@ -3,27 +3,82 @@
   "productName": "Telematics Deploy",
   "version": "0.1.0",
   "private": true,
-  "description": "Desktop UI that collects deployment inputs and runs deployment/scripts/deploy.py",
+  "description": "Desktop app that collects deployment inputs and runs the Telematics deploy.py pipeline",
+  "homepage": "https://github.com/usdot-fhwa-stol/its-telematics",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "ITS Telematics team"
+  },
   "main": "electron/main.js",
+  "desktopName": "telematics-deploy.desktop",
   "scripts": {
     "dev": "node scripts/run-app.mjs",
     "build": "vite build",
     "start": "vite build && node scripts/run-app.mjs --built",
+    "stage-bundle": "node scripts/stage-bundle.mjs",
+    "dist": "vite build && node scripts/stage-bundle.mjs && electron-builder --linux deb",
     "test": "node --test \"test/**/*.test.js\""
   },
   "engines": {
     "node": ">=22.12.0"
   },
-  "dependencies": {
+  "devDependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/material": "^5.18.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
     "@vitejs/plugin-react": "^4.7.0",
     "electron": "^44.10.2",
+    "electron-builder": "26.18.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "vite": "^5.4.21"
+  },
+  "build": {
+    "appId": "org.its.telematics.deploy",
+    "productName": "Telematics Deploy",
+    "executableName": "telematics-deploy",
+    "directories": {
+      "output": "release",
+      "buildResources": "build-resources"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "electron/askpass.py"
+    ],
+    "extraResources": [
+      {
+        "from": "build/bundle",
+        "to": "bundle"
+      }
+    ],
+    "artifactName": "${name}-${version}-${arch}.${ext}",
+    "linux": {
+      "target": [
+        "deb"
+      ],
+      "category": "Development",
+      "synopsis": "Deploy and connect to the ITS Telematics system",
+      "maintainer": "ITS Telematics team",
+      "syncDesktopName": true
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0",
+        "python3",
+        "sudo"
+      ]
+    }
   }
 }

@@ -13,12 +13,26 @@ const { configureTelematicsSession, createTelematicsView } = require('./telemati
 const { createSignInQueue } = require('./signInQueue');
 const { AWS_PROFILE, CredentialsError, profileStatus, saveDefaultProfile } = require('./awsCredentials');
 const { passwordNeeded, checkPassword, startPasswordServer, cloudInstalls } = require('./sudoPassword');
+const { defaultWorkingCopy, installBundle } = require('./bundle');
 
-// The repository whose deployment/ tree the app runs. During development the
-// app lives in <repo>/deployment/ui; TELEMATICS_REPO_ROOT points it elsewhere.
-const REPO_ROOT = process.env.TELEMATICS_REPO_ROOT
-  ? path.resolve(process.env.TELEMATICS_REPO_ROOT)
-  : path.resolve(__dirname, '..', '..', '..');
+// The repository whose deployment/ tree the app runs. TELEMATICS_REPO_ROOT
+// points it at any checkout. Otherwise a packaged app runs its bundled copy,
+// installed to ~/.local/share/telematics-deploy, and during development the
+// app runs the repository it sits in (<repo>/deployment/ui).
+let REPO_ROOT = null;
+let repoRootError = null;
+if (process.env.TELEMATICS_REPO_ROOT) {
+  REPO_ROOT = path.resolve(process.env.TELEMATICS_REPO_ROOT);
+} else if (app.isPackaged) {
+  REPO_ROOT = defaultWorkingCopy();
+  try {
+    installBundle(path.join(process.resourcesPath, 'bundle'), REPO_ROOT);
+  } catch (error) {
+    repoRootError = error;
+  }
+} else {
+  REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
+}
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 
 let mainWindow = null;
@@ -211,6 +225,14 @@ handle('servers:close-view', () => telematicsView.close());
 handle('servers:answer-sign-in', (id, credentials) => signIn.answer(id, credentials));
 
 app.whenReady().then(() => {
+  if (repoRootError) {
+    dialog.showErrorBox(
+      'Telematics Deploy could not start',
+      `The deployment files could not be installed in ${REPO_ROOT}.\n\n${repoRootError.message}`,
+    );
+    app.quit();
+    return;
+  }
   configureTelematicsSession();
   createWindow();
   app.on('activate', () => {

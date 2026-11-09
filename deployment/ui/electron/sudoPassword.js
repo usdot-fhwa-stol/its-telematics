@@ -19,7 +19,11 @@ const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 
-const ASKPASS = path.join(__dirname, 'askpass.py');
+// sudo and Ansible execute this file, so a packaged app ships it outside its
+// asar archive (asarUnpack in package.json), in app.asar.unpacked.
+const ASKPASS = path.join(__dirname, 'askpass.py').replace(
+  `${path.sep}app.asar${path.sep}`, `${path.sep}app.asar.unpacked${path.sep}`,
+);
 const SOCKET_ENV = 'TELEMATICS_ASKPASS_SOCKET';
 const CHECK_TIMEOUT_MS = 15_000;
 const MAX_PASSWORD_LENGTH = 1024;

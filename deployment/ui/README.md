@@ -10,7 +10,7 @@ An Electron app with two paths, chosen on its start screen:
 
 ## Requirements
 
-- Ubuntu 22.04 or 24.04 with a desktop session
+- Ubuntu 22.04 or newer with a desktop session
 - Node.js 22.12 or newer (Electron 40 and later will not install on Node 20)
 - Python 3.9 or newer (`python3` on `PATH`), as `deploy.py` needs. Ubuntu
   20.04 ships Python 3.8, which `deploy.py` does not run on.
@@ -27,8 +27,54 @@ npm start       # production build, then Electron
 npm test        # CLI_Bridge unit tests
 ```
 
-The app runs `deploy.py` from the repository that contains it. To point it at
-another checkout, set `TELEMATICS_REPO_ROOT=/path/to/repo`.
+During development the app runs `deploy.py` from the repository that contains
+it. To point it at another checkout, set `TELEMATICS_REPO_ROOT=/path/to/repo`.
+
+## Packaging
+
+```bash
+sudo apt install binutils   # once: the .deb build needs `ar`
+cd deployment/ui
+npm install
+npm run dist
+```
+
+`npm run dist` writes `release/telematics-deploy-<version>-amd64.deb`. Raise
+`version` in `package.json` for each release.
+
+The package carries their own copy of the deployment files: everything git
+tracks under `deployment/` (except this app) and `telematic_system/`, staged by
+`scripts/stage-bundle.mjs` into `build/bundle/`. Tracked files are taken from
+the working tree, so commit first; the bundle's `manifest.json` records the
+commit and whether there were uncommitted changes.
+
+### What users need
+
+- Ubuntu 22.04 or newer with a desktop session, Python 3.9 or newer
+- To install, double-click the .deb (App Center may warn that a downloaded
+  package could be unsafe), or run
+  `sudo apt install ./telematics-deploy-<version>-amd64.deb`. It pulls in
+  `python3` and `sudo`, and adds Telematics Deploy to the app menu.
+- To update, install the newer .deb the same way. To remove it, use App
+  Center or `sudo apt remove telematics-deploy`; the deployment files in
+  `~/.local/share/telematics-deploy/` stay.
+
+### Where the packaged app keeps its files
+
+The app's own files are read-only, but `deploy.py` writes `.env`, secrets and
+Terraform state next to its scripts. So on first start the packaged app copies
+its bundled deployment files to `~/.local/share/telematics-deploy/` (or
+`$XDG_DATA_HOME/telematics-deploy/`) and runs `deploy.py` there.
+
+A newer version of the app replaces the bundled files there and removes those
+it no longer ships. It never touches files `deploy.py` generated: `.env`,
+`secrets/*.txt`, `terraform.tfstate`, `terraform.tfvars.json` and the
+Terraform provider cache stay. Edits to bundled files in that folder are
+overwritten by the next version. `TELEMATICS_REPO_ROOT` still points a packaged
+app at a checkout instead.
+
+`electron/askpass.py` is shipped outside the app's asar archive
+(`asarUnpack`), because sudo and Ansible execute it.
 
 ## Configuring Deployment
 
@@ -96,4 +142,6 @@ loads the final address if the server redirects. A bare address on a server that
 | `electron/signInQueue.js` | Queues HTTP authentication challenges from the view for the sign-in dialog |
 | `electron/sudoPassword.js` | Checks the administrator password and serves it to `askpass.py` during a localhost run |
 | `electron/askpass.py` | Hands that password to sudo and Ansible |
+| `electron/bundle.js` | Installs and updates the packaged app's copy of the deployment files |
+| `scripts/stage-bundle.mjs` | Stages those files for packaging |
 | `src/` | React screens: start screen, configure form, AWS credentials dialog, result page, server screen, the strip above a server's pages, and the sign-in dialog |
