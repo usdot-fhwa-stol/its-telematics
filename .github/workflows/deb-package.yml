@@ -2,9 +2,6 @@ name: Telematics Deploy package
 
 # Builds the Telematics Deploy Electron app (deployment/ui) into a .deb and
 # keeps it as a build artifact (telematics-deploy-deb) on the workflow run.
-# Download it from the run's summary page. Build artifacts expire, so for a tag
-# on master the .deb is also attached to the tag's GitHub Release, where it is
-# kept permanently.
 
 on:
   workflow_dispatch:
@@ -45,10 +42,6 @@ jobs:
         env:
           REVISION_INFO: ${{ needs.git-revision-info-get.outputs.git-revision-info }}
         run: |
-          # Match the C++ packages' Debian version, <version>-<revision info>.
-          # electron-builder turns a dash inside package.json's version into ~
-          # (which sorts before <version>), so the revision info goes in as the
-          # build number, which becomes the Debian revision instead.
           BUILD_ARGS=(--x64 --publish never)
           if [ -n "${REVISION_INFO}" ]; then
             BUILD_ARGS+=("-c.buildNumber=${REVISION_INFO}")
