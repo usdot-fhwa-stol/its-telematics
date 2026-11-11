@@ -48,6 +48,20 @@ tracks under `deployment/` (except this app) and `telematic_system/`, staged by
 the working tree, so commit first; the bundle's `manifest.json` records the
 commit and whether there were uncommitted changes.
 
+### CI builds
+
+The `Telematics Deploy package` workflow (`.github/workflows/deb-package.yml`)
+builds the .deb for every pull request and every push to `develop`, `master`
+and `release/*`. Download it from the run's summary page under **Artifacts**
+(`telematics-deploy-deb`, a zip holding the .deb); it expires after the repo's
+artifact retention period. For a tag on `master`, the .deb is also attached to
+the tag's GitHub Release, where it is kept.
+
+Branch builds are versioned `<version>-<date>.git<count>.<sha>`; tag builds use
+`<version>` alone, which sorts below the branch builds of that version. Raise
+`version` before tagging, or installing the release over a branch build is a
+downgrade.
+
 ### What users need
 
 - Ubuntu 22.04 or newer with a desktop session, Python 3.9 or newer
