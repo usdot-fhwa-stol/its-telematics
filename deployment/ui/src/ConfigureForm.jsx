@@ -164,15 +164,14 @@ function AwsCredentialsStatus({ status, onEdit, disabled }) {
   if (status.ready) {
     return (
       <Alert severity="success" action={editKeys('Edit keys')}>
-        The default profile has access keys. deploy.py and Terraform use them.
+        Your profile has access keys.
       </Alert>
     );
   }
   if (status.incomplete) {
     return (
       <Alert severity="warning" action={editKeys('Edit keys')}>
-        The default profile in {status.namedProfiles ? 'your AWS files' : file} is missing its access key ID or
-        secret access key. Enter both with Edit keys.
+        Your profile is missing its access key ID or secret access key. Enter both with Edit keys.
       </Alert>
     );
   }
@@ -181,8 +180,7 @@ function AwsCredentialsStatus({ status, onEdit, disabled }) {
       severity="warning"
       action={<Button color="inherit" size="small" onClick={() => onEdit(false)} disabled={disabled}>Add credentials</Button>}
     >
-      No access keys for the default profile in {file}. deploy.py needs them for the cloud target.
-      {status.inConfigFile && ` The default profile in ${status.configFile}, such as one set up for AWS SSO, is not enough: deploy.py only reads access keys from the credentials file.`}
+      No access keys for the default profile.
     </Alert>
   );
 }
