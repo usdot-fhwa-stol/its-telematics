@@ -23,7 +23,7 @@ import { monoFont } from './theme';
 const api = window.deployApi;
 
 const TARGET_HELP = {
-  'on-premise': 'Deploys to this machine with --target localhost. Asks for your administrator password.',
+  'on-premise': 'Deploys to this machine.',
   cloud: 'Creates AWS instances with Terraform, then deploys the stack to them.',
 };
 
