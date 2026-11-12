@@ -39,14 +39,32 @@ test('the real deploy.py lists the choices the app has labels for', async () => 
   assert.deepEqual(values(options.ENVIRONMENTS), values(builtIn.ENVIRONMENTS));
   assert.deepEqual(values(options.USE_CASES), values(builtIn.USE_CASES));
   assert.deepEqual(values(options.TARGETS), values(builtIn.TARGETS));
-  assert.equal(options.ENVIRONMENTS.find((option) => option.value === 'prod').label, 'prod (default)');
+  assert.ok(values(options.ENVIRONMENTS).includes(builtIn.DEPLOY_ENVIRONMENT));
+});
+
+test('lists the desired services in the form\'s order, with their services', () => {
+  const options = optionsFromListing(listing());
+  assert.deepEqual(options.USE_CASES.map((option) => [option.value, option.label]), [
+    ['core', 'Core Services'],
+    ['rsu_integration', 'RSU Management Services'],
+    ['all', 'All Services'],
+  ]);
+  const [core, rsu, all] = options.USE_CASES;
+  assert.match(core.description, /^All services needed to deploy the Telematics application/);
+  assert.ok(core.services.includes('Messaging Server'));
+  assert.ok(!core.services.includes('RSU Management Service'));
+  assert.ok(rsu.services.includes('RSU Management Service') && rsu.services.includes('InfluxDB v3'));
+  assert.ok(!rsu.services.includes('Messaging Server'));
+  assert.deepEqual([...all.services].sort(), [...new Set([...core.services, ...rsu.services])].sort());
 });
 
 test('follows choices added to or removed from deploy.py', () => {
   const options = optionsFromListing(listing({ environments: ['dev', 'staging'], useCases: ['core'] }));
   assert.deepEqual(options.ENVIRONMENTS, [{ value: 'dev', label: 'dev' }, { value: 'staging', label: 'staging' }]);
   assert.deepEqual(values(options.USE_CASES), ['core']);
-  assert.match(options.USE_CASES[0].label, /^core services only: /);
+  assert.equal(options.USE_CASES[0].label, 'Core Services');
+  const unknown = optionsFromListing(listing({ useCases: ['core', 'edge'] })).USE_CASES[1];
+  assert.deepEqual(unknown, { value: 'edge', label: 'edge', description: '', services: [] });
 });
 
 test('offers only the targets deploy.py accepts', () => {
@@ -61,10 +79,12 @@ test('offers only the targets deploy.py accepts', () => {
 });
 
 test('validates against the listed choices', () => {
-  const options = optionsFromListing(listing({ environments: ['dev'] }));
-  const params = { target: 'on-premise', environment: 'prod', useCase: 'core' };
-  assert.throws(() => validateParams(params, options), ValidationError);
-  assert.equal(validateParams({ ...params, environment: 'dev' }, options).environment, 'dev');
+  const params = { target: 'on-premise', useCase: 'core' };
+  assert.equal(validateParams(params, optionsFromListing(listing())).environment, 'prod');
+  // The app always sends prod, so a deploy.py without it can't be used.
+  assert.throws(() => validateParams(params, optionsFromListing(listing({ environments: ['dev'] }))),
+    /does not accept --environment prod/);
+  assert.throws(() => validateParams(params, optionsFromListing(listing({ useCases: ['all'] }))), ValidationError);
 });
 
 test('rejects a listing in another format', () => {
@@ -111,8 +131,8 @@ test('offers the cloud fields only when deploy.py lists its cloud options', asyn
   assert.equal(options.CLOUD.defaultRegion, 'us-east-1');
   assert.equal(options.CLOUD.defaultTopology, 'centralized');
   assert.deepEqual(values(options.CLOUD.TOPOLOGIES), ['centralized', 'distributed']);
-  assert.match(options.CLOUD.TOPOLOGIES[0].label, /\(default\)$/);
-  assert.deepEqual(values(options.CLOUD.PROFILES), ['default']);
+  assert.deepEqual(options.CLOUD.TOPOLOGIES.map((option) => option.label), ['Single Server', 'Multiple Servers']);
+  assert.match(options.CLOUD.TOPOLOGIES[1].details, /m5n\.8xlarge.*t2\.2xlarge.*t2\.large/);
   assert.equal(options.TARGETS.find((option) => option.value === 'cloud').label, builtIn.CLOUD_TARGET_LABEL);
 
   assert.equal(options.CLOUD.namedProfiles, false);

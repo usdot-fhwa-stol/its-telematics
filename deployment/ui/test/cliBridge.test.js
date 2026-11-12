@@ -9,7 +9,7 @@ const {
   ValidationError, validateParams, buildArgs, formatCommand, parseSteps, parseOutput, parseInventory, runDeploy,
 } = require('../electron/cliBridge');
 
-const localCore = { target: 'on-premise', environment: 'dev', useCase: 'core' };
+const localCore = { target: 'on-premise', useCase: 'core' };
 
 function errorsFor(params) {
   try {
@@ -23,14 +23,14 @@ function errorsFor(params) {
 
 test('builds the README examples for this machine', () => {
   assert.deepEqual(buildArgs(validateParams(localCore)),
-    ['--environment', 'dev', '--target', 'localhost', '--use-case', 'core']);
+    ['--environment', 'prod', '--target', 'localhost', '--use-case', 'core']);
   assert.deepEqual(buildArgs(validateParams({ ...localCore, useCase: 'rsu_integration' })),
-    ['--environment', 'dev', '--target', 'localhost', '--use-case', 'rsu_integration']);
+    ['--environment', 'prod', '--target', 'localhost', '--use-case', 'rsu_integration']);
 });
 
 test('formats the command as typed from the repository root', () => {
   assert.equal(formatCommand(buildArgs(validateParams(localCore))),
-    './deployment/scripts/deploy.py --environment dev --target localhost --use-case core');
+    './deployment/scripts/deploy.py --environment prod --target localhost --use-case core');
 });
 
 test('maps cloud and ignores fields from other targets', () => {
@@ -41,17 +41,22 @@ test('maps cloud and ignores fields from other targets', () => {
 test('on-premise always deploys to this machine, even with old remote settings', () => {
   const stale = { ...localCore, deployTo: 'remote', remoteIo: '10.0.0.5', remoteUser: 'ubuntu', keyPath: '/no/such/key' };
   assert.deepEqual(buildArgs(validateParams(stale)),
-    ['--environment', 'dev', '--target', 'localhost', '--use-case', 'core']);
+    ['--environment', 'prod', '--target', 'localhost', '--use-case', 'core']);
 });
 
 test('reports every missing field at once', () => {
-  assert.deepEqual(errorsFor({}), ['Choose a target.', 'Choose an environment.', 'Choose a use case.']);
+  assert.deepEqual(errorsFor({}), ['Choose a deployment mode.', 'Choose the desired services.']);
 });
 
 test('rejects values outside the deploy.py choices', () => {
-  assert.deepEqual(errorsFor({ ...localCore, environment: 'staging' }), ['Choose an environment.']);
-  assert.deepEqual(errorsFor({ ...localCore, target: 'localhost' }), ['Choose a target.']);
-  assert.deepEqual(errorsFor({ ...localCore, target: 'remote' }), ['Choose a target.']);
+  assert.deepEqual(errorsFor({ ...localCore, useCase: 'everything' }), ['Choose the desired services.']);
+  assert.deepEqual(errorsFor({ ...localCore, target: 'localhost' }), ['Choose a deployment mode.']);
+  assert.deepEqual(errorsFor({ ...localCore, target: 'remote' }), ['Choose a deployment mode.']);
+});
+
+test('always deploys prod, whatever environment the form or old settings send', () => {
+  assert.equal(validateParams({ ...localCore, environment: 'dev' }).environment, 'prod');
+  assert.equal(validateParams(localCore).environment, 'prod');
 });
 
 test('parses the markers deploy.py prints', () => {
@@ -190,11 +195,13 @@ test('lists each instance of the inventory once', () => {
   ]);
 });
 
-test('keeps the data only when the script lists --volume-prune', () => {
+test('always keeps existing data when the script lists --volume-prune', () => {
   const listed = { ...require('../electron/cliOptions'), SECRET_KEYS: [], prunesVolumes: true };
-  assert.equal(buildArgs(validateParams({ ...localCore, keepData: true }, listed)).at(-1), '--no-volume-prune');
-  assert.equal(buildArgs(validateParams({ ...localCore, keepData: false }, listed)).includes('--no-volume-prune'), false);
-  assert.equal(buildArgs(validateParams({ ...localCore, keepData: true })).includes('--no-volume-prune'), false);
+  assert.equal(buildArgs(validateParams(localCore, listed)).at(-1), '--no-volume-prune');
+  // An old saved keepData: false doesn't turn it off.
+  assert.equal(buildArgs(validateParams({ ...localCore, keepData: false }, listed)).at(-1), '--no-volume-prune');
+  // A deploy.py without the flag gets nothing it can't parse.
+  assert.equal(buildArgs(validateParams(localCore)).includes('--no-volume-prune'), false);
 });
 
 // A stand-in deploy.py that echoes what it received.
@@ -221,7 +228,7 @@ test('runs deploy.py without a shell, from the repository root', async () => {
   const repoRoot = fakeRepo();
   // A free-text value with shell syntax; validateParams would reject this key path, so it is built directly.
   const valid = {
-    environment: 'dev', target: 'cloud', useCase: 'core',
+    environment: 'prod', target: 'cloud', useCase: 'core',
     awsRegion: 'us-east-1', topology: 'centralized', keyPath: '/keys/$(touch${IFS}pwned)',
   };
   const outputs = [];
@@ -233,7 +240,7 @@ test('runs deploy.py without a shell, from the repository root', async () => {
   assert.equal(result.exitCode, 0);
   const echoed = JSON.parse(result.lines.find((line) => line.stream === 'stdout').text);
   assert.deepEqual(echoed.argv, [
-    '--environment', 'dev', '--target', 'cloud', '--use-case', 'core',
+    '--environment', 'prod', '--target', 'cloud', '--use-case', 'core',
     '--aws-region=us-east-1', '--centralized', '--key-path=/keys/$(touch${IFS}pwned)',
   ]);
   assert.equal(echoed.cwd, fs.realpathSync(repoRoot));
@@ -245,7 +252,7 @@ test('runs deploy.py without a shell, from the repository root', async () => {
   assert.ok(result.lines.some((line) => line.stream === 'stderr' && line.text === 'problem'));
   assert.ok(result.lines.some((line) => line.text === 'no trailing newline'));
   assert.equal(result.command,
-    "./deployment/scripts/deploy.py --environment dev --target cloud --use-case core --aws-region=us-east-1 --centralized '--key-path=/keys/$(touch${IFS}pwned)'");
+    "./deployment/scripts/deploy.py --environment prod --target cloud --use-case core --aws-region=us-east-1 --centralized '--key-path=/keys/$(touch${IFS}pwned)'");
 });
 
 test('reports a failing exit code', async () => {
@@ -347,7 +354,6 @@ const cloudOptions = {
     defaultRegion: 'us-east-1',
     defaultTopology: 'centralized',
     TOPOLOGIES: builtIn.TOPOLOGIES,
-    PROFILES: [{ value: 'default', label: 'default' }],
   },
 };
 
@@ -390,8 +396,9 @@ test('checks the cloud fields', () => {
   assert.deepEqual(errors({ awsRegion: 'us east 1' }), ['AWS region must not contain spaces or control characters.']);
   assert.deepEqual(errors({ awsRegion: 'mars-1' }), ['AWS region must look like us-east-1.']);
   assert.deepEqual(errors({ awsRegion: '' }), ['AWS region is required.']);
-  assert.deepEqual(errors({ topology: 'edge' }), ['Choose a topology.']);
-  assert.deepEqual(errors({ awsProfile: 'work' }), ['Choose an AWS profile.']);
+  assert.deepEqual(errors({ topology: 'edge' }), ['Choose a server setup.']);
+  // The form has no profile field: an old saved profile is ignored.
+  assert.deepEqual(errors({ awsProfile: 'work' }), []);
   assert.deepEqual(errors({ keyPath: '' }), ['Choose the SSH key for the instances.']);
   assert.deepEqual(errors({ keyPath: '/no/such/key' }), ['SSH key file does not exist or is not readable.']);
   assert.equal(validateParams({ ...params, awsRegion: 'us-gov-west-1' }, cloudOptions, { env }).awsRegion, 'us-gov-west-1');
@@ -405,25 +412,18 @@ test('keeps the plain cloud command for a deploy.py without cloud options', () =
   assert.deepEqual(buildArgs(validateParams(params)), ['--environment', 'prod', '--target', 'cloud', '--use-case', 'all']);
 });
 
-test('passes the chosen profile when deploy.py takes --aws-profile', () => {
+test('always uses the default profile, also when deploy.py takes --aws-profile', () => {
   const { params, env, key } = cloudFixture({ credentials: null });
-  fs.writeFileSync(env.AWS_CONFIG_FILE, '[default]\nsso_session = lab\n[profile lab-admin]\nsso_session = lab\n[profile empty]\nregion = x\n');
+  fs.writeFileSync(env.AWS_CONFIG_FILE, '[default]\nsso_session = lab\n[profile lab-admin]\nsso_session = lab\n');
   const named = { ...cloudOptions, CLOUD: { ...cloudOptions.CLOUD, namedProfiles: true } };
   assert.deepEqual(buildArgs(validateParams(params, named, { env })).slice(6), [
     '--aws-profile=default', '--aws-region=us-west-2', '--distributed', `--key-path=${key}`,
   ]);
-  assert.equal(buildArgs(validateParams({ ...params, awsProfile: 'lab-admin' }, named, { env }))[6], '--aws-profile=lab-admin');
-  const errors = (awsProfile) => {
-    try {
-      validateParams({ ...params, awsProfile }, named, { env });
-    } catch (error) {
-      return error.errors;
-    }
-    return [];
-  };
-  assert.deepEqual(errors('empty'), ['The empty AWS profile has no credentials deploy.py can use.']);
-  assert.deepEqual(errors('nope'), ['Choose an AWS profile.']);
+  // A profile saved by an earlier version is ignored.
+  assert.equal(buildArgs(validateParams({ ...params, awsProfile: 'lab-admin' }, named, { env }))[6], '--aws-profile=default');
   // Without --aws-profile, the same SSO default profile is not enough.
-  assert.deepEqual(errors('default'), []);
   assert.throws(() => validateParams(params, cloudOptions, { env }), /Add AWS credentials for the default profile/);
+
+  fs.writeFileSync(env.AWS_CONFIG_FILE, '[default]\nregion = x\n');
+  assert.throws(() => validateParams(params, named, { env }), /default AWS profile has no credentials deploy.py can use/);
 });

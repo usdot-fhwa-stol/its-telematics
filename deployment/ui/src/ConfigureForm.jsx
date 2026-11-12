@@ -3,6 +3,7 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
+import Chip from '@mui/material/Chip';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -28,13 +29,10 @@ const TARGET_HELP = {
 
 export const EMPTY_PARAMS = {
   target: '',
-  environment: '',
   useCase: '',
   keyPath: '',
   awsRegion: '',
-  awsProfile: 'default',
   topology: '',
-  keepData: false,
   // Held in memory only: never saved and never on the command line.
   secretOverrides: {},
 };
@@ -73,6 +71,55 @@ function OptionSelect({ id, label, value, options, onChange, helperText, disable
   );
 }
 
+// A dropdown whose options show their name and, in the menu, a description.
+// The chosen option's description is the helper text.
+function DescribedSelect({ id, label, value, options, onChange, disabled, placeholderHelp }) {
+  const selected = options.find((option) => option.value === value);
+  return (
+    <TextField
+      id={id} select required fullWidth label={label} value={value}
+      onChange={(event) => onChange(event.target.value)} disabled={disabled}
+      helperText={selected?.description || placeholderHelp}
+      SelectProps={{ renderValue: (picked) => options.find((option) => option.value === picked)?.label || picked }}
+    >
+      {options.map((option) => (
+        <MenuItem key={option.value} value={option.value} sx={{ whiteSpace: 'normal' }}>
+          <Stack spacing={0.25} sx={{ py: 0.25 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.label}</Typography>
+            {option.description && (
+              <Typography variant="caption" color="text.secondary">{option.description}</Typography>
+            )}
+          </Stack>
+        </MenuItem>
+      ))}
+    </TextField>
+  );
+}
+
+// "Desired Services", with the services the chosen option starts below it.
+function ServicesSelect({ value, options, onChange, disabled }) {
+  const selected = options.find((option) => option.value === value);
+  return (
+    <Stack spacing={1}>
+      <DescribedSelect
+        id="use-case" label="Desired Services" value={value} options={options} onChange={onChange}
+        disabled={disabled} placeholderHelp="Decides which services come up."
+      />
+      {selected?.services.length > 0 && (
+        <Stack
+          direction="row" useFlexGap flexWrap="wrap" spacing={0.75} alignItems="center"
+          aria-label="Services that will be deployed" sx={{ px: 1.75 }}
+        >
+          <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
+            Deploys {selected.services.length} services:
+          </Typography>
+          {selected.services.map((name) => <Chip key={name} label={name} size="small" variant="outlined" />)}
+        </Stack>
+      )}
+    </Stack>
+  );
+}
+
 function KeyField({ id, label, value, helperText, onBrowse, onClear, disabled }) {
   return (
     <Stack direction="row" spacing={1} alignItems="flex-start">
@@ -89,69 +136,52 @@ function KeyField({ id, label, value, helperText, onBrowse, onClear, disabled })
 
 const PROFILE_KINDS = { keys: 'access keys', sso: 'SSO', role: 'role', process: 'credential process' };
 
-// The profile choices: every profile in the AWS files when deploy.py takes
-// --aws-profile, otherwise only the default profile.
-function profileOptions(cloud, status) {
-  if (!cloud.namedProfiles || !status?.profiles) return cloud.PROFILES;
-  const listed = status.profiles.map(({ name, kind }) => ({
-    value: name, label: `${name} (${PROFILE_KINDS[kind] || 'no credentials'})`,
-  }));
-  return listed.some((option) => option.value === 'default')
-    ? listed : [{ value: 'default', label: 'default (not set up)' }, ...listed];
-}
-
-// Whether deploy.py will find credentials for the chosen profile. The status
-// never includes a key.
-function AwsCredentialsStatus({ status, onAdd, disabled }) {
+// Whether deploy.py will find credentials in the default profile, which cloud
+// runs always use. The status never includes a key. `onEdit(replace)` opens the
+// access keys dialog: replace is true when the default profile already exists.
+function AwsCredentialsStatus({ status, onEdit, disabled }) {
   if (!status) return <Typography variant="body2" color="text.secondary">Checking AWS credentials…</Typography>;
   const mono = (text) => <Box component="span" sx={{ fontFamily: monoFont }}>{text}</Box>;
   const file = mono(status.file);
+  const editKeys = (label) => (
+    <Button color="inherit" size="small" onClick={() => onEdit(true)} disabled={disabled}>{label}</Button>
+  );
   if (status.ready && status.kind === 'sso') {
     return (
       <Alert severity="success">
-        The {status.profile} profile uses AWS SSO. deploy.py does not check the sign-in, so if your session has
-        expired, run {mono(`aws sso login --profile ${status.profile}`)} before Launch.
+        The default profile uses AWS SSO. deploy.py does not check the sign-in, so if your session has
+        expired, run {mono('aws sso login')} before Launch.
       </Alert>
     );
   }
   if (status.ready && status.kind !== 'keys') {
     return (
       <Alert severity="success">
-        The {status.profile} profile gets credentials from a {PROFILE_KINDS[status.kind]} in {mono(status.configFile)}.
+        The default profile gets credentials from a {PROFILE_KINDS[status.kind]} in {mono(status.configFile)}.
       </Alert>
     );
   }
   if (status.ready) {
     return (
-      <Alert severity="success">
-        The {status.profile} profile has access keys. deploy.py and Terraform use them.
-      </Alert>
-    );
-  }
-  if (status.incomplete && status.namedProfiles) {
-    return (
-      <Alert severity="warning">
-        The {status.profile} profile has no credentials deploy.py can use: it needs both access keys, SSO, a role
-        or a credential process. Fix it with aws configure, or choose another profile.
+      <Alert severity="success" action={editKeys('Edit keys')}>
+        The default profile has access keys. deploy.py and Terraform use them.
       </Alert>
     );
   }
   if (status.incomplete) {
     return (
-      <Alert severity="warning">
-        The [default] profile in {file} is missing aws_access_key_id or aws_secret_access_key. Fix it there,
-        or with aws configure.
+      <Alert severity="warning" action={editKeys('Edit keys')}>
+        The default profile in {status.namedProfiles ? 'your AWS files' : file} is missing its access key ID or
+        secret access key. Enter both with Edit keys.
       </Alert>
     );
   }
   return (
     <Alert
       severity="warning"
-      action={<Button color="inherit" size="small" onClick={onAdd} disabled={disabled}>Add credentials</Button>}
+      action={<Button color="inherit" size="small" onClick={() => onEdit(false)} disabled={disabled}>Add credentials</Button>}
     >
-      {status.namedProfiles
-        ? 'The default profile is not set up. Add access keys for it, set it up with aws configure sso, or choose another profile.'
-        : <>No access keys for the default profile in {file}. deploy.py needs them for the cloud target.</>}
+      No access keys for the default profile in {file}. deploy.py needs them for the cloud target.
       {status.inConfigFile && ` The default profile in ${status.configFile}, such as one set up for AWS SSO, is not enough: deploy.py only reads access keys from the credentials file.`}
     </Alert>
   );
@@ -160,10 +190,10 @@ function AwsCredentialsStatus({ status, onAdd, disabled }) {
 
 // What --target localhost does to this machine, from
 // deployment/config/ansible/playbooks/host_preparation.yml and deploy.py.
-function LocalhostSteps({ prunesVolumes }) {
+function LocalhostSteps() {
   return (
     <DialogContentText component="div">
-      Running this deployment with Ansible requires your password in order to prepare this machine and start the stack in Docker.
+      Running this deployment requires your password in order to prepare this machine and start the stack in Docker.
     </DialogContentText>
   );
 }
@@ -188,7 +218,8 @@ export default function ConfigureForm({
   const [preview, setPreview] = useState({ validationErrors: [] });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [awsStatus, setAwsStatus] = useState(null);
-  const [credentialsOpen, setCredentialsOpen] = useState(false);
+  // The access keys dialog: null when closed, { replace } when open.
+  const [credentialsDialog, setCredentialsDialog] = useState(null);
   // The administrator password for a localhost run. It stays in this dialog
   // until Continue, then goes to the main process for that run only.
   const [sudo, setSudo] = useState(NO_SUDO);
@@ -200,9 +231,9 @@ export default function ConfigureForm({
 
   useEffect(() => {
     let current = true;
-    if (isCloud) api.awsProfileStatus(params.awsProfile).then((status) => { if (current) setAwsStatus(status); });
+    if (isCloud) api.awsProfileStatus().then((status) => { if (current) setAwsStatus(status); });
     return () => { current = false; };
-  }, [isCloud, params.awsProfile]);
+  }, [isCloud]);
 
   // awsStatus: saving credentials can clear a validation error.
   useEffect(() => {
@@ -267,76 +298,39 @@ export default function ConfigureForm({
     <Paper variant="outlined" component="form" onSubmit={(event) => event.preventDefault()}>
       <Section title="Deployment" note="Required">
         {options.notice && <Alert severity="info">{options.notice}</Alert>}
-        <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
-          <OptionSelect
-            id="target" label="Target" value={params.target} options={options.TARGETS}
-            onChange={pickTarget} disabled={running}
-            helperText={TARGET_HELP[params.target] || 'Where the stack runs.'}
-          />
-          <OptionSelect
-            id="environment" label="Environment" value={params.environment} options={options.ENVIRONMENTS}
-            onChange={set('environment')} disabled={running}
-            helperText="Picks the image organization and tag."
-          />
-        </Box>
         <OptionSelect
-          id="use-case" label="Use case" value={params.useCase} options={options.USE_CASES}
-          onChange={set('useCase')} disabled={running}
-          helperText="Decides which services come up (full or partial)."
+          id="target" label="Deployment Mode" value={params.target} options={options.TARGETS}
+          onChange={pickTarget} disabled={running}
+          helperText={TARGET_HELP[params.target] || 'Where the stack runs.'}
         />
-        {options.prunesVolumes && (
-          <FormControlLabel
-            control={(
-              <Checkbox
-                checked={Boolean(params.keepData)} disabled={running}
-                onChange={(event) => set('keepData')(event.target.checked)}
-              />
-            )}
-            label={(
-              <>
-                Keep existing data{' '}
-                <Typography component="span" variant="body2" color="text.secondary">
-                  (--no-volume-prune. Otherwise each run deletes the stack's Docker volumes, so the databases start empty.)
-                </Typography>
-              </>
-            )}
-          />
-        )}
+        <ServicesSelect value={params.useCase} options={options.USE_CASES} onChange={set('useCase')} disabled={running} />
       </Section>
 
       {isCloud && (
         <>
           <Divider />
           <Section title="AWS" note="Required">
-            <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
-              <TextField
-                id="aws-region" label="Region" required value={params.awsRegion}
-                onChange={(event) => set('awsRegion')(event.target.value)} disabled={running}
-                placeholder={options.CLOUD.defaultRegion}
-                inputProps={{ spellCheck: false, style: { fontFamily: monoFont } }}
-              />
-              <OptionSelect
-                id="aws-profile" label="AWS profile" value={params.awsProfile || 'default'}
-                options={profileOptions(options.CLOUD, awsStatus)} onChange={set('awsProfile')} disabled={running}
-                helperText={options.CLOUD.namedProfiles
-                  ? `--aws-profile. From ${awsStatus?.file || '~/.aws/credentials'} and ${awsStatus?.configFile || '~/.aws/config'}.`
-                  : ''}
-              />
-            </Box>
-            <OptionSelect
-              id="topology" label="Topology" value={params.topology} options={options.CLOUD.TOPOLOGIES}
-              onChange={set('topology')} disabled={running}
-              helperText="Decides how many EC2 instances are created (centralized or distributed)."
+            <TextField
+              id="aws-region" label="Region" required value={params.awsRegion}
+              onChange={(event) => set('awsRegion')(event.target.value)} disabled={running}
+              placeholder={options.CLOUD.defaultRegion}
+              inputProps={{ spellCheck: false, style: { fontFamily: monoFont } }}
+            />
+            <DescribedSelect
+              id="topology" label="Server Setup" value={params.topology} options={options.CLOUD.TOPOLOGIES}
+              onChange={set('topology')} disabled={running} placeholderHelp="How many AWS servers are created."
             />
             <KeyField
               id="cloud-key-path" label="SSH key for the instances" value={params.keyPath}
-              helperText="--key-path. A public key, or an unencrypted private key such as a .pem. Terraform registers it as the instances' key pair."
+              helperText="A public key, or an unencrypted private key such as a .pem."
               onBrowse={browseKey} onClear={() => set('keyPath')('')} disabled={running}
             />
-            <AwsCredentialsStatus status={awsStatus} onAdd={() => setCredentialsOpen(true)} disabled={running} />
+            <AwsCredentialsStatus
+              status={awsStatus} onEdit={(replace) => setCredentialsDialog({ replace })} disabled={running}
+            />
             <AwsCredentialsDialog
-              open={credentialsOpen} file={awsStatus?.file} onClose={() => setCredentialsOpen(false)}
-              onSaved={setAwsStatus}
+              open={Boolean(credentialsDialog)} replace={Boolean(credentialsDialog?.replace)}
+              file={awsStatus?.file} onClose={() => setCredentialsDialog(null)} onSaved={setAwsStatus}
             />
           </Section>
         </>
@@ -419,7 +413,7 @@ export default function ConfigureForm({
       >
         <FormControlLabel
           control={<Checkbox checked={remember} onChange={(event) => onRememberChange(event.target.checked)} />}
-          label={<>Remember for this target <Typography component="span" variant="body2" color="text.secondary">(no secrets are saved)</Typography></>}
+          label={<>Remember for this deployment mode <Typography component="span" variant="body2" color="text.secondary">(no secrets are saved)</Typography></>}
         />
         <Box sx={{ flexGrow: 1, textAlign: 'right' }}>
           {!ready && preview.validationErrors?.length > 0 && (
@@ -438,13 +432,13 @@ export default function ConfigureForm({
           {isCloud ? (
             <DialogContentText component="div">
               With --target cloud, deploy.py runs Terraform in {params.awsRegion} with the{' '}
-              {params.awsProfile || 'default'} AWS profile. It creates:
+              default AWS profile. It creates:
               <ul>
                 <li>a VPC with a public subnet, internet gateway, security groups and a CloudWatch log group</li>
                 <li>an IAM role for the instances, and a key pair from the SSH key you chose</li>
                 <li>
                   EC2 instances with 100 GiB gp3 volumes.{' '}
-                  {options.CLOUD.TOPOLOGIES.find((option) => option.value === params.topology)?.label}
+                  {options.CLOUD.TOPOLOGIES.find((option) => option.value === params.topology)?.details}
                 </li>
               </ul>
               AWS charges for these until they are removed, which this app does not do: stop or terminate the
@@ -458,7 +452,7 @@ export default function ConfigureForm({
               )}
             </DialogContentText>
           ) : (
-            <LocalhostSteps prunesVolumes={options.prunesVolumes && !params.keepData} />
+            <LocalhostSteps />
           )}
           {sudo.needed === null && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>Checking sudo…</Typography>

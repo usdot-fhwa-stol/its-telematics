@@ -8,7 +8,6 @@ const { execFile } = require('node:child_process');
 const path = require('node:path');
 const builtIn = require('./cliOptions');
 const { DEPLOY_SCRIPT } = require('./cliBridge');
-const { AWS_PROFILE } = require('./awsCredentials');
 
 const LIST_TIMEOUT_MS = 10_000;
 const MAX_LISTING_BYTES = 256 * 1024;
@@ -28,6 +27,27 @@ function withLabels(choices, known, defaultValue) {
   });
 }
 
+// The services each use case starts, as display names in SERVICE_NAMES order.
+function serviceNames(services) {
+  return Object.keys(builtIn.SERVICE_NAMES)
+    .filter((name) => services.includes(name))
+    .map((name) => builtIn.SERVICE_NAMES[name]);
+}
+
+// "Desired Services": the use cases deploy.py lists, in the form's order, each
+// with its description and services. A use case the app doesn't know shows by
+// name, without a service list.
+function useCaseOptions(choices) {
+  const known = builtIn.USE_CASES.filter((option) => choices.includes(option.value));
+  const unknown = choices.filter((value) => !known.some((option) => option.value === value));
+  return [
+    ...known.map(({ value, label, description, services }) => ({
+      value, label, description, services: serviceNames(services),
+    })),
+    ...unknown.map((value) => ({ value, label: value, description: '', services: [] })),
+  ];
+}
+
 // The cloud fields need deploy.py's cloud options; without them the
 // form shows no cloud fields. Access keys are never offered: deploy.py
 // takes them only on the command line, so the app uses the default profile.
@@ -39,11 +59,10 @@ function cloudOptions(byName) {
   return {
     defaultRegion: typeof region.default === 'string' ? region.default : '',
     defaultTopology,
-    TOPOLOGIES: withLabels(topologies, builtIn.TOPOLOGIES, defaultTopology),
-    // With --aws-profile the form lists the profiles in the AWS files
-    // (awsCredentials.js); without it, deploy.py uses only the default profile.
+    TOPOLOGIES: builtIn.TOPOLOGIES.filter((option) => topologies.includes(option.value)),
+    // The app always uses the default profile. With --aws-profile, deploy.py
+    // also accepts it from the config file (SSO, role); without it, only access keys.
     namedProfiles: Boolean(byName('--aws-profile')),
-    PROFILES: [{ value: AWS_PROFILE, label: AWS_PROFILE }],
   };
 }
 
@@ -75,7 +94,7 @@ function optionsFromListing(listing) {
   return {
     TARGETS: targets,
     ENVIRONMENTS: withLabels(environment.choices, builtIn.ENVIRONMENTS, environment.default),
-    USE_CASES: withLabels(useCase.choices, builtIn.USE_CASES, useCase.default),
+    USE_CASES: useCaseOptions(useCase.choices),
     SECRET_KEYS: secretKeys,
     CLOUD: cloud,
     // Whether a run removes the stack's Docker volumes (deploy.py's --volume-prune default).
@@ -113,6 +132,7 @@ async function loadScriptOptions({ repoRoot, python = 'python3' }) {
   } catch (error) {
     return {
       ...builtIn,
+      USE_CASES: useCaseOptions(builtIn.USE_CASES.map((option) => option.value)),
       SECRET_KEYS: [],
       CLOUD: null,
       prunesVolumes: false,

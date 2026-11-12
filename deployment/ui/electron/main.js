@@ -133,22 +133,20 @@ handle('deploy:pick-key-file', async () => {
   return canceled ? null : filePaths[0];
 });
 
-// The AWS default profile for the cloud target. The status never includes a
-// key, and saved keys go only to the credentials file, never to deploy.py.
-async function awsProfileStatus(profile) {
+// The AWS default profile, which cloud runs always use. The status never
+// includes a key, and saved keys go only to the credentials file, never to deploy.py.
+async function awsProfileStatus() {
   const { CLOUD } = await getScriptOptions();
-  return profileStatus(process.env, {
-    profile: typeof profile === 'string' && profile ? profile : AWS_PROFILE,
-    namedProfiles: Boolean(CLOUD && CLOUD.namedProfiles),
-  });
+  return profileStatus(process.env, { profile: AWS_PROFILE, namedProfiles: Boolean(CLOUD && CLOUD.namedProfiles) });
 }
 
 handle('aws:profile-status', awsProfileStatus);
 
-handle('aws:save-profile', async (credentials) => {
+// `replace`: Edit keys, which changes the keys of an existing default profile.
+handle('aws:save-profile', async (credentials, { replace = false } = {}) => {
   try {
-    saveDefaultProfile(credentials);
-    return { status: await awsProfileStatus(AWS_PROFILE) };
+    saveDefaultProfile(credentials, process.env, { replace: replace === true });
+    return { status: await awsProfileStatus() };
   } catch (error) {
     if (error instanceof CredentialsError) return { error: error.message };
     throw error;

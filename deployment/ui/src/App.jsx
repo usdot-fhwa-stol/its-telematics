@@ -18,7 +18,7 @@ const MAX_PROGRESS_LINES = 200;
 
 const HEADINGS = {
   start: ['Telematics Deploy', 'Deploy a new Telematics instance, or connect to one that is already running.'],
-  configure: ['Configure deployment', 'Pick the target, environment and use case, then launch deploy.py.'],
+  configure: ['Configure deployment', 'Pick the deployment mode and the services to deploy, then launch deploy.py.'],
   result: ['Result', 'Output of the last run of deploy.py.'],
   servers: ['Connect to a server', 'Enter a server address or pick a saved server.'],
 };

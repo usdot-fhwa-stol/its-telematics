@@ -9,7 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const builtInOptions = require('./cliOptions');
 
-const { ON_PREMISE_TARGET } = builtInOptions;
+const { ON_PREMISE_TARGET, DEPLOY_ENVIRONMENT } = builtInOptions;
 const { AWS_PROFILE, profileStatus } = require('./awsCredentials');
 
 const DEPLOY_SCRIPT = path.join('deployment', 'scripts', 'deploy.py');
@@ -60,16 +60,13 @@ function checkKeyPath(value, errors) {
 // The cloud fields exist only when deploy.py lists its cloud options
 // (options.CLOUD). AWS access keys are never among them: deploy.py reads the
 // default profile from the shared credentials file instead.
+// Cloud runs always use the default AWS profile; the form has no profile field.
 function checkCloud(input, cloud, env, valid, errors) {
-  const profile = input.awsProfile || AWS_PROFILE;
   if (cloud.namedProfiles) {
-    const status = typeof profile === 'string' ? profileStatus(env, { profile, namedProfiles: true }) : null;
-    if (status && status.ready) valid.awsProfile = profile;
-    else if (status && status.incomplete) errors.push(`The ${profile} AWS profile has no credentials deploy.py can use.`);
-    else if (profile === AWS_PROFILE) errors.push('Add AWS credentials for the default profile.');
-    else errors.push('Choose an AWS profile.');
-  } else if (!cloud.PROFILES.some((option) => option.value === profile)) {
-    errors.push('Choose an AWS profile.');
+    const status = profileStatus(env, { profile: AWS_PROFILE, namedProfiles: true });
+    if (status.ready) valid.awsProfile = AWS_PROFILE;
+    else if (status.incomplete) errors.push('The default AWS profile has no credentials deploy.py can use.');
+    else errors.push('Add AWS credentials for the default profile.');
   } else if (!profileStatus(env).ready) {
     errors.push('Add AWS credentials for the default profile.');
   }
@@ -80,7 +77,7 @@ function checkCloud(input, cloud, env, valid, errors) {
     else errors.push('AWS region must look like us-east-1.');
   }
   if (findOption(cloud.TOPOLOGIES, input.topology)) valid.topology = input.topology;
-  else errors.push('Choose a topology.');
+  else errors.push('Choose a server setup.');
   if (input.keyPath) {
     const keyPath = checkKeyPath(input.keyPath, errors);
     if (keyPath) valid.keyPath = keyPath;
@@ -97,9 +94,12 @@ function validateParams(params, options = builtInOptions, { env = process.env } 
   const input = params && typeof params === 'object' ? params : {};
   const errors = [];
 
-  if (!findOption(TARGETS, input.target)) errors.push('Choose a target.');
-  if (!findOption(ENVIRONMENTS, input.environment)) errors.push('Choose an environment.');
-  if (!findOption(USE_CASES, input.useCase)) errors.push('Choose a use case.');
+  if (!findOption(TARGETS, input.target)) errors.push('Choose a deployment mode.');
+  // The app always deploys prod; the form has no environment field.
+  if (!findOption(ENVIRONMENTS, DEPLOY_ENVIRONMENT)) {
+    errors.push(`This deploy.py does not accept --environment ${DEPLOY_ENVIRONMENT}.`);
+  }
+  if (!findOption(USE_CASES, input.useCase)) errors.push('Choose the desired services.');
 
   // On-premise deploys to this machine only.
   const scriptTarget = input.target === 'on-premise' ? ON_PREMISE_TARGET : 'cloud';
@@ -110,12 +110,13 @@ function validateParams(params, options = builtInOptions, { env = process.env } 
 
   const secretOverrides = checkSecretOverrides(input.secretOverrides, options.SECRET_KEYS || [], errors);
   if (Object.keys(secretOverrides).length) valid.secretOverrides = secretOverrides;
-  // Only when the script lists --volume-prune, whose --no- form keeps the data.
-  if (input.keepData === true && options.prunesVolumes) valid.keepData = true;
+  // Runs always keep the stack's existing data: deploy.py deletes its Docker
+  // volumes by default, so the app sends --no-volume-prune whenever the script lists it.
+  if (options.prunesVolumes) valid.keepData = true;
 
   if (errors.length) throw new ValidationError(errors);
   return {
-    environment: input.environment,
+    environment: DEPLOY_ENVIRONMENT,
     target: scriptTarget,
     useCase: input.useCase,
     ...valid,

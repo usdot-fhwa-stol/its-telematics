@@ -18,9 +18,9 @@ contextBridge.exposeInMainWorld('deployApi', {
     ipcRenderer.on('deploy:output', listener);
     return () => ipcRenderer.removeListener('deploy:output', listener);
   },
-  awsProfileStatus: (profile) => ipcRenderer.invoke('aws:profile-status', profile),
+  awsProfileStatus: () => ipcRenderer.invoke('aws:profile-status'),
   // credentials: { accessKeyId, secretAccessKey }. Written to the AWS credentials file only.
-  saveAwsProfile: (credentials) => ipcRenderer.invoke('aws:save-profile', credentials),
+  saveAwsProfile: (credentials, { replace = false } = {}) => ipcRenderer.invoke('aws:save-profile', credentials, { replace }),
 
   listServers: () => ipcRenderer.invoke('servers:list'),
   connect: (address, connectOptions) => ipcRenderer.invoke('servers:connect', address, connectOptions),

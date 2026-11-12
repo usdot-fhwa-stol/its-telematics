@@ -8,7 +8,7 @@ const CHOICES = [
   {
     key: 'deploy',
     title: 'Deploy a new instance',
-    description: 'Pick a target, environment and use case, then run deploy.py to prepare the host and generate its configuration.',
+    description: 'Pick this machine or AWS and the services you want, then deploy the Telematics stack.',
   },
   {
     key: 'servers',
