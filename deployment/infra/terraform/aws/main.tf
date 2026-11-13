@@ -123,7 +123,7 @@ resource "aws_security_group" "ui_web" {
 }
 
 resource "aws_cloudwatch_log_group" "instances" {
-  name              = "/${var.name_prefix}/instances"
+  name_prefix       = "/${var.name_prefix}/instances-"
   retention_in_days = 14
 }
 

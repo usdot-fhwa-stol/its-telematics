@@ -3,6 +3,7 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
+import Chip from '@mui/material/Chip';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -14,24 +15,23 @@ import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import AwsCredentialsDialog from './AwsCredentialsDialog';
+import { OutputToggle, StepList } from './RunOutput';
 import { monoFont } from './theme';
 
 const api = window.deployApi;
 
+const TARGET_HELP = {
+  'on-premise': 'Deploys to this machine.',
+  cloud: 'Creates AWS instances with Terraform, then deploys the stack to them.',
+};
+
 export const EMPTY_PARAMS = {
   target: '',
-  environment: '',
   useCase: '',
-  deployTo: 'local',
-  remoteIo: '',
-  remoteUser: '',
   keyPath: '',
   awsRegion: '',
-  awsProfile: 'default',
   topology: '',
   // Held in memory only: never saved and never on the command line.
   secretOverrides: {},
@@ -71,6 +71,55 @@ function OptionSelect({ id, label, value, options, onChange, helperText, disable
   );
 }
 
+// A dropdown whose options show their name and, in the menu, a description.
+// The chosen option's description is the helper text.
+function DescribedSelect({ id, label, value, options, onChange, disabled, placeholderHelp }) {
+  const selected = options.find((option) => option.value === value);
+  return (
+    <TextField
+      id={id} select required fullWidth label={label} value={value}
+      onChange={(event) => onChange(event.target.value)} disabled={disabled}
+      helperText={selected?.description || placeholderHelp}
+      SelectProps={{ renderValue: (picked) => options.find((option) => option.value === picked)?.label || picked }}
+    >
+      {options.map((option) => (
+        <MenuItem key={option.value} value={option.value} sx={{ whiteSpace: 'normal' }}>
+          <Stack spacing={0.25} sx={{ py: 0.25 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.label}</Typography>
+            {option.description && (
+              <Typography variant="caption" color="text.secondary">{option.description}</Typography>
+            )}
+          </Stack>
+        </MenuItem>
+      ))}
+    </TextField>
+  );
+}
+
+// "Desired Services", with the services the chosen option starts below it.
+function ServicesSelect({ value, options, onChange, disabled }) {
+  const selected = options.find((option) => option.value === value);
+  return (
+    <Stack spacing={1}>
+      <DescribedSelect
+        id="use-case" label="Desired Services" value={value} options={options} onChange={onChange}
+        disabled={disabled} placeholderHelp="Decides which services come up."
+      />
+      {selected?.services.length > 0 && (
+        <Stack
+          direction="row" useFlexGap flexWrap="wrap" spacing={0.75} alignItems="center"
+          aria-label="Services that will be deployed" sx={{ px: 1.75 }}
+        >
+          <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
+            Deploys {selected.services.length} services:
+          </Typography>
+          {selected.services.map((name) => <Chip key={name} label={name} size="small" variant="outlined" />)}
+        </Stack>
+      )}
+    </Stack>
+  );
+}
+
 function KeyField({ id, label, value, helperText, onBrowse, onClear, disabled }) {
   return (
     <Stack direction="row" spacing={1} alignItems="flex-start">
@@ -87,141 +136,102 @@ function KeyField({ id, label, value, helperText, onBrowse, onClear, disabled })
 
 const PROFILE_KINDS = { keys: 'access keys', sso: 'SSO', role: 'role', process: 'credential process' };
 
-// The profile choices: every profile in the AWS files when setup.py takes
-// --aws-profile, otherwise only the default profile.
-function profileOptions(cloud, status) {
-  if (!cloud.namedProfiles || !status?.profiles) return cloud.PROFILES;
-  const listed = status.profiles.map(({ name, kind }) => ({
-    value: name, label: `${name} (${PROFILE_KINDS[kind] || 'no credentials'})`,
-  }));
-  return listed.some((option) => option.value === 'default')
-    ? listed : [{ value: 'default', label: 'default (not set up)' }, ...listed];
-}
-
-// Whether setup.py will find credentials for the chosen profile. The status
-// never includes a key.
-function AwsCredentialsStatus({ status, onAdd, disabled }) {
+// Whether deploy.py will find credentials in the default profile, which cloud
+// runs always use. The status never includes a key. `onEdit(replace)` opens the
+// access keys dialog: replace is true when the default profile already exists.
+function AwsCredentialsStatus({ status, onEdit, disabled }) {
   if (!status) return <Typography variant="body2" color="text.secondary">Checking AWS credentials…</Typography>;
   const mono = (text) => <Box component="span" sx={{ fontFamily: monoFont }}>{text}</Box>;
   const file = mono(status.file);
+  const editKeys = (label) => (
+    <Button color="inherit" size="small" onClick={() => onEdit(true)} disabled={disabled}>{label}</Button>
+  );
   if (status.ready && status.kind === 'sso') {
     return (
       <Alert severity="success">
-        The {status.profile} profile uses AWS SSO. setup.py does not check the sign-in, so if your session has
-        expired, run {mono(`aws sso login --profile ${status.profile}`)} before Launch.
+        The default profile uses AWS SSO. deploy.py does not check the sign-in, so if your session has
+        expired, run {mono('aws sso login')} before Launch.
       </Alert>
     );
   }
   if (status.ready && status.kind !== 'keys') {
     return (
       <Alert severity="success">
-        The {status.profile} profile gets credentials from a {PROFILE_KINDS[status.kind]} in {mono(status.configFile)}.
+        The default profile gets credentials from a {PROFILE_KINDS[status.kind]} in {mono(status.configFile)}.
       </Alert>
     );
   }
   if (status.ready) {
     return (
-      <Alert severity="success">
-        The {status.profile} profile has access keys. setup.py and Terraform use them.
-      </Alert>
-    );
-  }
-  if (status.incomplete && status.namedProfiles) {
-    return (
-      <Alert severity="warning">
-        The {status.profile} profile has no credentials setup.py can use: it needs both access keys, SSO, a role
-        or a credential process. Fix it with aws configure, or choose another profile.
+      <Alert severity="success" action={editKeys('Edit keys')}>
+        Your profile has access keys.
       </Alert>
     );
   }
   if (status.incomplete) {
     return (
-      <Alert severity="warning">
-        The [default] profile in {file} is missing aws_access_key_id or aws_secret_access_key. Fix it there,
-        or with aws configure.
+      <Alert severity="warning" action={editKeys('Edit keys')}>
+        Your profile is missing its access key ID or secret access key. Enter both with Edit keys.
       </Alert>
     );
   }
   return (
     <Alert
       severity="warning"
-      action={<Button color="inherit" size="small" onClick={onAdd} disabled={disabled}>Add credentials</Button>}
+      action={<Button color="inherit" size="small" onClick={() => onEdit(false)} disabled={disabled}>Add credentials</Button>}
     >
-      {status.namedProfiles
-        ? 'The default profile is not set up. Add access keys for it, set it up with aws configure sso, or choose another profile.'
-        : <>No access keys for the default profile in {file}. setup.py needs them for the cloud target.</>}
-      {status.inConfigFile && ` The default profile in ${status.configFile}, such as one set up for AWS SSO, is not enough: setup.py only reads access keys from the credentials file.`}
+      No access keys for the default profile.
     </Alert>
   );
 }
 
 
-function LocalhostSteps({ hostPreparation, prunesVolumes }) {
-  if (hostPreparation === 'local.setup.sh') {
-    return (
-      <DialogContentText component="div">
-        With --target localhost, setup.py runs local.setup.sh with sudo. That script:
-        <ul>
-          <li>adds the cav-telematics.com host names to /etc/hosts</li>
-          <li>deletes and recreates /opt/grafana, /opt/apache2 and /opt/influxdb2, discarding any data in them</li>
-          <li>creates /opt/telematics/upload and changes permissions under /opt/telematics</li>
-        </ul>
-      </DialogContentText>
-    );
-  }
-  if (hostPreparation === 'ansible') {
-    return (
-      <DialogContentText component="div">
-        With --target localhost, setup.py prepares this machine with an Ansible playbook run with sudo, then
-        starts the stack in Docker. The playbook is skipped if everything below is already in place. It:
-        <ul>
-          <li>adds the local.cav-telematics.com host names to /etc/hosts, pointing to 127.0.0.1</li>
-          <li>
-            installs docker.io, the Docker Compose plugin, ca-certificates, curl, gnupg and apt-transport-https,
-            and starts the Docker service and enables it at boot
-          </li>
-          <li>adds you to the docker group, so you can run Docker without sudo</li>
-          <li>
-            creates /opt/telematics, /opt/grafana, /opt/apache2 and /opt/influxdb2 and their subfolders, owned by
-            you and writable by every user on this machine, and an empty /opt/apache2/grafana_htpasswd. Existing
-            files are kept.
-          </li>
-        </ul>
-        Then setup.py stops the stack it deployed before
-        {prunesVolumes ? ' and deletes its Docker volumes, so the databases start empty, ' : ' '}
-        and starts it again on the latest images. A stack started another way, for example with docker compose
-        in telematic_system/, is not stopped, and its ports will conflict.
-      </DialogContentText>
-    );
-  }
+// What --target localhost does to this machine, from
+// deployment/config/ansible/playbooks/host_preparation.yml and deploy.py.
+function LocalhostSteps() {
   return (
-    <DialogContentText>
-      With --target localhost, setup.py prepares this machine with sudo. This checkout has neither
-      local.setup.sh nor the host preparation playbook, so review deployment/scripts before you continue.
+    <DialogContentText component="div">
+      Running this deployment requires your password in order to prepare this machine and start the stack in Docker.
     </DialogContentText>
   );
 }
 
+// The pipeline steps deploy.py has reached while it runs, and the end of its output behind a toggle.
+function RunProgress({ progress }) {
+  const tail = progress.lines.slice(-12).map((line) => line.text).join('\n');
+  return (
+    <Stack spacing={1.5} sx={{ mx: 3.5, mb: 2 }}>
+      {progress.steps.length > 0 && <StepList steps={progress.steps} active />}
+      <OutputToggle text={tail} placeholder="Starting deploy.py…" />
+    </Stack>
+  );
+}
+
+const NO_SUDO = { needed: null, installs: [], password: '', error: null, checking: false };
+
 export default function ConfigureForm({
-  setup, params, onChange, remember, onRememberChange, running, launchErrors, onLaunch,
+  setup, params, onChange, remember, onRememberChange, running, progress, launchErrors, onLaunch,
 }) {
-  const { options, saved, hostPreparation } = setup;
+  const { options, saved } = setup;
   const [preview, setPreview] = useState({ validationErrors: [] });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [awsStatus, setAwsStatus] = useState(null);
-  const [credentialsOpen, setCredentialsOpen] = useState(false);
+  // The access keys dialog: null when closed, { replace } when open.
+  const [credentialsDialog, setCredentialsDialog] = useState(null);
+  // The administrator password for a localhost run. It stays in this dialog
+  // until Continue, then goes to the main process for that run only.
+  const [sudo, setSudo] = useState(NO_SUDO);
 
-  const isOnPrem = params.target === 'on-premise';
-  const isLocal = isOnPrem && params.deployTo === 'local';
-  const isRemote = isOnPrem && params.deployTo === 'remote';
-  // The cloud fields need setup.py's cloud options.
+  // On-premise deploys to this machine (deploy.py --target localhost).
+  const isLocal = params.target === 'on-premise';
+  // The cloud fields need deploy.py's cloud options.
   const isCloud = params.target === 'cloud' && Boolean(options.CLOUD);
 
   useEffect(() => {
     let current = true;
-    if (isCloud) api.awsProfileStatus(params.awsProfile).then((status) => { if (current) setAwsStatus(status); });
+    if (isCloud) api.awsProfileStatus().then((status) => { if (current) setAwsStatus(status); });
     return () => { current = false; };
-  }, [isCloud, params.awsProfile]);
+  }, [isCloud]);
 
   // awsStatus: saving credentials can clear a validation error.
   useEffect(() => {
@@ -248,113 +258,77 @@ export default function ConfigureForm({
   const overrideCount = Object.values(secrets).filter(Boolean).length;
   const ready = Boolean(preview.command);
 
+  // Localhost runs always use sudo; cloud runs only to install Terraform or Ansible here.
+  const asksSudo = isLocal || isCloud;
   const requestLaunch = () => {
-    if (isLocal || isCloud) setConfirmOpen(true);
-    else onLaunch();
+    if (asksSudo) {
+      setSudo(NO_SUDO);
+      api.sudoStatus(isLocal ? 'localhost' : 'cloud').then(({ passwordNeeded, installs }) => (
+        setSudo((current) => ({ ...current, needed: passwordNeeded, installs }))
+      ));
+      setConfirmOpen(true);
+    } else {
+      onLaunch();
+    }
+  };
+  const closeConfirm = () => {
+    setConfirmOpen(false);
+    setSudo(NO_SUDO);
+  };
+  const confirmLaunch = async () => {
+    if (!asksSudo || !sudo.needed) {
+      closeConfirm();
+      onLaunch();
+      return;
+    }
+    setSudo((current) => ({ ...current, checking: true, error: null }));
+    const { error } = await api.checkSudoPassword(sudo.password);
+    if (error) {
+      setSudo((current) => ({ ...current, checking: false, error }));
+      return;
+    }
+    const sudoPassword = sudo.password;
+    closeConfirm();
+    onLaunch({ sudoPassword });
   };
 
   return (
     <Paper variant="outlined" component="form" onSubmit={(event) => event.preventDefault()}>
       <Section title="Deployment" note="Required">
         {options.notice && <Alert severity="info">{options.notice}</Alert>}
-        <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
-          <OptionSelect
-            id="target" label="Target" value={params.target} options={options.TARGETS}
-            onChange={pickTarget} disabled={running}
-            helperText="Remote targets ask for connection details below."
-          />
-          <OptionSelect
-            id="environment" label="Environment" value={params.environment} options={options.ENVIRONMENTS}
-            onChange={set('environment')} disabled={running}
-            helperText="Picks the image organization and tag."
-          />
-        </Box>
         <OptionSelect
-          id="use-case" label="Use case" value={params.useCase} options={options.USE_CASES}
-          onChange={set('useCase')} disabled={running}
-          helperText="Decides which services come up (full or partial)."
+          id="target" label="Deployment Mode" value={params.target} options={options.TARGETS}
+          onChange={pickTarget} disabled={running}
+          helperText={TARGET_HELP[params.target] || 'Where the stack runs.'}
         />
+        <ServicesSelect value={params.useCase} options={options.USE_CASES} onChange={set('useCase')} disabled={running} />
       </Section>
-
-      {isOnPrem && (
-        <>
-          <Divider />
-          <Section title="On-premise connection" note="Where the stack runs">
-            <ToggleButtonGroup
-              exclusive
-              color="primary"
-              value={params.deployTo}
-              onChange={(_event, value) => value && set('deployTo')(value)}
-              aria-label="Deploy to"
-              disabled={running}
-              sx={{ maxWidth: 520 }}
-            >
-              {options.DEPLOY_TO.map((option) => (
-                <ToggleButton key={option.value} value={option.value} sx={{ flex: 1 }}>{option.label}</ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-            <Typography variant="body2" color="text.secondary">
-              {isLocal
-                ? 'Runs setup.py with --target localhost. It prepares this machine, so it asks for your administrator password.'
-                : 'Runs setup.py with --target remote. It generates the configuration for that host; deploying to it is not built yet.'}
-            </Typography>
-            {isRemote && (
-              <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1.4fr' } }}>
-                <TextField
-                  id="remote-io" label="Host address" required value={params.remoteIo}
-                  onChange={(event) => set('remoteIo')(event.target.value)} disabled={running}
-                  placeholder="192.168.1.50" helperText="--remote-io"
-                  inputProps={{ style: { fontFamily: monoFont } }}
-                />
-                <TextField
-                  id="remote-user" label="SSH user" required value={params.remoteUser}
-                  onChange={(event) => set('remoteUser')(event.target.value)} disabled={running}
-                  placeholder="ubuntu" helperText="--remote-user"
-                  inputProps={{ style: { fontFamily: monoFont } }}
-                />
-                <KeyField
-                  id="key-path" label="SSH private key (optional)" value={params.keyPath} helperText="--key-path"
-                  onBrowse={browseKey} onClear={() => set('keyPath')('')} disabled={running}
-                />
-              </Box>
-            )}
-          </Section>
-        </>
-      )}
 
       {isCloud && (
         <>
           <Divider />
           <Section title="AWS" note="Required">
-            <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
-              <TextField
-                id="aws-region" label="Region" required value={params.awsRegion}
-                onChange={(event) => set('awsRegion')(event.target.value)} disabled={running}
-                placeholder={options.CLOUD.defaultRegion} helperText="--aws-region"
-                inputProps={{ spellCheck: false, style: { fontFamily: monoFont } }}
-              />
-              <OptionSelect
-                id="aws-profile" label="AWS profile" value={params.awsProfile || 'default'}
-                options={profileOptions(options.CLOUD, awsStatus)} onChange={set('awsProfile')} disabled={running}
-                helperText={options.CLOUD.namedProfiles
-                  ? `--aws-profile. From ${awsStatus?.file || '~/.aws/credentials'} and ${awsStatus?.configFile || '~/.aws/config'}.`
-                  : 'This setup.py has no --aws-profile option and always uses the default profile.'}
-              />
-            </Box>
-            <OptionSelect
-              id="topology" label="Topology" value={params.topology} options={options.CLOUD.TOPOLOGIES}
-              onChange={set('topology')} disabled={running}
-              helperText="--centralized or --distributed. Decides how many EC2 instances are created, and their cost."
+            <TextField
+              id="aws-region" label="Region" required value={params.awsRegion}
+              onChange={(event) => set('awsRegion')(event.target.value)} disabled={running}
+              placeholder={options.CLOUD.defaultRegion}
+              inputProps={{ spellCheck: false, style: { fontFamily: monoFont } }}
+            />
+            <DescribedSelect
+              id="topology" label="Server Setup" value={params.topology} options={options.CLOUD.TOPOLOGIES}
+              onChange={set('topology')} disabled={running} placeholderHelp="How many AWS servers are created."
             />
             <KeyField
               id="cloud-key-path" label="SSH key for the instances" value={params.keyPath}
-              helperText="--key-path. A public key, or an unencrypted private key such as a .pem. Terraform registers it as the instances' key pair."
+              helperText="A public key, or an unencrypted private key such as a .pem."
               onBrowse={browseKey} onClear={() => set('keyPath')('')} disabled={running}
             />
-            <AwsCredentialsStatus status={awsStatus} onAdd={() => setCredentialsOpen(true)} disabled={running} />
+            <AwsCredentialsStatus
+              status={awsStatus} onEdit={(replace) => setCredentialsDialog({ replace })} disabled={running}
+            />
             <AwsCredentialsDialog
-              open={credentialsOpen} file={awsStatus?.file} onClose={() => setCredentialsOpen(false)}
-              onSaved={setAwsStatus}
+              open={Boolean(credentialsDialog)} replace={Boolean(credentialsDialog?.replace)}
+              file={awsStatus?.file} onClose={() => setCredentialsDialog(null)} onSaved={setAwsStatus}
             />
           </Section>
         </>
@@ -387,7 +361,7 @@ export default function ConfigureForm({
         <Section title="Secret overrides" note="Not available">
           <Typography variant="body2" color="text.secondary">
             Every run overwrites telematic_system/.env and the secret files in telematic_system/secrets/, using
-            the .example files. This setup.py cannot read overrides from standard input, and passing them as
+            the .example files. This deploy.py cannot read overrides from standard input, and passing them as
             command-line arguments would let any user on this machine read them.
           </Typography>
         </Section>
@@ -408,15 +382,22 @@ export default function ConfigureForm({
         </Box>
         <Typography variant="body2" color="text.secondary">
           Runs on this computer, from the repository the app is in.
-          {overrideCount > 0 && ` ${overrideCount === 1 ? '1 secret override goes' : `${overrideCount} secret overrides go`} to setup.py on standard input.`}
+          {overrideCount > 0 && ` ${overrideCount === 1 ? '1 secret override goes' : `${overrideCount} secret overrides go`} to deploy.py on standard input.`}
         </Typography>
       </Section>
 
       {running && (
-        <Alert severity="info" sx={{ mx: 3.5, mb: 2 }}>
-          Running setup.py. {isLocal && 'If it asks for your administrator password, the dialog comes from Ubuntu and the app never sees the password. '}
-          The result appears when the run ends. Closing the app stops the run.
-        </Alert>
+        <>
+          <Alert severity="info" sx={{ mx: 3.5, mb: 2 }}>
+            {isCloud
+              ? 'Terraform is creating the AWS instances, then Ansible and Docker Compose start the stack. This can take '
+                + 'several minutes or longer. The result appears when the run ends. Closing the app stops the run, and AWS '
+                + 'resources it already created stay.'
+              : 'Running deploy.py. Pulling images can take several minutes. The result appears when the run ends; '
+                + 'closing the app stops the run.'}
+          </Alert>
+          <RunProgress progress={progress} />
+        </>
       )}
       {launchErrors.length > 0 && (
         <Alert severity="error" sx={{ mx: 3.5, mb: 2 }}>{launchErrors.join(' ')}</Alert>
@@ -430,7 +411,7 @@ export default function ConfigureForm({
       >
         <FormControlLabel
           control={<Checkbox checked={remember} onChange={(event) => onRememberChange(event.target.checked)} />}
-          label={<>Remember for this target <Typography component="span" variant="body2" color="text.secondary">(no secrets are saved)</Typography></>}
+          label={<>Remember for this deployment mode <Typography component="span" variant="body2" color="text.secondary">(no secrets are saved)</Typography></>}
         />
         <Box sx={{ flexGrow: 1, textAlign: 'right' }}>
           {!ready && preview.validationErrors?.length > 0 && (
@@ -443,32 +424,56 @@ export default function ConfigureForm({
         </Button>
       </Stack>
 
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} aria-labelledby="confirm-title">
+      <Dialog open={confirmOpen} onClose={closeConfirm} aria-labelledby="confirm-title">
         <DialogTitle id="confirm-title">{isCloud ? 'Create AWS resources?' : 'Prepare this machine?'}</DialogTitle>
         <DialogContent>
           {isCloud ? (
             <DialogContentText component="div">
-              With --target cloud, setup.py runs Terraform in {params.awsRegion} with the{' '}
-              {params.awsProfile || 'default'} AWS profile. It creates:
+              With --target cloud, deploy.py runs Terraform in {params.awsRegion} with the{' '}
+              default AWS profile. It creates:
               <ul>
                 <li>a VPC with a public subnet, internet gateway, security groups and a CloudWatch log group</li>
                 <li>an IAM role for the instances, and a key pair from the SSH key you chose</li>
                 <li>
                   EC2 instances with 100 GiB gp3 volumes.{' '}
-                  {options.CLOUD.TOPOLOGIES.find((option) => option.value === params.topology)?.label}
+                  {options.CLOUD.TOPOLOGIES.find((option) => option.value === params.topology)?.details}
                 </li>
               </ul>
-              AWS charges for these until they are destroyed. If provisioning fails, setup.py destroys what it
+              AWS charges for these until they are removed, which this app does not do: stop or terminate the
+              instances in the AWS console when you are done. If provisioning fails, deploy.py destroys what it
               created; if a later step fails, the instances keep running.
+              {sudo.installs.length > 0 && (
+                <Box sx={{ mt: 1.5 }}>
+                  First it installs {sudo.installs.join(' and ')} on this machine with apt
+                  {sudo.needed ? ', which needs your administrator password.' : '.'}
+                </Box>
+              )}
             </DialogContentText>
           ) : (
-            <LocalhostSteps hostPreparation={hostPreparation} prunesVolumes={options.prunesVolumes} />
+            <LocalhostSteps />
+          )}
+          {sudo.needed === null && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>Checking sudo…</Typography>
+          )}
+          {sudo.needed && (
+            <TextField
+              id="sudo-password" label="Administrator password" type="password" autoComplete="current-password"
+              fullWidth autoFocus sx={{ mt: 2.5 }} value={sudo.password}
+              disabled={sudo.checking} error={Boolean(sudo.error)}
+              onChange={(event) => setSudo({ ...sudo, password: event.target.value, error: null })}
+              onKeyDown={(event) => { if (event.key === 'Enter' && sudo.password) confirmLaunch(); }}
+              helperText={sudo.error
+                || (isCloud ? `To install ${sudo.installs.join(' and ')}` : 'To run the deployment')}
+            />
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="warning" onClick={() => { setConfirmOpen(false); onLaunch(); }}>
-            Continue
+          <Button onClick={closeConfirm}>Cancel</Button>
+          <Button
+            variant="contained" color="warning" onClick={confirmLaunch}
+            disabled={asksSudo && (sudo.needed === null || sudo.checking || (sudo.needed && !sudo.password))}
+          >
+            {sudo.checking ? 'Checking…' : 'Continue'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,14 +1,13 @@
 'use strict';
 
-// Reads the choices setup.py accepts from `setup.py --list-options` and turns
+// Reads the choices deploy.py accepts from `deploy.py --list-options` and turns
 // them into the form's lists. Labels for known values come from cliOptions.js.
-// An older setup.py without --list-options gets the built-in lists instead.
+// An older deploy.py without --list-options gets the built-in lists instead.
 
 const { execFile } = require('node:child_process');
 const path = require('node:path');
 const builtIn = require('./cliOptions');
-const { SETUP_SCRIPT } = require('./cliBridge');
-const { AWS_PROFILE } = require('./awsCredentials');
+const { DEPLOY_SCRIPT } = require('./cliBridge');
 
 const LIST_TIMEOUT_MS = 10_000;
 const MAX_LISTING_BYTES = 256 * 1024;
@@ -28,8 +27,29 @@ function withLabels(choices, known, defaultValue) {
   });
 }
 
-// The cloud fields need setup.py's cloud options; without them the
-// form shows no cloud fields. Access keys are never offered: setup.py
+// The services each use case starts, as display names in SERVICE_NAMES order.
+function serviceNames(services) {
+  return Object.keys(builtIn.SERVICE_NAMES)
+    .filter((name) => services.includes(name))
+    .map((name) => builtIn.SERVICE_NAMES[name]);
+}
+
+// "Desired Services": the use cases deploy.py lists, in the form's order, each
+// with its description and services. A use case the app doesn't know shows by
+// name, without a service list.
+function useCaseOptions(choices) {
+  const known = builtIn.USE_CASES.filter((option) => choices.includes(option.value));
+  const unknown = choices.filter((value) => !known.some((option) => option.value === value));
+  return [
+    ...known.map(({ value, label, description, services }) => ({
+      value, label, description, services: serviceNames(services),
+    })),
+    ...unknown.map((value) => ({ value, label: value, description: '', services: [] })),
+  ];
+}
+
+// The cloud fields need deploy.py's cloud options; without them the
+// form shows no cloud fields. Access keys are never offered: deploy.py
 // takes them only on the command line, so the app uses the default profile.
 function cloudOptions(byName) {
   const region = byName('--aws-region');
@@ -39,11 +59,10 @@ function cloudOptions(byName) {
   return {
     defaultRegion: typeof region.default === 'string' ? region.default : '',
     defaultTopology,
-    TOPOLOGIES: withLabels(topologies, builtIn.TOPOLOGIES, defaultTopology),
-    // With --aws-profile the form lists the profiles in the AWS files
-    // (awsCredentials.js); without it, setup.py uses only the default profile.
+    TOPOLOGIES: builtIn.TOPOLOGIES.filter((option) => topologies.includes(option.value)),
+    // The app always uses the default profile. With --aws-profile, deploy.py
+    // also accepts it from the config file (SSO, role); without it, only access keys.
     namedProfiles: Boolean(byName('--aws-profile')),
-    PROFILES: [{ value: AWS_PROFILE, label: AWS_PROFILE }],
   };
 }
 
@@ -56,16 +75,13 @@ function optionsFromListing(listing) {
   const useCase = listedOption(listing, '--use-case');
   const target = listedOption(listing, '--target');
 
-  // The form groups setup.py's localhost and remote targets under on-premise.
-  const deployTo = builtIn.DEPLOY_TO.filter((option) => target.choices.includes(option.scriptTarget));
+  // On-premise is deploy.py's localhost target.
   const byName = (name) => listing.options.find((entry) => entry && entry.name === name);
   const cloud = cloudOptions(byName);
   const targets = builtIn.TARGETS
-    .filter((option) => (
-      option.value === 'on-premise' ? deployTo.length > 0 : target.choices.includes(option.value)
-    ))
+    .filter((option) => target.choices.includes(option.value === 'on-premise' ? builtIn.ON_PREMISE_TARGET : option.value))
     .map((option) => (cloud && option.value === 'cloud' ? { ...option, label: builtIn.CLOUD_TARGET_LABEL } : option));
-  const mapped = new Set([...builtIn.DEPLOY_TO.map((option) => option.scriptTarget), 'cloud']);
+  const mapped = new Set([builtIn.ON_PREMISE_TARGET, 'cloud', ...builtIn.OMITTED_TARGETS]);
   const unmapped = target.choices.filter((value) => !mapped.has(value));
 
   // Secret overrides are offered only when the script can read them from
@@ -77,32 +93,35 @@ function optionsFromListing(listing) {
 
   return {
     TARGETS: targets,
-    DEPLOY_TO: deployTo,
     ENVIRONMENTS: withLabels(environment.choices, builtIn.ENVIRONMENTS, environment.default),
-    USE_CASES: withLabels(useCase.choices, builtIn.USE_CASES, useCase.default),
+    USE_CASES: useCaseOptions(useCase.choices),
     SECRET_KEYS: secretKeys,
     CLOUD: cloud,
-    // Whether a run removes the stack's Docker volumes (setup.py's --volume-prune default).
+    // Whether a run removes the stack's Docker volumes (deploy.py's --volume-prune default).
     prunesVolumes: byName('--volume-prune')?.default === true,
-    source: 'setup.py',
+    source: 'deploy.py',
     notice: unmapped.length
-      ? `setup.py also accepts --target ${unmapped.join(', ')}, which this app cannot configure yet.`
+      ? `deploy.py also accepts --target ${unmapped.join(', ')}, which this app cannot configure yet.`
       : null,
   };
 }
 
 function describeFailure(error) {
   if (error.killed) return 'it did not answer within 10 seconds';
-  if (typeof error.code === 'number') return `it exited with code ${error.code}`;
+  if (typeof error.code === 'number') {
+    // For example "AttributeError: module 'argparse' has no attribute ..." from a Python older than 3.9.
+    const lastError = String(error.stderr || '').trim().split('\n').pop();
+    return lastError ? `it exited with code ${error.code}: ${lastError}` : `it exited with code ${error.code}`;
+  }
   if (error instanceof SyntaxError) return 'its output was not JSON';
   return error.message.split('\n')[0];
 }
 
 function runListOptions({ repoRoot, python }) {
   return new Promise((resolve, reject) => {
-    execFile(python, [path.join(repoRoot, SETUP_SCRIPT), '--list-options'], {
+    execFile(python, [path.join(repoRoot, DEPLOY_SCRIPT), '--list-options'], {
       cwd: repoRoot, timeout: LIST_TIMEOUT_MS, maxBuffer: MAX_LISTING_BYTES,
-    }, (error, stdout) => (error ? reject(error) : resolve(stdout)));
+    }, (error, stdout, stderr) => (error ? reject(Object.assign(error, { stderr })) : resolve(stdout)));
   });
 }
 
@@ -113,11 +132,12 @@ async function loadScriptOptions({ repoRoot, python = 'python3' }) {
   } catch (error) {
     return {
       ...builtIn,
+      USE_CASES: useCaseOptions(builtIn.USE_CASES.map((option) => option.value)),
       SECRET_KEYS: [],
       CLOUD: null,
       prunesVolumes: false,
       source: 'built-in',
-      notice: `setup.py could not list its options (${describeFailure(error)}), so the form uses the app's built-in list.`,
+      notice: `deploy.py could not list its options (${describeFailure(error)}), so the form uses the app's built-in list.`,
     };
   }
 }

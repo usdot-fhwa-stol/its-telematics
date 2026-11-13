@@ -15,10 +15,12 @@ const later = () => new Promise((resolve) => setTimeout(resolve, 5));
 test('saves only the non-secret target fields', () => {
   const dir = tempDir();
   saveTargetSettings(dir, {
-    target: 'on-premise', environment: 'dev', useCase: 'core', deployTo: 'local', password: 'never-saved',
+    target: 'on-premise', environment: 'dev', useCase: 'core', password: 'never-saved',
   });
   const saved = loadTargetSettings(dir)['on-premise'];
-  assert.equal(saved.environment, 'dev');
+  assert.equal(saved.useCase, 'core');
+  // The app always deploys prod, so the environment isn't remembered.
+  assert.equal('environment' in saved, false);
   assert.equal('password' in saved, false);
   assert.equal(fs.statSync(path.join(dir, 'targets.json')).mode & 0o777, 0o600);
 });

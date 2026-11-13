@@ -1,6 +1,6 @@
 'use strict';
 
-// CLI_Bridge: turns the form's params into a setup.py command and runs it.
+// CLI_Bridge: turns the form's params into a deploy.py command and runs it.
 // The renderer is never trusted: every value is checked here before a
 // process starts, and the script is spawned without a shell.
 
@@ -8,9 +8,11 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const builtInOptions = require('./cliOptions');
+
+const { ON_PREMISE_TARGET, DEPLOY_ENVIRONMENT } = builtInOptions;
 const { AWS_PROFILE, profileStatus } = require('./awsCredentials');
 
-const SETUP_SCRIPT = path.join('deployment', 'scripts', 'setup.py');
+const DEPLOY_SCRIPT = path.join('deployment', 'scripts', 'deploy.py');
 const MAX_OUTPUT_CHARS = 1_000_000;
 const MAX_TEXT_LENGTH = 255;
 const MAX_SECRET_LENGTH = 4096;
@@ -55,19 +57,16 @@ function checkKeyPath(value, errors) {
   return undefined;
 }
 
-// The cloud fields exist only when setup.py lists its cloud options
-// (options.CLOUD). AWS access keys are never among them: setup.py reads the
+// The cloud fields exist only when deploy.py lists its cloud options
+// (options.CLOUD). AWS access keys are never among them: deploy.py reads the
 // default profile from the shared credentials file instead.
+// Cloud runs always use the default AWS profile; the form has no profile field.
 function checkCloud(input, cloud, env, valid, errors) {
-  const profile = input.awsProfile || AWS_PROFILE;
   if (cloud.namedProfiles) {
-    const status = typeof profile === 'string' ? profileStatus(env, { profile, namedProfiles: true }) : null;
-    if (status && status.ready) valid.awsProfile = profile;
-    else if (status && status.incomplete) errors.push(`The ${profile} AWS profile has no credentials setup.py can use.`);
-    else if (profile === AWS_PROFILE) errors.push('Add AWS credentials for the default profile.');
-    else errors.push('Choose an AWS profile.');
-  } else if (!cloud.PROFILES.some((option) => option.value === profile)) {
-    errors.push('Choose an AWS profile.');
+    const status = profileStatus(env, { profile: AWS_PROFILE, namedProfiles: true });
+    if (status.ready) valid.awsProfile = AWS_PROFILE;
+    else if (status.incomplete) errors.push('The default AWS profile has no credentials deploy.py can use.');
+    else errors.push('Add AWS credentials for the default profile.');
   } else if (!profileStatus(env).ready) {
     errors.push('Add AWS credentials for the default profile.');
   }
@@ -78,7 +77,7 @@ function checkCloud(input, cloud, env, valid, errors) {
     else errors.push('AWS region must look like us-east-1.');
   }
   if (findOption(cloud.TOPOLOGIES, input.topology)) valid.topology = input.topology;
-  else errors.push('Choose a topology.');
+  else errors.push('Choose a server setup.');
   if (input.keyPath) {
     const keyPath = checkKeyPath(input.keyPath, errors);
     if (keyPath) valid.keyPath = keyPath;
@@ -87,45 +86,37 @@ function checkCloud(input, cloud, env, valid, errors) {
   }
 }
 
-// Returns the values setup.py needs, or throws ValidationError listing every problem.
+// Returns the values deploy.py needs, or throws ValidationError listing every problem.
 // `options` are the lists the form showed (see scriptOptions.js); `env` is
-// where the AWS credentials file is looked up, as setup.py does.
+// where the AWS credentials file is looked up, as deploy.py does.
 function validateParams(params, options = builtInOptions, { env = process.env } = {}) {
-  const { TARGETS, DEPLOY_TO, ENVIRONMENTS, USE_CASES } = options;
+  const { TARGETS, ENVIRONMENTS, USE_CASES } = options;
   const input = params && typeof params === 'object' ? params : {};
   const errors = [];
 
-  if (!findOption(TARGETS, input.target)) errors.push('Choose a target.');
-  if (!findOption(ENVIRONMENTS, input.environment)) errors.push('Choose an environment.');
-  if (!findOption(USE_CASES, input.useCase)) errors.push('Choose a use case.');
+  if (!findOption(TARGETS, input.target)) errors.push('Choose a deployment mode.');
+  // The app always deploys prod; the form has no environment field.
+  if (!findOption(ENVIRONMENTS, DEPLOY_ENVIRONMENT)) {
+    errors.push(`This deploy.py does not accept --environment ${DEPLOY_ENVIRONMENT}.`);
+  }
+  if (!findOption(USE_CASES, input.useCase)) errors.push('Choose the desired services.');
 
-  let scriptTarget = 'cloud';
+  // On-premise deploys to this machine only.
+  const scriptTarget = input.target === 'on-premise' ? ON_PREMISE_TARGET : 'cloud';
   const valid = {};
-  if (input.target === 'on-premise') {
-    const deployTo = findOption(DEPLOY_TO, input.deployTo);
-    if (!deployTo) {
-      errors.push('Choose where to deploy.');
-    } else {
-      scriptTarget = deployTo.scriptTarget;
-    }
-    if (input.deployTo === 'remote') {
-      valid.remoteIo = checkText(input.remoteIo, 'Host address', errors);
-      valid.remoteUser = checkText(input.remoteUser, 'SSH user', errors);
-      if (input.keyPath) {
-        const keyPath = checkKeyPath(input.keyPath, errors);
-        if (keyPath) valid.keyPath = keyPath;
-      }
-    }
-  } else if (input.target === 'cloud' && options.CLOUD) {
+  if (input.target === 'cloud' && options.CLOUD) {
     checkCloud(input, options.CLOUD, env, valid, errors);
   }
 
   const secretOverrides = checkSecretOverrides(input.secretOverrides, options.SECRET_KEYS || [], errors);
   if (Object.keys(secretOverrides).length) valid.secretOverrides = secretOverrides;
+  // Runs always keep the stack's existing data: deploy.py deletes its Docker
+  // volumes by default, so the app sends --no-volume-prune whenever the script lists it.
+  if (options.prunesVolumes) valid.keepData = true;
 
   if (errors.length) throw new ValidationError(errors);
   return {
-    environment: input.environment,
+    environment: DEPLOY_ENVIRONMENT,
     target: scriptTarget,
     useCase: input.useCase,
     ...valid,
@@ -139,7 +130,7 @@ function checkSecretOverrides(overrides, secretKeys, errors) {
   for (const [key, value] of Object.entries(overrides)) {
     if (typeof value !== 'string' || value === '') continue;
     if (!secretKeys.includes(key)) {
-      errors.push(`setup.py does not accept a secret override for ${key}.`);
+      errors.push(`deploy.py does not accept a secret override for ${key}.`);
     } else if (value.length > MAX_SECRET_LENGTH) {
       errors.push(`The ${key} override must be ${MAX_SECRET_LENGTH} characters or fewer.`);
     } else if (/[\u0000-\u001f\u007f]/.test(value)) {
@@ -160,18 +151,15 @@ function buildArgs(valid) {
     '--target', valid.target,
     '--use-case', valid.useCase,
   ];
-  if (valid.target === 'remote') {
-    args.push(`--remote-io=${valid.remoteIo}`, `--remote-user=${valid.remoteUser}`);
-    if (valid.keyPath) args.push(`--key-path=${valid.keyPath}`);
-  }
-  // Only with setup.py's cloud options. Never --aws-access-key-id or
-  // --aws-secret-access-key: setup.py reads the default profile instead.
+  // Only with deploy.py's cloud options. Never --aws-access-key-id or
+  // --aws-secret-access-key: deploy.py reads the default profile instead.
   if (valid.target === 'cloud' && valid.awsRegion) {
     if (valid.awsProfile) args.push(`--aws-profile=${valid.awsProfile}`);
     args.push(`--aws-region=${valid.awsRegion}`, `--${valid.topology}`, `--key-path=${valid.keyPath}`);
   }
-  // The values themselves go to the script's standard input (runSetup).
+  // The values themselves go to the script's standard input (runDeploy).
   if (valid.secretOverrides) args.push('--secret-overrides-stdin');
+  if (valid.keepData) args.push('--no-volume-prune');
   return args;
 }
 
@@ -181,10 +169,67 @@ function shellQuote(arg) {
 
 // Display only: the command as a user would type it from the repository root.
 function formatCommand(args) {
-  return ['./' + SETUP_SCRIPT.split(path.sep).join('/'), ...args].map(shellQuote).join(' ');
+  return ['./' + DEPLOY_SCRIPT.split(path.sep).join('/'), ...args].map(shellQuote).join(' ');
 }
 
-// Picks the known markers out of setup.py and configuration_service.py output.
+// The pipeline prints "[3] Verify registry connectivity ..... OK". A step
+// still running has no status yet; it is either the unfinished last line
+// (`partial`) or a line cut short by the step's "    - " progress bullets.
+const STEP_LINE = /^\[(\d+)\] (.+?)[ .]*(OK|FAILED)?$/;
+
+const CLOUD_STAGES = [
+  { name: 'Install Terraform', start: /^error: Terraform is not installed/, end: /^Terraform installation: OK$/ },
+  { name: 'Plan AWS infrastructure', start: /^Generated Terraform variables: /, end: /^Proposed infrastructure changes:$/ },
+  { name: 'Create AWS infrastructure', start: /^Applying the plan\.$/, end: /^Ansible inventory: / },
+];
+const RUN_FAILED = /^Deployment failed at step: /;
+
+function parseSteps(lines, partial = '') {
+  const texts = [...lines.map((line) => line.text), partial];
+  const failed = texts.some((text) => RUN_FAILED.test(text));
+  const stages = [];
+  for (const stage of CLOUD_STAGES) {
+    const start = texts.findIndex((text) => stage.start.test(text));
+    if (start === -1) continue;
+    const ended = texts.slice(start + 1).some((text) => stage.end.test(text));
+    stages.push({ name: stage.name, status: ended ? 'OK' : failed ? 'FAILED' : 'running' });
+  }
+  const steps = new Map();
+  for (const text of texts) {
+    const match = text.match(STEP_LINE);
+    if (match) steps.set(Number(match[1]), { name: match[2], status: match[3] || 'running' });
+  }
+  return [...stages, ...steps.values()];
+}
+
+// deploy.py's Ansible inventory: one "<address> role=\"…\" private_ip=\"…\" …"
+// line per host and group. A centralized node is listed once per group.
+function parseInventory(text) {
+  const hosts = new Map();
+  for (const line of text.split('\n')) {
+    const match = line.match(/^(\S+)\s+(.*)$/);
+    if (!match || match[1].startsWith('[') || hosts.has(match[1])) continue;
+    const vars = Object.fromEntries([...match[2].matchAll(/(\w+)="([^"]*)"/g)].map((entry) => [entry[1], entry[2]]));
+    hosts.set(match[1], { address: match[1], role: vars.role || '', privateIp: vars.private_ip || '' });
+  }
+  return [...hosts.values()];
+}
+
+// The EC2 instances of a cloud run, from the inventory it printed it wrote.
+// An inventory from an earlier run is never read: the path must come from
+// this run's output and lie inside the repository.
+function readCloudInstances(summary, repoRoot) {
+  if (!summary.inventoryPath) return [];
+  const file = path.resolve(repoRoot, summary.inventoryPath);
+  if (!file.startsWith(path.resolve(repoRoot) + path.sep)) return [];
+  try {
+    return parseInventory(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+// Picks the known markers out of deploy.py and configuration_service.py output.
 function parseOutput(lines) {
   const summary = {
     checks: [],
@@ -196,23 +241,65 @@ function parseOutput(lines) {
     errors: [],
     deploymentContext: null,
     manifestReference: null,
+    // deploy.py's ExecutionSummary: overall_status, ui_url, active_services, diagnostics.
+    execution: null,
+    uiUrl: null,
+    // Cloud runs: the inventory deploy.py wrote once the instances existed,
+    // and what happened to them when provisioning failed.
+    inventoryPath: null,
+    rollback: null,
+    rollbackCommand: null,
+    steps: parseSteps(lines),
   };
-  for (const { text } of lines) {
+  // deploy.py prints its ExecutionSummary as indented JSON, from "{" to "}".
+  const blocks = { stdout: null, stderr: null };
+  for (const { stream, text } of lines) {
+    if (blocks[stream] !== null) {
+      blocks[stream].push(text);
+      if (text === '}') {
+        try {
+          const value = JSON.parse(blocks[stream].join('\n'));
+          if (value && 'overall_status' in value) summary.execution = value;
+        } catch {
+          // Not JSON; leave it in the log only.
+        }
+        blocks[stream] = null;
+      }
+      continue;
+    }
+    if (text === '{') {
+      blocks[stream] = [text];
+      continue;
+    }
     let match;
-    if ((match = text.match(/^(.+?): (PASS|FAIL)$/))) {
+    if ((match = text.match(/^Open the UI: (https?:\/\/\S+)$/))) {
+      summary.uiUrl = match[1];
+    } else if ((match = text.match(/^(.+?): (PASS|FAIL)$/))) {
       summary.checks.push({ name: match[1], status: match[2] });
     } else if ((match = text.match(/^Configured (\S+) from (.+)\.$/))) {
       summary.configuredSecrets.push({ key: match[1], source: match[2] });
     } else if ((match = text.match(/^Generated runtime configuration: (.+)$/))) {
       summary.generatedEnv = match[1];
+    } else if ((match = text.match(/^Ansible inventory: (.+)$/))) {
+      summary.inventoryPath = match[1];
+    } else if (text.startsWith('Rollback complete')) {
+      summary.rollback = 'complete';
+    } else if ((match = text.match(/^Rollback FAILED\. Remove leftovers manually: (.+)$/))) {
+      summary.rollback = 'failed';
+      summary.rollbackCommand = match[1];
+    } else if (text.startsWith('Rollback could not run')) {
+      summary.rollback = 'failed';
+    // A failed stage is reported again by each stage around it, ending with
+    // "Execute deployment pipeline"; the first report names the stage itself.
     } else if ((match = text.match(/^Deployment failed at step: (.+)$/))) {
-      summary.failedStep = match[1];
+      summary.failedStep = summary.failedStep || match[1];
     } else if ((match = text.match(/^Exit code: (-?\d+)$/))) {
-      summary.reportedExitCode = Number(match[1]);
+      summary.reportedExitCode = summary.reportedExitCode ?? Number(match[1]);
     } else if ((match = text.match(/^Hint: (.+)$/))) {
-      summary.hint = match[1];
+      summary.hint = summary.hint || match[1];
     } else if ((match = text.match(/^error: (.+)$/))) {
-      summary.errors.push(match[1]);
+      // "error: Terraform is not installed …; installing it now." is a notice.
+      if (!match[1].endsWith('installing it now.')) summary.errors.push(match[1]);
     } else if (text.startsWith('{')) {
       try {
         const value = JSON.parse(text);
@@ -226,13 +313,13 @@ function parseOutput(lines) {
   return summary;
 }
 
-// Starts setup.py. Returns the child process, a promise for the result, and
-// stop() to end the run.
-function runSetup(valid, { repoRoot, python = 'python3', askpassPath, env = process.env }) {
+// Starts deploy.py. Returns the child process, a promise for the result, and
+// stop() to end the run. `extraEnv` adds variables such as the password
+// helper's (sudoPassword.js). `onOutput` gets each chunk's new lines and the
+// steps so far, while the run is going.
+function runDeploy(valid, { repoRoot, python = 'python3', extraEnv = {}, env = process.env, onOutput }) {
   const args = buildArgs(valid);
-  const childEnv = { ...env, PYTHONUNBUFFERED: '1' };
-  // sudo has no terminal here, so it asks through this graphical helper.
-  if (askpassPath) childEnv.SUDO_ASKPASS = askpassPath;
+  const childEnv = { ...env, ...extraEnv, PYTHONUNBUFFERED: '1' };
 
   const startedAt = new Date().toISOString();
   const lines = [];
@@ -253,9 +340,9 @@ function runSetup(valid, { repoRoot, python = 'python3', askpassPath, env = proc
 
   // `detached` starts the script in its own session with no controlling
   // terminal. Without it, an app launched from a terminal passes that terminal
-  // on, and sudo prompts there instead of opening the askpass dialog. It also
+  // on, and sudo prompts there instead of running SUDO_ASKPASS. It also
   // makes the script the leader of a process group that stop() can end.
-  const child = spawn(python, [path.join(repoRoot, SETUP_SCRIPT), ...args], {
+  const child = spawn(python, [path.join(repoRoot, DEPLOY_SCRIPT), ...args], {
     cwd: repoRoot,
     env: childEnv,
     stdio: [valid.secretOverrides ? 'pipe' : 'ignore', 'pipe', 'pipe'],
@@ -268,7 +355,7 @@ function runSetup(valid, { repoRoot, python = 'python3', askpassPath, env = proc
     child.stdin.end(JSON.stringify(valid.secretOverrides));
   }
 
-  // Ends setup.py and everything it started (sudo, local.setup.sh).
+  // Ends deploy.py and everything it started (Ansible, Docker Compose).
   const stop = () => {
     if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
     try {
@@ -283,7 +370,9 @@ function runSetup(valid, { repoRoot, python = 'python3', askpassPath, env = proc
     child[stream].on('data', (chunk) => {
       const parts = (pending[stream] + chunk).split(/\r?\n/);
       pending[stream] = parts.pop();
+      const before = lines.length;
       parts.forEach((text) => addLine(stream, text));
+      if (onOutput) onOutput({ lines: lines.slice(before), steps: parseSteps(lines, pending.stdout) });
     });
   }
 
@@ -293,6 +382,7 @@ function runSetup(valid, { repoRoot, python = 'python3', askpassPath, env = proc
         if (pending[stream]) addLine(stream, pending[stream]);
         pending[stream] = '';
       }
+      const summary = parseOutput(lines);
       resolve({
         ok: exitCode === 0,
         exitCode,
@@ -304,7 +394,9 @@ function runSetup(valid, { repoRoot, python = 'python3', askpassPath, env = proc
         startedAt,
         finishedAt: new Date().toISOString(),
         lines,
-        summary: parseOutput(lines),
+        summary,
+        instances: valid.target === 'cloud' ? readCloudInstances(summary, repoRoot) : [],
+        awsRegion: valid.awsRegion || null,
       });
     };
     child.on('error', (error) => {
@@ -319,11 +411,13 @@ function runSetup(valid, { repoRoot, python = 'python3', askpassPath, env = proc
 }
 
 module.exports = {
-  SETUP_SCRIPT,
+  DEPLOY_SCRIPT,
   ValidationError,
   validateParams,
   buildArgs,
   formatCommand,
+  parseSteps,
   parseOutput,
-  runSetup,
+  parseInventory,
+  runDeploy,
 };

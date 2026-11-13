@@ -1,10 +1,9 @@
 'use strict';
 
 const { app, BrowserWindow, dialog, ipcMain, net } = require('electron');
-const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { ValidationError, validateParams, buildArgs, formatCommand, runSetup } = require('./cliBridge');
+const { ValidationError, validateParams, buildArgs, formatCommand, runDeploy } = require('./cliBridge');
 const { loadScriptOptions } = require('./scriptOptions');
 const {
   loadTargetSettings, saveTargetSettings, listServers, rememberServer, touchServer, forgetServer,
@@ -13,13 +12,27 @@ const { ServerAddressError, normalizeServerUrl, checkServer } = require('./serve
 const { configureTelematicsSession, createTelematicsView } = require('./telematicsView');
 const { createSignInQueue } = require('./signInQueue');
 const { AWS_PROFILE, CredentialsError, profileStatus, saveDefaultProfile } = require('./awsCredentials');
+const { passwordNeeded, checkPassword, startPasswordServer, cloudInstalls } = require('./sudoPassword');
+const { defaultWorkingCopy, installBundle } = require('./bundle');
 
-// The repository whose deployment/ tree the app runs. During development the
-// app lives in <repo>/deployment/ui; TELEMATICS_REPO_ROOT points it elsewhere.
-const REPO_ROOT = process.env.TELEMATICS_REPO_ROOT
-  ? path.resolve(process.env.TELEMATICS_REPO_ROOT)
-  : path.resolve(__dirname, '..', '..', '..');
-const ASKPASS = path.join(__dirname, 'askpass.sh');
+// The repository whose deployment/ tree the app runs. TELEMATICS_REPO_ROOT
+// points it at any checkout. Otherwise a packaged app runs its bundled copy,
+// installed to ~/.local/share/telematics-deploy, and during development the
+// app runs the repository it sits in (<repo>/deployment/ui).
+let REPO_ROOT = null;
+let repoRootError = null;
+if (process.env.TELEMATICS_REPO_ROOT) {
+  REPO_ROOT = path.resolve(process.env.TELEMATICS_REPO_ROOT);
+} else if (app.isPackaged) {
+  REPO_ROOT = defaultWorkingCopy();
+  try {
+    installBundle(path.join(process.resourcesPath, 'bundle'), REPO_ROOT);
+  } catch (error) {
+    repoRootError = error;
+  }
+} else {
+  REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
+}
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 
 let mainWindow = null;
@@ -27,7 +40,7 @@ let telematicsView = null;
 let activeRun = null;
 let scriptOptions = null;
 
-// The form's choices, read once from `setup.py --list-options`.
+// The form's choices, read once from `deploy.py --list-options`.
 function getScriptOptions() {
   if (!scriptOptions) scriptOptions = loadScriptOptions({ repoRoot: REPO_ROOT });
   return scriptOptions;
@@ -96,18 +109,8 @@ function validationResult(error) {
   throw error;
 }
 
-// How setup.py prepares this machine for --target localhost: local.setup.sh or
-// an Ansible playbook. The confirmation describes whichever this checkout has.
-function hostPreparation() {
-  const exists = (...parts) => fs.existsSync(path.join(REPO_ROOT, 'deployment', ...parts));
-  if (exists('scripts', 'local.setup.sh')) return 'local.setup.sh';
-  if (exists('config', 'ansible', 'playbooks', 'host_preparation.yml')) return 'ansible';
-  return 'unknown';
-}
-
 handle('deploy:get-options', async () => ({
   options: await getScriptOptions(),
-  hostPreparation: hostPreparation(),
   saved: loadTargetSettings(app.getPath('userData')),
   repoRoot: REPO_ROOT,
 }));
@@ -130,29 +133,35 @@ handle('deploy:pick-key-file', async () => {
   return canceled ? null : filePaths[0];
 });
 
-// The AWS default profile for the cloud target. The status never includes a
-// key, and saved keys go only to the credentials file, never to setup.py.
-async function awsProfileStatus(profile) {
+// The AWS default profile, which cloud runs always use. The status never
+// includes a key, and saved keys go only to the credentials file, never to deploy.py.
+async function awsProfileStatus() {
   const { CLOUD } = await getScriptOptions();
-  return profileStatus(process.env, {
-    profile: typeof profile === 'string' && profile ? profile : AWS_PROFILE,
-    namedProfiles: Boolean(CLOUD && CLOUD.namedProfiles),
-  });
+  return profileStatus(process.env, { profile: AWS_PROFILE, namedProfiles: Boolean(CLOUD && CLOUD.namedProfiles) });
 }
 
 handle('aws:profile-status', awsProfileStatus);
 
-handle('aws:save-profile', async (credentials) => {
+// `replace`: Edit keys, which changes the keys of an existing default profile.
+handle('aws:save-profile', async (credentials, { replace = false } = {}) => {
   try {
-    saveDefaultProfile(credentials);
-    return { status: await awsProfileStatus(AWS_PROFILE) };
+    saveDefaultProfile(credentials, process.env, { replace: replace === true });
+    return { status: await awsProfileStatus() };
   } catch (error) {
     if (error instanceof CredentialsError) return { error: error.message };
     throw error;
   }
 });
 
-handle('deploy:launch', async (params, { remember } = {}) => {
+handle('deploy:sudo-status', async (target) => {
+  if (target !== 'cloud') return { passwordNeeded: await passwordNeeded(), installs: [] };
+  const installs = cloudInstalls();
+  return { passwordNeeded: installs.length > 0 && await passwordNeeded(), installs };
+});
+
+handle('deploy:check-sudo-password', async (password) => ({ error: await checkPassword(password) }));
+
+handle('deploy:launch', async (params, { remember, sudoPassword } = {}) => {
   const options = await getScriptOptions();
   if (activeRun) return { validationErrors: ['A run is already in progress.'] };
   let valid;
@@ -161,16 +170,24 @@ handle('deploy:launch', async (params, { remember } = {}) => {
   } catch (error) {
     return validationResult(error);
   }
-  if (remember) saveTargetSettings(app.getPath('userData'), params);
-
-  activeRun = runSetup(valid, {
-    repoRoot: REPO_ROOT,
-    askpassPath: valid.target === 'localhost' ? ASKPASS : undefined,
-  });
+  const usesPassword = valid.target === 'localhost' || valid.target === 'cloud';
+  const passwordServer = usesPassword && typeof sudoPassword === 'string' && sudoPassword
+    ? startPasswordServer(sudoPassword, { ansibleBecome: valid.target === 'localhost' })
+    : null;
   try {
+    if (passwordServer) await passwordServer.listening;
+    if (remember) saveTargetSettings(app.getPath('userData'), params);
+    activeRun = runDeploy(valid, {
+      repoRoot: REPO_ROOT,
+      extraEnv: passwordServer ? passwordServer.env : {},
+      onOutput: (output) => {
+        if (mainWindow) mainWindow.webContents.send('deploy:output', output);
+      },
+    });
     return await activeRun.done;
   } finally {
     activeRun = null;
+    if (passwordServer) passwordServer.close();
   }
 });
 
@@ -206,6 +223,14 @@ handle('servers:close-view', () => telematicsView.close());
 handle('servers:answer-sign-in', (id, credentials) => signIn.answer(id, credentials));
 
 app.whenReady().then(() => {
+  if (repoRootError) {
+    dialog.showErrorBox(
+      'Telematics Deploy could not start',
+      `The deployment files could not be installed in ${REPO_ROOT}.\n\n${repoRootError.message}`,
+    );
+    app.quit();
+    return;
+  }
   configureTelematicsSession();
   createWindow();
   app.on('activate', () => {

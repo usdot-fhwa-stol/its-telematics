@@ -362,6 +362,12 @@ def rotate_secret_artifacts(config_map, parameters):
         write_atomic(secrets_dir / f"{secret}.txt", contents, mode=0o644)
         print(f"Configured {secret} from {source}.", flush=True)
 
+    # Compose mounts this file; the web server fills it with Grafana logins, so never replace one.
+    htpasswd = secrets_dir / "grafana_htpasswd"
+    if not htpasswd.exists():
+        write_atomic(htpasswd, b"", mode=0o666)
+        print("Created an empty grafana_htpasswd.", flush=True)
+
     config_map["MYSQL_PASSWORD"] = mysql_password
     return config_map
 

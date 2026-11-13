@@ -33,17 +33,22 @@
       loop: "{{ local_host_names }}"
       when: ansible_connection | default('ssh') == 'local'
 
+    # Docker CE (Docker's own apt repository) conflicts with Ubuntu's docker.io: its containerd.io
+    # package conflicts with Ubuntu's containerd. A host that already has Docker CE keeps it.
+    - name: Check for Docker CE
+      ansible.builtin.command: dpkg-query -W -f=${Status} docker-ce
+      register: docker_ce
+      changed_when: false
+      failed_when: false
+
     - name: Install Docker and system transport libraries
       ansible.builtin.apt:
-        name:
-          - docker.io
-          - ca-certificates
-          - curl
-          - gnupg
-          - apt-transport-https
+        name: "{{ ([] if docker_ce_installed else ['docker.io']) + ['ca-certificates', 'curl', 'gnupg', 'apt-transport-https'] }}"
         state: present
         update_cache: true
         cache_valid_time: 3600
+      vars:
+        docker_ce_installed: "{{ docker_ce.rc == 0 and 'install ok installed' in docker_ce.stdout }}"
       register: base_packages
       retries: 5
       delay: 15

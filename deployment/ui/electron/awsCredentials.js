@@ -1,11 +1,12 @@
 'use strict';
 
-// The AWS profile that setup.py uses for the cloud target. setup.py accepts
+// The AWS profile that deploy.py uses for the cloud target. deploy.py accepts
 // access keys on its command line, where any user can read them with ps, so
 // the app never passes them. Instead it checks the shared AWS files the way
-// setup.py does, and can add the default profile to the credentials file.
+// deploy.py does, and can add the default profile to the credentials file or
+// change its access keys.
 //
-// setup.py reads only the default profile's access keys from the
+// deploy.py reads only the default profile's access keys from the
 // credentials file. With --aws-profile (namedProfiles), it also accepts any
 // profile from the config file, including SSO and role profiles.
 
@@ -15,7 +16,7 @@ const path = require('node:path');
 
 const AWS_PROFILE = 'default';
 const ACCESS_KEYS = ['aws_access_key_id', 'aws_secret_access_key'];
-// Config-file settings that supply credentials, as in setup.py's AWS_CONFIG_CREDENTIAL_SOURCES.
+// Config-file settings that supply credentials, as in deploy.py's AWS_CONFIG_CREDENTIAL_SOURCES.
 const CONFIG_SOURCES = [
   ['sso_session', 'sso'], ['sso_start_url', 'sso'], ['role_arn', 'role'],
   ['credential_process', 'process'], ['web_identity_token_file', 'role'],
@@ -30,7 +31,7 @@ function expandHome(file) {
   return file === '~' || file.startsWith('~/') ? path.join(os.homedir(), file.slice(1)) : file;
 }
 
-// Same lookup as setup.py: AWS_SHARED_CREDENTIALS_FILE, else ~/.aws/credentials.
+// Same lookup as deploy.py: AWS_SHARED_CREDENTIALS_FILE, else ~/.aws/credentials.
 function credentialsFile(env = process.env) {
   return path.resolve(expandHome(env.AWS_SHARED_CREDENTIALS_FILE || path.join(os.homedir(), '.aws', 'credentials')));
 }
@@ -73,7 +74,7 @@ function readSections(file) {
 const hasKeys = (options) => ACCESS_KEYS.every((key) => options.has(key));
 
 // Every profile in the credentials and config files, with how it gets
-// credentials (keys, sso, role, process), or kind null when setup.py's
+// credentials (keys, sso, role, process), or kind null when deploy.py's
 // --aws-profile would reject it. Names only, never values.
 function listProfiles(env = process.env) {
   const kinds = new Map();
@@ -85,7 +86,7 @@ function listProfiles(env = process.env) {
     add(name, hasKeys(options) ? 'keys' : null);
   }
   for (const [section, options] of readSections(configFile(env)) || []) {
-    // setup.py reads the default profile from [default] only, as the AWS CLI does.
+    // deploy.py reads the default profile from [default] only, as the AWS CLI does.
     const name = section === AWS_PROFILE ? section
       : section.startsWith('profile ') && section !== `profile ${AWS_PROFILE}` ? section.slice(8) : null;
     if (name === null) continue; // sso-session and services sections
@@ -122,43 +123,103 @@ function profileStatus(env = process.env, { profile = AWS_PROFILE, namedProfiles
     profiles: null,
     ready,
     kind: ready ? 'keys' : null,
-    // A [default] section without both keys: setup.py would not use it, and the app won't edit it.
+    // A [default] section without both keys: deploy.py would not use it, and the app won't edit it.
     incomplete: Boolean(options) && !ready,
     // A default profile set up with `aws configure sso` lives in the config file;
-    // setup.py without --aws-profile does not look there.
+    // deploy.py without --aws-profile does not look there.
     inConfigFile: Boolean(config && config.has(AWS_PROFILE)),
   };
 }
 
-// Adds the default profile to the credentials file, as setup.py would with
-// --aws-access-key-id and --aws-secret-access-key. Refuses to change an
-// existing default profile. Messages never include a key.
-function saveDefaultProfile(credentials, env = process.env) {
+function checkKeys(credentials) {
   const accessKeyId = typeof credentials?.accessKeyId === 'string' ? credentials.accessKeyId.trim() : '';
   const secretAccessKey = typeof credentials?.secretAccessKey === 'string' ? credentials.secretAccessKey.trim() : '';
   const errors = [];
   if (!KEY_ID_PATTERN.test(accessKeyId)) errors.push('The access key ID should be 16 or more capital letters and digits.');
   if (!SECRET_PATTERN.test(secretAccessKey)) errors.push('The secret access key should be 16 or more letters, digits, /, + or =.');
   if (errors.length) throw new CredentialsError(errors.join(' '));
+  return { accessKeyId, secretAccessKey };
+}
 
-  const file = credentialsFile(env);
-  const sections = readSections(file);
-  if (sections && sections.has(AWS_PROFILE)) {
-    throw new CredentialsError(`${displayPath(file)} already has a [${AWS_PROFILE}] profile. Edit it there, or with aws configure.`);
+// Options replaced in [default] when its keys change. A session token belongs
+// to the old temporary keys, so it goes too.
+const REPLACED_OPTIONS = new Set([...ACCESS_KEYS, 'aws_session_token']);
+
+// The credentials file's text with the default profile's keys set to `keys`.
+// Every other line, including other profiles, comments and the default
+// profile's other settings, is kept as it was.
+function withDefaultKeys(text, { accessKeyId, secretAccessKey }) {
+  const keyLines = [`aws_access_key_id = ${accessKeyId}`, `aws_secret_access_key = ${secretAccessKey}`];
+  const out = [];
+  let section = null;
+  let dropping = false; // Inside a replaced option's continuation lines.
+  let inserted = false;
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    const header = trimmed.match(/^\[(.+)\]$/);
+    if (header) {
+      section = header[1];
+      dropping = false;
+      out.push(line);
+      if (section === AWS_PROFILE && !inserted) {
+        out.push(...keyLines);
+        inserted = true;
+      }
+      continue;
+    }
+    if (section === AWS_PROFILE) {
+      // As in configparser, an indented line continues the option above it.
+      if (dropping && /^\s/.test(line) && trimmed) continue;
+      dropping = false;
+      const option = /^\S/.test(line) && line.match(/^([^=:]+)[=:]/);
+      if (option && REPLACED_OPTIONS.has(option[1].trim().toLowerCase())) {
+        dropping = true;
+        continue;
+      }
+    }
+    out.push(line);
   }
+  if (!inserted) {
+    const body = out.join('\n');
+    const separator = !body ? '' : body.endsWith('\n') ? '\n' : '\n\n';
+    return `${body}${separator}[${AWS_PROFILE}]\n${keyLines.join('\n')}\n`;
+  }
+  return out.join('\n');
+}
+
+// Writes the default profile's access keys to the credentials file, as
+// deploy.py would with --aws-access-key-id and --aws-secret-access-key.
+// Without `replace`, refuses to change an existing default profile; with it
+// (Edit keys), replaces that profile's keys. The file is written beside the
+// old one and renamed over it, with mode 600. Messages never include a key.
+function saveDefaultProfile(credentials, env = process.env, { replace = false } = {}) {
+  const keys = checkKeys(credentials);
+  const file = credentialsFile(env);
   let existing = '';
   try {
     existing = fs.readFileSync(file, 'utf8');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw new CredentialsError(`Could not read ${displayPath(file)}; check its permissions.`);
+  }
+  const sections = readSections(file);
+  if (!replace && sections && sections.has(AWS_PROFILE)) {
+    throw new CredentialsError(`${displayPath(file)} already has a [${AWS_PROFILE}] profile. Use Edit keys to change it.`);
+  }
+  // Follow a symlinked credentials file rather than replacing the link.
+  let target = file;
+  try {
+    target = fs.realpathSync(file);
   } catch {
     // No file yet.
   }
-  const separator = existing && !existing.endsWith('\n') ? '\n\n' : existing ? '\n' : '';
+  const temporary = path.join(path.dirname(target), `.${path.basename(target)}.${process.pid}.tmp`);
   try {
-    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-    fs.appendFileSync(file, `${separator}[${AWS_PROFILE}]\naws_access_key_id = ${accessKeyId}\n`
-      + `aws_secret_access_key = ${secretAccessKey}\n`, { mode: 0o600 });
-    fs.chmodSync(file, 0o600);
+    fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(temporary, withDefaultKeys(existing, keys), { mode: 0o600 });
+    fs.chmodSync(temporary, 0o600);
+    fs.renameSync(temporary, target);
   } catch {
+    fs.rmSync(temporary, { force: true });
     throw new CredentialsError(`Could not write ${displayPath(file)}; check its permissions.`);
   }
 }

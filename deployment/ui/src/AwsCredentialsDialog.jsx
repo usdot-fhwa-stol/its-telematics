@@ -12,10 +12,12 @@ import { monoFont } from './theme';
 
 const api = window.deployApi;
 
-// Adds the AWS default profile to the shared credentials file, which setup.py
-// reads for the cloud target. The keys never go to setup.py itself, whose
-// --aws-access-key-id and --aws-secret-access-key would show them in ps.
-export default function AwsCredentialsDialog({ open, file, onClose, onSaved }) {
+// Adds the AWS default profile to the shared credentials file, which deploy.py
+// reads for the cloud target, or with `replace` (Edit keys) changes its keys.
+// The keys never go to deploy.py itself, whose --aws-access-key-id and
+// --aws-secret-access-key would show them in ps. The current keys are never
+// read back into this dialog.
+export default function AwsCredentialsDialog({ open, replace = false, file, onClose, onSaved }) {
   const [accessKeyId, setAccessKeyId] = useState('');
   const [secretAccessKey, setSecretAccessKey] = useState('');
   const [error, setError] = useState(null);
@@ -32,7 +34,7 @@ export default function AwsCredentialsDialog({ open, file, onClose, onSaved }) {
     event.preventDefault();
     setSaving(true);
     try {
-      const outcome = await api.saveAwsProfile({ accessKeyId, secretAccessKey });
+      const outcome = await api.saveAwsProfile({ accessKeyId, secretAccessKey }, { replace });
       if (outcome.error) {
         setError(outcome.error);
       } else {
@@ -55,14 +57,9 @@ export default function AwsCredentialsDialog({ open, file, onClose, onSaved }) {
       fullWidth
       maxWidth="sm"
     >
-      <DialogTitle id="aws-credentials-title">Add AWS credentials</DialogTitle>
+      <DialogTitle id="aws-credentials-title">{replace ? 'Edit AWS access keys' : 'Add AWS credentials'}</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
-          <DialogContentText>
-            The app adds a [default] profile to <span style={{ fontFamily: monoFont }}>{file}</span>, readable
-            only by you, as setup.py does with --aws-access-key-id. The keys are not passed to setup.py or saved
-            anywhere else. Other AWS tools that use the default profile will use these keys too.
-          </DialogContentText>
           {error && <Alert severity="error">{error}</Alert>}
           <TextField
             id="aws-access-key-id"

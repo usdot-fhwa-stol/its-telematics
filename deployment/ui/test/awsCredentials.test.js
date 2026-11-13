@@ -20,7 +20,7 @@ function awsDir({ credentials, config } = {}) {
   return env;
 }
 
-test('finds the credentials file the way setup.py does', () => {
+test('finds the credentials file the way deploy.py does', () => {
   assert.equal(credentialsFile({}), path.join(os.homedir(), '.aws', 'credentials'));
   assert.equal(credentialsFile({ AWS_SHARED_CREDENTIALS_FILE: '~/keys/aws' }), path.join(os.homedir(), 'keys', 'aws'));
 });
@@ -36,7 +36,7 @@ test('reports whether the default profile has access keys, without the keys', ()
   const incomplete = profileStatus(awsDir({ credentials: `[default]\naws_access_key_id = ${KEY_ID}\n` }));
   assert.deepEqual([incomplete.ready, incomplete.incomplete], [false, true]);
 
-  // `aws configure sso` writes the default profile to the config file, which setup.py does not read.
+  // `aws configure sso` writes the default profile to the config file, which deploy.py does not read.
   const sso = profileStatus(awsDir({ config: '[default]\nsso_session = lab\n' }));
   assert.deepEqual([sso.ready, sso.incomplete, sso.inConfigFile], [false, false, true]);
 });
@@ -55,16 +55,80 @@ test('adds the default profile, readable only by the user, and keeps the rest of
   assert.equal(fs.readFileSync(fresh.AWS_SHARED_CREDENTIALS_FILE, 'utf8').split('\n')[0], '[default]');
 });
 
-test('never changes an existing default profile, and never echoes a key', () => {
+test('changes an existing default profile only with replace, and never echoes a key', () => {
   const env = awsDir({ credentials: '[default]\nregion = us-east-1\n' });
   const before = fs.readFileSync(env.AWS_SHARED_CREDENTIALS_FILE, 'utf8');
   assert.throws(() => saveDefaultProfile({ accessKeyId: KEY_ID, secretAccessKey: SECRET }, env),
-    (error) => error instanceof CredentialsError && /already has a \[default\] profile/.test(error.message));
+    (error) => error instanceof CredentialsError && /already has a \[default\] profile. Use Edit keys/.test(error.message));
   assert.equal(fs.readFileSync(env.AWS_SHARED_CREDENTIALS_FILE, 'utf8'), before);
+
+  // An incomplete default profile gets both keys with replace.
+  saveDefaultProfile({ accessKeyId: KEY_ID, secretAccessKey: SECRET }, env, { replace: true });
+  assert.equal(fs.readFileSync(env.AWS_SHARED_CREDENTIALS_FILE, 'utf8'),
+    `[default]\naws_access_key_id = ${KEY_ID}\naws_secret_access_key = ${SECRET}\nregion = us-east-1\n`);
+  assert.equal(profileStatus(env).ready, true);
 
   assert.throws(() => saveDefaultProfile({ accessKeyId: 'not a key', secretAccessKey: 'bad\nsecret value' }, awsDir()),
     (error) => /access key ID/.test(error.message) && /secret access key/.test(error.message)
       && !error.message.includes('bad') && !error.message.includes('not a key'));
+});
+
+test('Edit keys replaces only the default profile\'s keys and keeps everything else', () => {
+  const NEW_ID = 'AKIANEWKEYID00000002';
+  const NEW_SECRET = 'newSecretKey/With+Chars=0000000000';
+  const original = [
+    '# my AWS keys',
+    '[work]',
+    'aws_access_key_id = WORKKEYID00000001',
+    'aws_secret_access_key = work',
+    '',
+    '[default]',
+    `AWS_Access_Key_ID=${KEY_ID}X`,
+    'aws_secret_access_key: wrong-secret',
+    '  continued-secret-line',
+    'aws_session_token = OLDTOKEN',
+    'region = us-east-1',
+    '; keep this comment',
+    '',
+    '[other]',
+    'aws_access_key_id = OTHERKEYID0000001',
+    '',
+  ].join('\n');
+  const env = awsDir({ credentials: original });
+  saveDefaultProfile({ accessKeyId: NEW_ID, secretAccessKey: NEW_SECRET }, env, { replace: true });
+  assert.equal(fs.readFileSync(env.AWS_SHARED_CREDENTIALS_FILE, 'utf8'), [
+    '# my AWS keys',
+    '[work]',
+    'aws_access_key_id = WORKKEYID00000001',
+    'aws_secret_access_key = work',
+    '',
+    '[default]',
+    `aws_access_key_id = ${NEW_ID}`,
+    `aws_secret_access_key = ${NEW_SECRET}`,
+    'region = us-east-1',
+    '; keep this comment',
+    '',
+    '[other]',
+    'aws_access_key_id = OTHERKEYID0000001',
+    '',
+  ].join('\n'));
+  assert.equal(fs.statSync(env.AWS_SHARED_CREDENTIALS_FILE).mode & 0o777, 0o600);
+  assert.deepEqual(fs.readdirSync(path.dirname(env.AWS_SHARED_CREDENTIALS_FILE)).filter((name) => name.endsWith('.tmp')), []);
+
+  // With no default profile yet, replace adds one.
+  const fresh = awsDir({ credentials: '[work]\naws_access_key_id = W\n' });
+  saveDefaultProfile({ accessKeyId: NEW_ID, secretAccessKey: NEW_SECRET }, fresh, { replace: true });
+  assert.equal(profileStatus(fresh).ready, true);
+});
+
+test('Edit keys writes through a symlinked credentials file', () => {
+  const env = awsDir({ credentials: `[default]\naws_access_key_id = ${KEY_ID}\naws_secret_access_key = ${SECRET}\n` });
+  const real = `${env.AWS_SHARED_CREDENTIALS_FILE}.real`;
+  fs.renameSync(env.AWS_SHARED_CREDENTIALS_FILE, real);
+  fs.symlinkSync(real, env.AWS_SHARED_CREDENTIALS_FILE);
+  saveDefaultProfile({ accessKeyId: 'AKIANEWKEYID00000002', secretAccessKey: SECRET }, env, { replace: true });
+  assert.ok(fs.lstatSync(env.AWS_SHARED_CREDENTIALS_FILE).isSymbolicLink());
+  assert.match(fs.readFileSync(real, 'utf8'), /aws_access_key_id = AKIANEWKEYID00000002/);
 });
 
 const NAMED = {
@@ -74,7 +138,7 @@ const NAMED = {
     + '[profile partial]\ncredential_process = /bin/creds\n',
 };
 
-test('lists the profiles setup.py --aws-profile accepts, default first', () => {
+test('lists the profiles deploy.py --aws-profile accepts, default first', () => {
   assert.deepEqual(listProfiles(awsDir(NAMED)), [
     { name: 'default', kind: 'sso', ready: true },
     { name: 'keys', kind: 'keys', ready: true },
@@ -84,7 +148,7 @@ test('lists the profiles setup.py --aws-profile accepts, default first', () => {
   ]);
 });
 
-test('accepts an SSO default profile only when setup.py takes --aws-profile', () => {
+test('accepts an SSO default profile only when deploy.py takes --aws-profile', () => {
   const env = awsDir(NAMED);
   assert.equal(profileStatus(env).ready, false);
   const named = profileStatus(env, { profile: 'default', namedProfiles: true });

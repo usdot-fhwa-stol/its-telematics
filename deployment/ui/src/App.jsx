@@ -13,11 +13,13 @@ import StartScreen from './StartScreen';
 import TelematicsStrip from './TelematicsStrip';
 
 const api = window.deployApi;
+const EMPTY_PROGRESS = { lines: [], steps: [] };
+const MAX_PROGRESS_LINES = 200;
 
 const HEADINGS = {
   start: ['Telematics Deploy', 'Deploy a new Telematics instance, or connect to one that is already running.'],
-  configure: ['Configure deployment', 'Pick the target, environment and use case, then launch setup.py.'],
-  result: ['Result', 'Output of the last run of setup.py.'],
+  configure: ['Configure deployment', 'Pick the deployment mode and the services to deploy.'],
+  result: ['Result', 'Output of the last run of deploy.py.'],
   servers: ['Connect to a server', 'Enter a server address or pick a saved server.'],
 };
 
@@ -31,6 +33,7 @@ export default function App() {
   const [params, setParams] = useState(EMPTY_PARAMS);
   const [remember, setRemember] = useState(true);
   const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState(EMPTY_PROGRESS);
   const [launchErrors, setLaunchErrors] = useState([]);
   const [result, setResult] = useState(null);
 
@@ -50,17 +53,23 @@ export default function App() {
       setScreen('servers');
     });
     const stopSignIn = api.onTelematicsSignIn(setSignInPrompt);
+    const stopOutput = api.onDeployOutput(({ lines, steps }) => {
+      setProgress((current) => ({ lines: [...current.lines, ...lines].slice(-MAX_PROGRESS_LINES), steps }));
+    });
     return () => {
       stopLoadFailed();
       stopSignIn();
+      stopOutput();
     };
   }, []);
 
-  const launch = async () => {
+  // launchOptions: { sudoPassword } for a localhost run.
+  const launch = async (launchOptions = {}) => {
     setLaunchErrors([]);
+    setProgress(EMPTY_PROGRESS);
     setRunning(true);
     try {
-      const outcome = await api.launch(params, { remember });
+      const outcome = await api.launch(params, { remember, ...launchOptions });
       if (outcome.validationErrors) setLaunchErrors(outcome.validationErrors);
       else setResult(outcome);
     } catch (error) {
@@ -120,7 +129,17 @@ export default function App() {
     content = <CircularProgress aria-label="Loading" />;
   } else if (result) {
     heading = HEADINGS.result;
-    content = <ResultPage result={result} onBack={() => setResult(null)} />;
+    content = (
+      <ResultPage
+        result={result}
+        onBack={() => setResult(null)}
+        onOpenServer={(url) => {
+          setScreen('servers');
+          const names = { localhost: 'This machine', cloud: `AWS ${result.awsRegion || ''}`.trim() };
+          connect(url, { remember: true, name: names[result.target] || '' });
+        }}
+      />
+    );
   } else {
     heading = HEADINGS.configure;
     content = (
@@ -131,6 +150,7 @@ export default function App() {
         remember={remember}
         onRememberChange={setRemember}
         running={running}
+        progress={progress}
         launchErrors={launchErrors}
         onLaunch={launch}
       />

@@ -8,10 +8,19 @@ contextBridge.exposeInMainWorld('deployApi', {
   getOptions: () => ipcRenderer.invoke('deploy:get-options'),
   previewCommand: (params) => ipcRenderer.invoke('deploy:preview-command', params),
   pickKeyFile: () => ipcRenderer.invoke('deploy:pick-key-file'),
+  // launchOptions: { remember, sudoPassword }. The password is used for this run only.
   launch: (params, launchOptions) => ipcRenderer.invoke('deploy:launch', params, launchOptions),
-  awsProfileStatus: (profile) => ipcRenderer.invoke('aws:profile-status', profile),
+  sudoStatus: (target) => ipcRenderer.invoke('deploy:sudo-status', target),
+  checkSudoPassword: (password) => ipcRenderer.invoke('deploy:check-sudo-password', password),
+  // Returns a function that removes the listener. Each call gets { lines, steps } of the run.
+  onDeployOutput: (callback) => {
+    const listener = (_event, output) => callback(output);
+    ipcRenderer.on('deploy:output', listener);
+    return () => ipcRenderer.removeListener('deploy:output', listener);
+  },
+  awsProfileStatus: () => ipcRenderer.invoke('aws:profile-status'),
   // credentials: { accessKeyId, secretAccessKey }. Written to the AWS credentials file only.
-  saveAwsProfile: (credentials) => ipcRenderer.invoke('aws:save-profile', credentials),
+  saveAwsProfile: (credentials, { replace = false } = {}) => ipcRenderer.invoke('aws:save-profile', credentials, { replace }),
 
   listServers: () => ipcRenderer.invoke('servers:list'),
   connect: (address, connectOptions) => ipcRenderer.invoke('servers:connect', address, connectOptions),
