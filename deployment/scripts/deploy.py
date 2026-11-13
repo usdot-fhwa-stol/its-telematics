@@ -15,6 +15,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from configuration_service import generate_terraform_variables, DEFAULT_AWS_REGION
@@ -614,11 +615,8 @@ def ui_answers(url, timeout=UI_PROBE_TIMEOUT_SECONDS):
 def localhost_ui_url(env_file=None, answers=ui_answers, rounds=UI_PROBE_ROUNDS, delay=UI_PROBE_DELAY_SECONDS):
     """Return the web UI address of a localhost deployment.
 
-    The candidates are the ALLOW_CLIENT_URL origins (the web server accepts browser requests only
-    from these), then http://localhost/. Which one serves the UI depends on the Apache image: the prod
-    images answer at http://local.cav-telematics.com:8888, the develop images on port 80. Each is
-    tried with a short HTTP request; Apache may still be starting, so the candidates are tried for a
-    few rounds.
+    Candidate ports come from ALLOW_CLIENT_URL, but the hostname is always localhost. This supports
+    the different Apache image ports without depending on a configured local hostname.
 
     Args:
         env_file: The runtime .env to read; defaults to the one the deployment generated.
@@ -629,7 +627,17 @@ def localhost_ui_url(env_file=None, answers=ui_answers, rounds=UI_PROBE_ROUNDS, 
     Returns:
         The first candidate that answers, or, if none does, the first candidate.
     """
-    candidates = allowed_client_urls(env_file)
+    candidates = []
+    for origin in allowed_client_urls(env_file):
+        try:
+            parsed = urllib.parse.urlsplit(origin)
+            port = parsed.port
+        except ValueError:
+            continue
+        netloc = f"localhost:{port}" if port is not None else "localhost"
+        candidate = urllib.parse.urlunsplit((parsed.scheme, netloc, "/", "", ""))
+        if candidate not in candidates:
+            candidates.append(candidate)
     if LOCALHOST_UI_FALLBACK not in candidates:
         candidates.append(LOCALHOST_UI_FALLBACK)
     for attempt in range(rounds):
