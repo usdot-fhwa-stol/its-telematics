@@ -17,22 +17,7 @@
       - /opt/apache2
       - /opt/influxdb2
       - /opt/influxdb2/data
-    # Host names used to reach the stack when it is deployed on this machine.
-    local_host_names:
-      - grafana.local.cav-telematics.com
-      - local.cav-telematics.com
-      - topic-service.local.cav-telematics.com
-      - ui-service.local.cav-telematics.com
-      - ui-upload-service.local.cav-telematics.com
   tasks:
-    - name: Map the local host names to loopback (localhost deployments only)
-      ansible.builtin.lineinfile:
-        path: /etc/hosts
-        line: "127.0.0.1 {{ item }}"
-        regexp: '^127\.0\.0\.1\s+{{ item | regex_escape }}\s*$'
-      loop: "{{ local_host_names }}"
-      when: ansible_connection | default('ssh') == 'local'
-
     # Docker CE (Docker's own apt repository) conflicts with Ubuntu's docker.io: its containerd.io
     # package conflicts with Ubuntu's containerd. A host that already has Docker CE keeps it.
     - name: Check for Docker CE

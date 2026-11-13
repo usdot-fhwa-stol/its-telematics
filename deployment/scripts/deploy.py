@@ -574,27 +574,6 @@ UI_PROBE_ROUNDS = 5
 UI_PROBE_DELAY_SECONDS = 3
 
 
-def allowed_client_urls(env_file=None):
-    """Return the http(s) origins in ALLOW_CLIENT_URL, in order, each with a trailing slash.
-
-    Args:
-        env_file: The runtime .env to read; defaults to the one the deployment generated.
-
-    Returns:
-        The origins, or an empty list if the file or the setting is missing.
-    """
-    try:
-        lines = Path(env_file or SYSTEM_DIR / ".env").read_text(encoding="utf-8").splitlines()
-    except (OSError, UnicodeDecodeError):
-        return []
-    for line in lines:
-        key, _, value = line.partition("=")
-        if key.strip() == "ALLOW_CLIENT_URL":
-            entries = (entry.strip().strip('"') for entry in value.split(" #")[0].strip().strip('"').split(","))
-            return [entry.rstrip("/") + "/" for entry in entries if entry.startswith(("http://", "https://"))]
-    return []
-
-
 def ui_answers(url, timeout=UI_PROBE_TIMEOUT_SECONDS):
     """Return whether a web server answers at url with any HTTP response.
 
@@ -614,12 +593,6 @@ def ui_answers(url, timeout=UI_PROBE_TIMEOUT_SECONDS):
 def localhost_ui_url(env_file=None, answers=ui_answers, rounds=UI_PROBE_ROUNDS, delay=UI_PROBE_DELAY_SECONDS):
     """Return the web UI address of a localhost deployment.
 
-    The candidates are the ALLOW_CLIENT_URL origins (the web server accepts browser requests only
-    from these), then http://localhost/. Which one serves the UI depends on the Apache image: the prod
-    images answer at http://local.cav-telematics.com:8888, the develop images on port 80. Each is
-    tried with a short HTTP request; Apache may still be starting, so the candidates are tried for a
-    few rounds.
-
     Args:
         env_file: The runtime .env to read; defaults to the one the deployment generated.
         answers: Function that reports whether a URL answers.
@@ -627,18 +600,14 @@ def localhost_ui_url(env_file=None, answers=ui_answers, rounds=UI_PROBE_ROUNDS, 
         delay: Seconds to wait between rounds.
 
     Returns:
-        The first candidate that answers, or, if none does, the first candidate.
+        The localhost URL
     """
-    candidates = allowed_client_urls(env_file)
-    if LOCALHOST_UI_FALLBACK not in candidates:
-        candidates.append(LOCALHOST_UI_FALLBACK)
     for attempt in range(rounds):
         if attempt:
             time.sleep(delay)
-        for url in candidates:
-            if answers(url):
-                return url
-    return candidates[0]
+        if answers(LOCALHOST_UI_FALLBACK):
+            return LOCALHOST_UI_FALLBACK
+    return LOCALHOST_UI_FALLBACK
 
 
 def execute_deployment_pipeline(parameters: InputParameters):
