@@ -324,7 +324,7 @@ def override_influx_admin_token(contents, token):
         raise ValueError(
             "The influx_admin_token example must be a JSON object with a string token field."
         )
-    document["token"] = token
+    document["token"] = "apiv3_" + token
     serialized = json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     return serialized + (b"\n" if contents.endswith(b"\n") else b"")
 
