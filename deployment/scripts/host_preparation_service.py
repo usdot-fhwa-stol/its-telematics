@@ -23,7 +23,6 @@ DEPENDENCY_CHECK = (
     "/opt/grafana/provisioning /opt/apache2 /opt/influxdb2/data; do [ -d \"$d\" ] || exit 1; done "
     "&& [ -f /opt/apache2/grafana_htpasswd ]"
 )
-LOCAL_HOSTS_CHECK = " && grep -q 'local.cav-telematics.com' /etc/hosts"
 
 
 def is_supported_operating_system(name: str, version: str) -> bool:
@@ -111,10 +110,8 @@ class HostPreparationService:
             CommandResult of sudo authentication or the host preparation playbook run.
         """
         step = "Install system dependencies"
-        check = DEPENDENCY_CHECK
-        if all(profile.is_local for profile in self.context.target_profiles):
-            check += LOCAL_HOSTS_CHECK
-        if run_shell(self.inventory, ALL_HOSTS, check, step, timeout=CONNECTION_TIMEOUT_SECONDS).success:
+        if run_shell(self.inventory, ALL_HOSTS, DEPENDENCY_CHECK, step,
+                     timeout=CONNECTION_TIMEOUT_SECONDS).success:
             return CommandResult(step, True, 0, "System dependencies already installed; skipping.")
 
         if any(profile.is_local for profile in self.context.target_profiles) and os.geteuid() != 0:
