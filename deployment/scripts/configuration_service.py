@@ -314,6 +314,21 @@ def write_atomic(path, contents, mode=0o600):
             temporary_path.unlink()
 
 
+def override_influx_admin_token(contents, token):
+    """Replace only the token value in an Influx admin-token JSON document."""
+    try:
+        document = json.loads(contents)
+    except (UnicodeError, ValueError):
+        raise ValueError("The influx_admin_token example must contain valid JSON.") from None
+    if not isinstance(document, dict) or not isinstance(document.get("token"), str):
+        raise ValueError(
+            "The influx_admin_token example must be a JSON object with a string token field."
+        )
+    document["token"] = token
+    serialized = json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return serialized + (b"\n" if contents.endswith(b"\n") else b"")
+
+
 def rotate_secret_artifacts(config_map, parameters):
     """Resolve all secret sources, refresh protected artifacts, and return the synchronized ConfigMap.
 
@@ -338,7 +353,17 @@ def rotate_secret_artifacts(config_map, parameters):
         override = parameters[f"{secret}_override"]
         example = secrets_dir / f"{secret}.txt.example"
         if override:
-            prepared_secrets[secret] = (override.encode("utf-8"), "supplied override")
+            if secret == "influx_admin_token":
+                try:
+                    example_contents = example.read_bytes()
+                except OSError:
+                    raise ValueError(
+                        f"Could not read the influx_admin_token JSON example file {example}."
+                    ) from None
+                contents = override_influx_admin_token(example_contents, override)
+            else:
+                contents = override.encode("utf-8")
+            prepared_secrets[secret] = (contents, "supplied override")
             continue
         try:
             contents = example.read_bytes()
