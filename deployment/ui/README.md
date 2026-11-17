@@ -75,6 +75,14 @@ sudo apt update
 sudo apt install telematics-deploy
 ```
 
+To install a release from its GitHub Release instead, download the .deb
+attached to the release (replace `<tag>` and `<version>`):
+
+```bash
+wget https://github.com/usdot-fhwa-stol/its-telematics/releases/download/<tag>/telematics-deploy_<version>_amd64.deb
+sudo apt install ./telematics-deploy_<version>_amd64.deb
+```
+
 Branch builds are versioned `<version>-<date>.git<count>.<sha>`; tag builds use
 `<version>` alone, which sorts below the branch builds of that version. Raise
 `version` before tagging, or installing the release over a branch build is a
