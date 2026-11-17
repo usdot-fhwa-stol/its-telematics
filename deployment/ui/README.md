@@ -57,6 +57,24 @@ and `release/*`. Download it from the run's summary page under **Artifacts**
 artifact retention period. For a tag on `master`, the .deb is also attached to
 the tag's GitHub Release, where it is kept.
 
+Pushes to `develop` and `release/*`, and tags on `master`, are also published to
+the STOL apt repository for Ubuntu 22.04 (`jammy`) and 24.04 (`noble`):
+
+| Build | apt codename |
+| --- | --- |
+| `develop` | `develop` |
+| `release/<name>` (release candidate) | `release-<name>` |
+| Tag on `master` (release) | `main` |
+
+To install from it, for example the release on 24.04:
+
+```bash
+echo "deb [trusted=yes] http://s3.amazonaws.com/stol-apt-repository main noble" \
+  | sudo tee /etc/apt/sources.list.d/stol-apt-repository.list
+sudo apt update
+sudo apt install telematics-deploy
+```
+
 Branch builds are versioned `<version>-<date>.git<count>.<sha>`; tag builds use
 `<version>` alone, which sorts below the branch builds of that version. Raise
 `version` before tagging, or installing the release over a branch build is a
