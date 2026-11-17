@@ -31,6 +31,8 @@ services:
   influxdb:
     image:  influxdb:latest
     container_name: influxdb
+    profiles:
+      - messaging
     ports:
       - '8086:8086'
     restart: always
@@ -48,8 +50,8 @@ services:
       - DOCKER_INFLUXDB_INIT_RETENTION=${DOCKER_INFLUXDB_INIT_RETENTION}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
     volumes:
-      - /opt/influxdb2/data:/var/lib/influxdb2 # data directory
-      - /opt/influxdb2/:/etc/influxdb2 # config directory
+      - influxdb2_data:/var/lib/influxdb2 # data directory
+      - influxdb2_config:/etc/influxdb2 # config directory
 
   influxdb3-core:
     image: influxdb:3.7.0-core
@@ -90,3 +92,5 @@ volumes:
   mysql-datavolume:
   influxdb3_data:
   influxdb3_plugins:
+  influxdb2_data:
+  influxdb2_config:
