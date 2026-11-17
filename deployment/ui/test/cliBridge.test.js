@@ -7,9 +7,11 @@ const path = require('node:path');
 const { test } = require('node:test');
 const {
   ValidationError, validateParams, buildArgs, formatCommand, parseSteps, parseOutput, parseInventory, runDeploy,
+  readDeployedCredentials,
 } = require('../electron/cliBridge');
 
-const localCore = { target: 'on-premise', useCase: 'core' };
+const builtInOptions = require('../electron/cliOptions');
+const localCore = { target: 'on-premise' };
 
 function errorsFor(params) {
   try {
@@ -21,16 +23,20 @@ function errorsFor(params) {
   assert.fail('expected a ValidationError');
 }
 
-test('builds the README examples for this machine', () => {
+test('builds the README example for this machine', () => {
   assert.deepEqual(buildArgs(validateParams(localCore)),
-    ['--environment', 'prod', '--target', 'localhost', '--use-case', 'core']);
-  assert.deepEqual(buildArgs(validateParams({ ...localCore, useCase: 'rsu_integration' })),
-    ['--environment', 'prod', '--target', 'localhost', '--use-case', 'rsu_integration']);
+    ['--environment', 'prod', '--target', 'localhost', '--use-case', 'all']);
+});
+
+test('always deploys all services, whatever the form or old settings send', () => {
+  assert.equal(validateParams({ ...localCore, useCase: 'core' }).useCase, 'all');
+  const coreOnly = { ...builtInOptions, USE_CASES: [{ value: 'core', label: 'Core Services' }] };
+  assert.throws(() => validateParams(localCore, coreOnly), /does not accept --use-case all/);
 });
 
 test('formats the command as typed from the repository root', () => {
   assert.equal(formatCommand(buildArgs(validateParams(localCore))),
-    './deployment/scripts/deploy.py --environment prod --target localhost --use-case core');
+    './deployment/scripts/deploy.py --environment prod --target localhost --use-case all');
 });
 
 test('maps cloud and ignores fields from other targets', () => {
@@ -41,15 +47,14 @@ test('maps cloud and ignores fields from other targets', () => {
 test('on-premise always deploys to this machine, even with old remote settings', () => {
   const stale = { ...localCore, deployTo: 'remote', remoteIo: '10.0.0.5', remoteUser: 'ubuntu', keyPath: '/no/such/key' };
   assert.deepEqual(buildArgs(validateParams(stale)),
-    ['--environment', 'prod', '--target', 'localhost', '--use-case', 'core']);
+    ['--environment', 'prod', '--target', 'localhost', '--use-case', 'all']);
 });
 
 test('reports every missing field at once', () => {
-  assert.deepEqual(errorsFor({}), ['Choose a deployment mode.', 'Choose the desired services.']);
+  assert.deepEqual(errorsFor({}), ['Choose a deployment mode.']);
 });
 
 test('rejects values outside the deploy.py choices', () => {
-  assert.deepEqual(errorsFor({ ...localCore, useCase: 'everything' }), ['Choose the desired services.']);
   assert.deepEqual(errorsFor({ ...localCore, target: 'localhost' }), ['Choose a deployment mode.']);
   assert.deepEqual(errorsFor({ ...localCore, target: 'remote' }), ['Choose a deployment mode.']);
 });
@@ -291,58 +296,49 @@ test('reports a missing Python', async () => {
   assert.equal(result.spawnError, 'no-such-python3 was not found. Install Python 3 and try again.');
 });
 
-const withSecrets = { SECRET_KEYS: ['mysql_password', 'grafana_secret_key'] };
-const secretOptions = { ...require('../electron/cliOptions'), ...withSecrets };
-
-test('keeps secret override values off the command line', () => {
-  const valid = validateParams({
-    ...localCore, secretOverrides: { mysql_password: 'p@ss word', grafana_secret_key: '' },
-  }, secretOptions);
-  assert.deepEqual(valid.secretOverrides, { mysql_password: 'p@ss word' });
-  const args = buildArgs(valid);
-  assert.equal(args.at(-1), '--secret-overrides-stdin');
-  assert.equal(args.some((arg) => arg.includes('p@ss')), false);
-  assert.equal(formatCommand(args).includes('p@ss'), false);
-  // No values, no flag.
-  assert.equal(buildArgs(validateParams({ ...localCore, secretOverrides: { mysql_password: '' } }, secretOptions))
-    .includes('--secret-overrides-stdin'), false);
+test('never sends secret overrides: deploy.py uses its default secret files', () => {
+  const options = { ...builtInOptions, SECRET_KEYS: ['mysql_password'] };
+  const valid = validateParams({ ...localCore, secretOverrides: { mysql_password: 'p@ss word' } }, options);
+  assert.equal('secretOverrides' in valid, false);
+  assert.equal(buildArgs(valid).includes('--secret-overrides-stdin'), false);
 });
 
-test('rejects secret overrides the script cannot take, without echoing values', () => {
-  const errors = (overrides, options) => {
-    try {
-      validateParams({ ...localCore, secretOverrides: overrides }, options);
-    } catch (error) {
-      return error.errors.join(' ');
-    }
-    return '';
+function secretsRepo(files) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-ui-secrets-'));
+  const dir = path.join(root, 'telematic_system', 'secrets');
+  fs.mkdirSync(dir, { recursive: true });
+  for (const [name, content] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), content);
+  return root;
+}
+
+test('reads the MySQL root password and the Influx token the run deployed with', () => {
+  const root = secretsRepo({
+    'mysql_root_password.txt': 'r00t pass\n',
+    'influx_admin_token.txt': '{"name":"admin","token":"apiv3_abc123","hashed":false}\n',
+  });
+  assert.deepEqual(readDeployedCredentials(root), { mysqlRootPassword: 'r00t pass', influxToken: 'apiv3_abc123' });
+
+  const broken = secretsRepo({ 'influx_admin_token.txt': 'not json' });
+  assert.deepEqual(readDeployedCredentials(broken), { mysqlRootPassword: null, influxToken: null });
+});
+
+test('a successful run returns the credentials; a failed one does not', async () => {
+  const secrets = {
+    'mysql_root_password.txt': 'r00t\n',
+    'influx_admin_token.txt': '{"token":"apiv3_t0ken"}',
   };
-  assert.match(errors({ influx_admin_token: 'hunter2' }, secretOptions), /does not accept a secret override for influx_admin_token/);
-  // A deploy.py without --secret-overrides-stdin lists no keys.
-  assert.match(errors({ mysql_password: 'hunter2' }, undefined), /does not accept/);
-  assert.match(errors({ mysql_password: 'two\nlines' }, secretOptions), /line breaks/);
-  assert.match(errors({ mysql_password: 'x'.repeat(4097) }, secretOptions), /4096 characters/);
-  assert.equal(/hunter2/.test(errors({ influx_admin_token: 'hunter2' }, secretOptions)), false);
-});
-
-test('sends secret overrides on standard input only', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-ui-repo-'));
-  fs.mkdirSync(path.join(root, 'deployment', 'scripts'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'deployment', 'scripts', 'deploy.py'), [
-    'import json, os, sys',
-    'with open("received-stdin", "w") as received:',
-    '    received.write(sys.stdin.read())',
-    'print(json.dumps({"argv": sys.argv[1:], "env": any("s3cret" in value for value in os.environ.values())}))',
-  ].join('\n'));
-  const valid = validateParams({ ...localCore, secretOverrides: { mysql_password: 's3cret"\\' } }, secretOptions);
-  const run = runDeploy(valid, { repoRoot: root });
-  assert.equal(run.child.spawnargs.some((arg) => arg.includes('s3cret')), false);
-  const result = await run.done;
-  const echoed = JSON.parse(result.lines[0].text);
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'received-stdin'), 'utf8')), { mysql_password: 's3cret"\\' });
-  assert.equal(echoed.argv.at(-1), '--secret-overrides-stdin');
-  assert.equal(echoed.env, false);
-  assert.equal(JSON.stringify(result).includes('s3cret'), false);
+  for (const exitCode of [0, 2]) {
+    const root = fakeRepo(exitCode);
+    const dir = path.join(root, 'telematic_system', 'secrets');
+    fs.mkdirSync(dir, { recursive: true });
+    for (const [name, content] of Object.entries(secrets)) fs.writeFileSync(path.join(dir, name), content);
+    const result = await runDeploy(validateParams(localCore), { repoRoot: root }).done;
+    assert.equal(result.ok, exitCode === 0);
+    assert.deepEqual(result.credentials, exitCode === 0 ? { mysqlRootPassword: 'r00t', influxToken: 'apiv3_t0ken' } : null);
+    // Only on the result page: not in the output or the command.
+    assert.equal(result.lines.some((line) => line.text.includes('r00t') || line.text.includes('t0ken')), false);
+    assert.equal(result.command.includes('r00t'), false);
+  }
 });
 
 // Options as scriptOptions.js builds them when deploy.py lists its cloud options.
@@ -378,7 +374,7 @@ test('builds the cloud arguments, and never passes AWS access keys', () => {
   const args = buildArgs(validateParams(params, cloudOptions, { env }));
   assert.deepEqual(args, [
     '--environment', 'prod', '--target', 'cloud', '--use-case', 'all',
-    '--aws-region=us-west-2', '--distributed', `--key-path=${key}`,
+    '--aws-region=us-west-2', '--centralized', `--key-path=${key}`,
   ]);
   assert.equal(args.some((arg) => /aws-(access|secret)/.test(arg) || arg.includes('AKIA')), false);
 });
@@ -396,10 +392,13 @@ test('checks the cloud fields', () => {
   assert.deepEqual(errors({ awsRegion: 'us east 1' }), ['AWS region must not contain spaces or control characters.']);
   assert.deepEqual(errors({ awsRegion: 'mars-1' }), ['AWS region must look like us-east-1.']);
   assert.deepEqual(errors({ awsRegion: '' }), ['AWS region is required.']);
-  assert.deepEqual(errors({ topology: 'edge' }), ['Choose a server setup.']);
+  // Always Single Server: an old saved topology is ignored.
+  assert.deepEqual(errors({ topology: 'distributed' }), []);
   // The form has no profile field: an old saved profile is ignored.
   assert.deepEqual(errors({ awsProfile: 'work' }), []);
   assert.deepEqual(errors({ keyPath: '' }), ['Choose the SSH key for the instances.']);
+  const multiOnly = { ...cloudOptions, CLOUD: { ...cloudOptions.CLOUD, TOPOLOGIES: builtIn.TOPOLOGIES.slice(1) } };
+  assert.throws(() => validateParams(params, multiOnly, { env }), /does not accept --centralized/);
   assert.deepEqual(errors({ keyPath: '/no/such/key' }), ['SSH key file does not exist or is not readable.']);
   assert.equal(validateParams({ ...params, awsRegion: 'us-gov-west-1' }, cloudOptions, { env }).awsRegion, 'us-gov-west-1');
 
@@ -417,7 +416,7 @@ test('always uses the default profile, also when deploy.py takes --aws-profile',
   fs.writeFileSync(env.AWS_CONFIG_FILE, '[default]\nsso_session = lab\n[profile lab-admin]\nsso_session = lab\n');
   const named = { ...cloudOptions, CLOUD: { ...cloudOptions.CLOUD, namedProfiles: true } };
   assert.deepEqual(buildArgs(validateParams(params, named, { env })).slice(6), [
-    '--aws-profile=default', '--aws-region=us-west-2', '--distributed', `--key-path=${key}`,
+    '--aws-profile=default', '--aws-region=us-west-2', '--centralized', `--key-path=${key}`,
   ]);
   // A profile saved by an earlier version is ignored.
   assert.equal(buildArgs(validateParams({ ...params, awsProfile: 'lab-admin' }, named, { env }))[6], '--aws-profile=default');

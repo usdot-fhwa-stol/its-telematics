@@ -9,13 +9,16 @@ const fs = require('node:fs');
 const path = require('node:path');
 const builtInOptions = require('./cliOptions');
 
-const { ON_PREMISE_TARGET, DEPLOY_ENVIRONMENT } = builtInOptions;
+const { ON_PREMISE_TARGET, DEPLOY_ENVIRONMENT, DEPLOY_USE_CASE, DEPLOY_TOPOLOGY } = builtInOptions;
 const { AWS_PROFILE, profileStatus } = require('./awsCredentials');
 
 const DEPLOY_SCRIPT = path.join('deployment', 'scripts', 'deploy.py');
 const MAX_OUTPUT_CHARS = 1_000_000;
 const MAX_TEXT_LENGTH = 255;
-const MAX_SECRET_LENGTH = 4096;
+// The database credentials a successful run is shown, from the secret files
+// deploy.py wrote (telematic_system/secrets/*.txt).
+const SECRETS_DIR = path.join('telematic_system', 'secrets');
+const MAX_SECRET_FILE_BYTES = 64 * 1024;
 const AWS_REGION_PATTERN = /^[a-z]{2}(-[a-z]+)+-\d{1,2}$/;
 
 class ValidationError extends Error {
@@ -76,8 +79,9 @@ function checkCloud(input, cloud, env, valid, errors) {
     if (AWS_REGION_PATTERN.test(region)) valid.awsRegion = region;
     else errors.push('AWS region must look like us-east-1.');
   }
-  if (findOption(cloud.TOPOLOGIES, input.topology)) valid.topology = input.topology;
-  else errors.push('Choose a server setup.');
+  // Always Single Server; the form has no server setup field.
+  if (findOption(cloud.TOPOLOGIES, DEPLOY_TOPOLOGY)) valid.topology = DEPLOY_TOPOLOGY;
+  else errors.push(`This deploy.py does not accept --${DEPLOY_TOPOLOGY}.`);
   if (input.keyPath) {
     const keyPath = checkKeyPath(input.keyPath, errors);
     if (keyPath) valid.keyPath = keyPath;
@@ -99,7 +103,8 @@ function validateParams(params, options = builtInOptions, { env = process.env } 
   if (!findOption(ENVIRONMENTS, DEPLOY_ENVIRONMENT)) {
     errors.push(`This deploy.py does not accept --environment ${DEPLOY_ENVIRONMENT}.`);
   }
-  if (!findOption(USE_CASES, input.useCase)) errors.push('Choose the desired services.');
+  // Always All Services; the form has no services field.
+  if (!findOption(USE_CASES, DEPLOY_USE_CASE)) errors.push(`This deploy.py does not accept --use-case ${DEPLOY_USE_CASE}.`);
 
   // On-premise deploys to this machine only.
   const scriptTarget = input.target === 'on-premise' ? ON_PREMISE_TARGET : 'cloud';
@@ -108,8 +113,6 @@ function validateParams(params, options = builtInOptions, { env = process.env } 
     checkCloud(input, options.CLOUD, env, valid, errors);
   }
 
-  const secretOverrides = checkSecretOverrides(input.secretOverrides, options.SECRET_KEYS || [], errors);
-  if (Object.keys(secretOverrides).length) valid.secretOverrides = secretOverrides;
   // Runs always keep the stack's existing data: deploy.py deletes its Docker
   // volumes by default, so the app sends --no-volume-prune whenever the script lists it.
   if (options.prunesVolumes) valid.keepData = true;
@@ -118,28 +121,9 @@ function validateParams(params, options = builtInOptions, { env = process.env } 
   return {
     environment: DEPLOY_ENVIRONMENT,
     target: scriptTarget,
-    useCase: input.useCase,
+    useCase: DEPLOY_USE_CASE,
     ...valid,
   };
-}
-
-// Keeps the non-empty values. Messages name the key, never the value.
-function checkSecretOverrides(overrides, secretKeys, errors) {
-  const kept = {};
-  if (!overrides || typeof overrides !== 'object') return kept;
-  for (const [key, value] of Object.entries(overrides)) {
-    if (typeof value !== 'string' || value === '') continue;
-    if (!secretKeys.includes(key)) {
-      errors.push(`deploy.py does not accept a secret override for ${key}.`);
-    } else if (value.length > MAX_SECRET_LENGTH) {
-      errors.push(`The ${key} override must be ${MAX_SECRET_LENGTH} characters or fewer.`);
-    } else if (/[\u0000-\u001f\u007f]/.test(value)) {
-      errors.push(`The ${key} override must not contain line breaks or control characters.`);
-    } else {
-      kept[key] = value;
-    }
-  }
-  return kept;
 }
 
 // Enumerated values use the same "--flag value" form as the README examples.
@@ -157,8 +141,6 @@ function buildArgs(valid) {
     if (valid.awsProfile) args.push(`--aws-profile=${valid.awsProfile}`);
     args.push(`--aws-region=${valid.awsRegion}`, `--${valid.topology}`, `--key-path=${valid.keyPath}`);
   }
-  // The values themselves go to the script's standard input (runDeploy).
-  if (valid.secretOverrides) args.push('--secret-overrides-stdin');
   if (valid.keepData) args.push('--no-volume-prune');
   return args;
 }
@@ -227,6 +209,33 @@ function readCloudInstances(summary, repoRoot) {
   } catch {
     return [];
   }
+}
+
+// The MySQL root password and the InfluxDB admin token the run deployed with,
+// from the secret files deploy.py wrote. A value that can't be read is null.
+// They go only to the result page: never into the output, the command or saved settings.
+function readSecretFile(repoRoot, name) {
+  try {
+    const file = path.join(repoRoot, SECRETS_DIR, name);
+    if (fs.statSync(file).size > MAX_SECRET_FILE_BYTES) return null;
+    return fs.readFileSync(file, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+function readDeployedCredentials(repoRoot) {
+  const password = readSecretFile(repoRoot, 'mysql_root_password.txt');
+  let token = null;
+  try {
+    // A JSON document whose token field the InfluxDB v3 container uses.
+    const document = JSON.parse(readSecretFile(repoRoot, 'influx_admin_token.txt'));
+    if (document && typeof document.token === 'string' && document.token) token = document.token;
+  } catch {
+    token = null;
+  }
+  const trimmed = password === null ? '' : password.replace(/\r?\n$/, '');
+  return { mysqlRootPassword: trimmed || null, influxToken: token };
 }
 
 // Picks the known markers out of deploy.py and configuration_service.py output.
@@ -345,15 +354,9 @@ function runDeploy(valid, { repoRoot, python = 'python3', extraEnv = {}, env = p
   const child = spawn(python, [path.join(repoRoot, DEPLOY_SCRIPT), ...args], {
     cwd: repoRoot,
     env: childEnv,
-    stdio: [valid.secretOverrides ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });
-  // Secret values never go on the command line or into the environment,
-  // where other users or child processes could see them.
-  if (valid.secretOverrides) {
-    child.stdin.on('error', () => {}); // The script exited before reading.
-    child.stdin.end(JSON.stringify(valid.secretOverrides));
-  }
 
   // Ends deploy.py and everything it started (Ansible, Docker Compose).
   const stop = () => {
@@ -396,6 +399,7 @@ function runDeploy(valid, { repoRoot, python = 'python3', extraEnv = {}, env = p
         lines,
         summary,
         instances: valid.target === 'cloud' ? readCloudInstances(summary, repoRoot) : [],
+        credentials: exitCode === 0 ? readDeployedCredentials(repoRoot) : null,
         awsRegion: valid.awsRegion || null,
       });
     };
@@ -416,6 +420,7 @@ module.exports = {
   validateParams,
   buildArgs,
   formatCommand,
+  readDeployedCredentials,
   parseSteps,
   parseOutput,
   parseInventory,
