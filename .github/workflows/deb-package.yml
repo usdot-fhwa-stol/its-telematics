@@ -1,0 +1,149 @@
+name: Telematics Deploy package
+
+# Builds the Telematics Deploy Electron app (deployment/ui) into a .deb, keeps
+# it as a build artifact (telematics-deploy-deb) on the workflow run, and
+# publishes it to the STOL apt repository (stol-apt-repository):
+#   develop   -> codename develop     (develop builds)
+#   release/* -> codename release-<x> (release candidates)
+#   tag on master -> codename main    (releases, also attached to the GitHub Release)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - develop
+      - master
+      - "release/*"
+    tags:
+      - "*"
+
+jobs:
+  git-revision-info-get:
+    uses: usdot-fhwa-stol/actions/.github/workflows/git-revision-info.yml@main
+
+  build-deb:
+    needs: git-revision-info-get
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deployment/ui
+    steps:
+      - name: Checkout ${{ github.event.repository.name }}
+        uses: actions/checkout@v6
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: deployment/ui/.nvmrc
+          cache: npm
+          cache-dependency-path: deployment/ui/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test
+      - name: Build .deb
+        env:
+          REVISION_INFO: ${{ needs.git-revision-info-get.outputs.git-revision-info }}
+        run: |
+          BUILD_ARGS=(--x64 --publish never)
+          if [ -n "${REVISION_INFO}" ]; then
+            BUILD_ARGS+=("-c.buildNumber=${REVISION_INFO}")
+          fi
+          npm run dist -- "${BUILD_ARGS[@]}"
+
+          # Name the file the Debian way, like the C++ packages: <name>_<version>_<arch>.deb
+          shopt -s nullglob
+          debs=(release/*.deb)
+          if [ "${#debs[@]}" -ne 1 ]; then
+            echo "Expected one .deb in release/, found ${#debs[@]}"
+            exit 1
+          fi
+          name=$(dpkg-deb -f "${debs[0]}" Package)
+          version=$(dpkg-deb -f "${debs[0]}" Version)
+          arch=$(dpkg-deb -f "${debs[0]}" Architecture)
+          mv "${debs[0]}" "release/${name}_${version}_${arch}.deb"
+          ls -l release/*.deb
+      - name: Upload deb artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: telematics-deploy-deb
+          path: deployment/ui/release/*.deb
+          if-no-files-found: error
+
+  release-channel:
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.channel.outputs.channel }}
+    steps:
+      - name: Checkout ${{ github.event.repository.name }}
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Pick the release channel
+        id: channel
+        run: |
+          channel=""
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            echo "::notice::Pull request builds are only kept as a build artifact."
+          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            if git merge-base --is-ancestor "${GITHUB_SHA}" origin/master; then
+              channel=release
+            else
+              echo "::notice::Tag ${GITHUB_REF_NAME} is not on master, so its .deb is only kept as a build artifact."
+            fi
+          elif [ "${GITHUB_REF_NAME}" = "develop" ]; then
+            channel=develop
+          elif [[ "${GITHUB_REF_NAME}" == release/* ]]; then
+            channel=release-candidate
+          else
+            echo "::notice::${GITHUB_REF_NAME} builds are only kept as a build artifact. Tag master to publish a release."
+          fi
+          echo "Release channel: ${channel:-none}"
+          echo "channel=${channel}" >> "$GITHUB_OUTPUT"
+
+  stol-apt-publish:
+    if: needs.release-channel.outputs.channel != ''
+    needs: [build-deb, release-channel]
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/usdot-fhwa-stol/actions-deb-s3:main
+    strategy:
+      # One upload at a time: each rewrites the codename's Release file.
+      max-parallel: 1
+      matrix:
+        ubuntu: [jammy, noble]
+    steps:
+      - name: Publish .deb to stol-apt-repository (${{ matrix.ubuntu }})
+        uses: usdot-fhwa-stol/actions/deb-s3-upload@main
+        with:
+          artifact-name: telematics-deploy-deb
+          architecture: amd64
+          component-name: ${{ matrix.ubuntu }}
+          aws-access-key-id: ${{ secrets.APT_REPO_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.APT_REPO_AWS_SECRET_ACCESS_KEY }}
+
+  github-release:
+    if: needs.release-channel.outputs.channel == 'release'
+    needs: [build-deb, release-channel]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Download deb artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: telematics-deploy-deb
+          path: deb-packages
+      - name: Attach .deb to the GitHub Release
+        run: |
+          # Use the tag's release if one was already made (for example by hand
+          # in GitHub), otherwise create it.
+          if ! gh release view "${TAG}" > /dev/null 2>&1; then
+            gh release create "${TAG}" --verify-tag --title "${TAG}" --notes "Release ${TAG}"
+          fi
+          gh release upload "${TAG}" deb-packages/*.deb --clobber
