@@ -1,4 +1,5 @@
 import datetime
+import ast
 import csv
 import json
 import sys
@@ -10,7 +11,81 @@ import pandas as pd
 import re
 
 
+def parseKafkaBridgeLogs(logname, start_time_epoch, end_time_epoch, run_num):
+    """Parse Docker JSON Kafka bridge logs, including split log records."""
+    start = datetime.datetime.fromtimestamp(float(start_time_epoch), datetime.timezone.utc)
+    end = datetime.datetime.fromtimestamp(float(end_time_epoch), datetime.timezone.utc)
+    output_name = f'{logname.split(".")[0]}_{run_num}_parsed.csv'
+    parsed_count = 0
+    continuation_count = 0
+    error_count = 0
+    pending_log = ''
+    pending_time = None
+    pending_stream = None
+
+    with open(logname, 'r', encoding='utf-8', errors='replace') as source, \
+         open(output_name, 'w', newline='') as result:
+        writer = csv.writer(result)
+        writer.writerow(['Unit Id', 'Topic', 'Payload Timestamp', 'Metadata'])
+
+        for line_number, line in enumerate(source, 1):
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                error_count += 1
+                pending_log = ''
+                continue
+
+            chunk = record.get('log', '')
+            if pending_log and (record.get('time') != pending_time or
+                                record.get('stream') != pending_stream):
+                # Do not join unrelated Docker log records.
+                error_count += 1
+                pending_log = ''
+
+            if not pending_log:
+                pending_log = chunk
+                pending_time = record.get('time')
+                pending_stream = record.get('stream')
+            else:
+                pending_log += chunk
+                continuation_count += 1
+
+            if not pending_log.endswith('\n'):
+                continue
+
+            application_log, log_time = pending_log, pending_time
+            pending_log = ''
+            if 'Publishing message:' not in application_log:
+                continue
+
+            try:
+                docker_time = datetime.datetime.fromisoformat(log_time.replace('Z', '+00:00'))
+                if not start < docker_time < end:
+                    continue
+                message = ast.literal_eval(application_log.split('Publishing message:', 1)[1].strip())
+                payload_time = datetime.datetime.fromtimestamp(
+                    float(message['timestamp']) / 1e6, datetime.timezone.utc
+                ).replace(tzinfo=None)
+                writer.writerow([message['unit_id'], message['topic_name'], payload_time, payload_time])
+                parsed_count += 1
+            except (SyntaxError, ValueError, TypeError, KeyError, OverflowError, AttributeError) as exc:
+                error_count += 1
+                if error_count <= 5:
+                    print(f'Unable to parse publishing record near Docker line {line_number}: {exc}')
+
+        if pending_log:
+            error_count += 1
+
+    print(f'Kafka source messages in window: {parsed_count}')
+    print(f'Docker continuation chunks reconstructed: {continuation_count}')
+    print(f'Parsing/incomplete-record errors: {error_count}')
+    print(f'Wrote: {output_name}')
+
+
 def parseVehicleBridgeLogs(logname,start_time_epoch, end_time_epoch, run_num):
+    if 'kafka' in logname.lower():
+        return parseKafkaBridgeLogs(logname, start_time_epoch, end_time_epoch, run_num)
     filename = logname.split(".")[0]
 
     with open(logname, 'r') as vehicle_bridge_log:
