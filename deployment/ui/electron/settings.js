@@ -2,14 +2,14 @@
 
 // Settings kept in the app's user data folder (~/.config/Telematics Deploy/
 // on Linux). Neither file ever holds a secret or a Telematics login.
-//   targets.json  "Remember for this deployment mode": last non-secret form values per mode
+//   targets.json  "Remember this configuration": last non-secret form values per deployment mode
 //   servers.json  servers saved on the connect path: name and address only
 
 const fs = require('node:fs');
 const path = require('node:path');
 
 const REMEMBERED_FIELDS = [
-  'useCase', 'keyPath', 'awsRegion', 'topology',
+  'keyPath', 'awsRegion',
 ];
 
 function readJson(file, fallback) {

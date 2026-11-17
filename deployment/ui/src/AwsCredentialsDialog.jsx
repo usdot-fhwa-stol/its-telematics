@@ -8,9 +8,18 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import InfoTip from './InfoTip';
 import { monoFont } from './theme';
 
 const api = window.deployApi;
+
+export const ACCESS_KEYS_TIP = (
+  <>
+    Don&apos;t have access keys? In the AWS console, open IAM, then Users, choose your user, and on the Security
+    credentials tab choose Create access key. Copy the secret access key right away; AWS shows it only once. If you
+    can&apos;t create keys, ask your AWS administrator.
+  </>
+);
 
 // Adds the AWS default profile to the shared credentials file, which deploy.py
 // reads for the cloud target, or with `replace` (Edit keys) changes its keys.
@@ -57,7 +66,10 @@ export default function AwsCredentialsDialog({ open, replace = false, file, onCl
       fullWidth
       maxWidth="sm"
     >
-      <DialogTitle id="aws-credentials-title">{replace ? 'Edit AWS access keys' : 'Add AWS credentials'}</DialogTitle>
+      <DialogTitle id="aws-credentials-title" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        {replace ? 'Edit AWS access keys' : 'Add AWS credentials'}
+        <InfoTip title={ACCESS_KEYS_TIP} label="About AWS access keys" />
+      </DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
           {error && <Alert severity="error">{error}</Alert>}

@@ -3,7 +3,6 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
-import Chip from '@mui/material/Chip';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -16,7 +15,8 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import AwsCredentialsDialog from './AwsCredentialsDialog';
+import AwsCredentialsDialog, { ACCESS_KEYS_TIP } from './AwsCredentialsDialog';
+import InfoTip from './InfoTip';
 import { OutputToggle, StepList } from './RunOutput';
 import { monoFont } from './theme';
 
@@ -29,13 +29,16 @@ const TARGET_HELP = {
 
 export const EMPTY_PARAMS = {
   target: '',
-  useCase: '',
   keyPath: '',
   awsRegion: '',
-  topology: '',
-  // Held in memory only: never saved and never on the command line.
-  secretOverrides: {},
 };
+
+const KEY_FILE_TIP = (
+  <>
+    Don&apos;t have a key? In the AWS console, open EC2, then Key Pairs, and choose Create key pair with the
+    .pem format. Save the file it downloads; AWS lets you download it only once.
+  </>
+);
 
 function Section({ title, note, children }) {
   return (
@@ -71,56 +74,7 @@ function OptionSelect({ id, label, value, options, onChange, helperText, disable
   );
 }
 
-// A dropdown whose options show their name and, in the menu, a description.
-// The chosen option's description is the helper text.
-function DescribedSelect({ id, label, value, options, onChange, disabled, placeholderHelp }) {
-  const selected = options.find((option) => option.value === value);
-  return (
-    <TextField
-      id={id} select required fullWidth label={label} value={value}
-      onChange={(event) => onChange(event.target.value)} disabled={disabled}
-      helperText={selected?.description || placeholderHelp}
-      SelectProps={{ renderValue: (picked) => options.find((option) => option.value === picked)?.label || picked }}
-    >
-      {options.map((option) => (
-        <MenuItem key={option.value} value={option.value} sx={{ whiteSpace: 'normal' }}>
-          <Stack spacing={0.25} sx={{ py: 0.25 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.label}</Typography>
-            {option.description && (
-              <Typography variant="caption" color="text.secondary">{option.description}</Typography>
-            )}
-          </Stack>
-        </MenuItem>
-      ))}
-    </TextField>
-  );
-}
-
-// "Desired Services", with the services the chosen option starts below it.
-function ServicesSelect({ value, options, onChange, disabled }) {
-  const selected = options.find((option) => option.value === value);
-  return (
-    <Stack spacing={1}>
-      <DescribedSelect
-        id="use-case" label="Desired Services" value={value} options={options} onChange={onChange}
-        disabled={disabled} placeholderHelp="Decides which services come up."
-      />
-      {selected?.services.length > 0 && (
-        <Stack
-          direction="row" useFlexGap flexWrap="wrap" spacing={0.75} alignItems="center"
-          aria-label="Services that will be deployed" sx={{ px: 1.75 }}
-        >
-          <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
-            Deploys {selected.services.length} services:
-          </Typography>
-          {selected.services.map((name) => <Chip key={name} label={name} size="small" variant="outlined" />)}
-        </Stack>
-      )}
-    </Stack>
-  );
-}
-
-function KeyField({ id, label, value, helperText, onBrowse, onClear, disabled }) {
+function KeyField({ id, label, value, helperText, tip, onBrowse, onClear, disabled }) {
   return (
     <Stack direction="row" spacing={1} alignItems="flex-start">
       <TextField
@@ -130,6 +84,7 @@ function KeyField({ id, label, value, helperText, onBrowse, onClear, disabled })
       />
       <Button variant="outlined" onClick={onBrowse} disabled={disabled} sx={{ height: 56 }}>Browse</Button>
       {value && <Button onClick={onClear} disabled={disabled} sx={{ height: 56 }}>Clear</Button>}
+      {tip && <InfoTip title={tip} label={`About the ${label}`} sx={{ mt: 1.75 }} />}
     </Stack>
   );
 }
@@ -245,7 +200,6 @@ export default function ConfigureForm({
     const next = { ...EMPTY_PARAMS, ...params, ...(saved[target] || {}), target };
     if (target === 'cloud' && options.CLOUD) {
       next.awsRegion = next.awsRegion || options.CLOUD.defaultRegion;
-      next.topology = next.topology || options.CLOUD.defaultTopology;
     }
     onChange(next);
   };
@@ -254,8 +208,6 @@ export default function ConfigureForm({
     if (keyPath) onChange({ ...params, keyPath });
   };
 
-  const secrets = params.secretOverrides || {};
-  const overrideCount = Object.values(secrets).filter(Boolean).length;
   const ready = Boolean(preview.command);
 
   // Localhost runs always use sudo; cloud runs only to install Terraform or Ansible here.
@@ -301,7 +253,6 @@ export default function ConfigureForm({
           onChange={pickTarget} disabled={running}
           helperText={TARGET_HELP[params.target] || 'Where the stack runs.'}
         />
-        <ServicesSelect value={params.useCase} options={options.USE_CASES} onChange={set('useCase')} disabled={running} />
       </Section>
 
       {isCloud && (
@@ -314,57 +265,25 @@ export default function ConfigureForm({
               placeholder={options.CLOUD.defaultRegion}
               inputProps={{ spellCheck: false, style: { fontFamily: monoFont } }}
             />
-            <DescribedSelect
-              id="topology" label="Server Setup" value={params.topology} options={options.CLOUD.TOPOLOGIES}
-              onChange={set('topology')} disabled={running} placeholderHelp="How many AWS servers are created."
-            />
             <KeyField
               id="cloud-key-path" label="SSH key for the instances" value={params.keyPath}
-              helperText="A public key, or an unencrypted private key such as a .pem."
+              helperText="A public key, or an unencrypted private key such as a .pem." tip={KEY_FILE_TIP}
               onBrowse={browseKey} onClear={() => set('keyPath')('')} disabled={running}
             />
-            <AwsCredentialsStatus
-              status={awsStatus} onEdit={(replace) => setCredentialsDialog({ replace })} disabled={running}
-            />
+            <Stack direction="row" spacing={1} alignItems="flex-start">
+              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                <AwsCredentialsStatus
+                  status={awsStatus} onEdit={(replace) => setCredentialsDialog({ replace })} disabled={running}
+                />
+              </Box>
+              <InfoTip title={ACCESS_KEYS_TIP} label="About AWS access keys" sx={{ mt: 1 }} />
+            </Stack>
             <AwsCredentialsDialog
               open={Boolean(credentialsDialog)} replace={Boolean(credentialsDialog?.replace)}
               file={awsStatus?.file} onClose={() => setCredentialsDialog(null)} onSaved={setAwsStatus}
             />
           </Section>
         </>
-      )}
-
-      <Divider />
-      {options.SECRET_KEYS.length > 0 ? (
-        <Section title="Secret overrides" note="Optional">
-          <Typography variant="body2" color="text.secondary">
-            Overwrites secret files. An empty field uses defaults.
-          </Typography>
-          <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
-            {options.SECRET_KEYS.map((key) => (
-              <TextField
-                key={key}
-                id={`secret-${key}`}
-                label={key}
-                type="password"
-                autoComplete="new-password"
-                value={secrets[key] || ''}
-                onChange={(event) => onChange({ ...params, secretOverrides: { ...secrets, [key]: event.target.value } })}
-                disabled={running}
-                placeholder={`${key}.txt.example`}
-                inputProps={{ style: { fontFamily: monoFont } }}
-              />
-            ))}
-          </Box>
-        </Section>
-      ) : (
-        <Section title="Secret overrides" note="Not available">
-          <Typography variant="body2" color="text.secondary">
-            Every run overwrites telematic_system/.env and the secret files in telematic_system/secrets/, using
-            the .example files. This deploy.py cannot read overrides from standard input, and passing them as
-            command-line arguments would let any user on this machine read them.
-          </Typography>
-        </Section>
       )}
 
       <Divider />
@@ -382,7 +301,6 @@ export default function ConfigureForm({
         </Box>
         <Typography variant="body2" color="text.secondary">
           Runs on this computer, from the repository the app is in.
-          {overrideCount > 0 && ` ${overrideCount === 1 ? '1 secret override goes' : `${overrideCount} secret overrides go`} to deploy.py on standard input.`}
         </Typography>
       </Section>
 
@@ -411,7 +329,7 @@ export default function ConfigureForm({
       >
         <FormControlLabel
           control={<Checkbox checked={remember} onChange={(event) => onRememberChange(event.target.checked)} />}
-          label={<>Remember for this deployment mode <Typography component="span" variant="body2" color="text.secondary">(no secrets are saved)</Typography></>}
+          label="Remember this configuration"
         />
         <Box sx={{ flexGrow: 1, textAlign: 'right' }}>
           {!ready && preview.validationErrors?.length > 0 && (
@@ -436,7 +354,7 @@ export default function ConfigureForm({
                 <li>an IAM role for the instances, and a key pair from the SSH key you chose</li>
                 <li>
                   EC2 instances with 100 GiB gp3 volumes.{' '}
-                  {options.CLOUD.TOPOLOGIES.find((option) => option.value === params.topology)?.details}
+                  {options.CLOUD.TOPOLOGIES.find((option) => option.value === options.CLOUD.deployTopology)?.details}
                 </li>
               </ul>
               AWS charges for these until they are removed, which this app does not do: stop or terminate the

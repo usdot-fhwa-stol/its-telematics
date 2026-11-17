@@ -60,26 +60,21 @@ commit and whether there were uncommitted changes.
 
 | Form | deploy.py argument |
 | --- | --- |
-| (always) | `--environment prod`. The form has no environment field. |
 | Deployment Mode: This machine | `--target localhost` |
-| Deployment Mode: Cloud (AWS) | `--target cloud`, plus `--aws-region=<region> --centralized\|--distributed --key-path=<file>` when `deploy.py` lists its cloud options |
-| Desired Services: Core Services | `--use-case core` |
-| Desired Services: RSU Management Services | `--use-case rsu_integration` |
-| Desired Services: All Services | `--use-case all` |
-| Any secret override filled in | `--secret-overrides-stdin`, with the values as JSON on standard input |
+| Deployment Mode: Cloud (AWS) | `--target cloud`, plus `--aws-region=<region> --centralized --key-path=<file>` when `deploy.py` lists its cloud options |
+| (always) | `--environment prod --use-case all` (All Services: Core + RSU Management Services) |
 | (always) | `--no-volume-prune`, when `deploy.py` lists `--volume-prune`, so a run keeps the stack's existing data |
 
-For example, This machine with Core Services runs:
+For example, This machine runs:
 
 ```bash
-./deployment/scripts/deploy.py --environment prod --target localhost --use-case core
+./deployment/scripts/deploy.py --environment prod --target localhost --use-case all --no-volume-prune
 ```
 
-
-### Secret overrides
-
-The form has a password field for each key `deploy.py` lists for
-`--secret-override`. An empty field uses its `.example` file. 
+After a successful run, the result page shows the
+MySQL root password (`mysql_root_password.txt`) and the InfluxDB access token
+(the `token` field of `influx_admin_token.txt`) from those files. They are
+shown on screen only, never in Copy output or the saved settings.
 
 ### Cloud
 
@@ -87,11 +82,12 @@ The AWS fields appear only when `deploy.py --list-options` lists `--aws-region`
 and `--key-path`.
 
 - **Region** defaults to the script's `--aws-region` default.
-- **AWS profile** offers only `default` unless `deploy.py` lists
-  `--aws-profile`. Then it lists every profile in the credentials and config
-  files, including SSO and role profiles, and sends `--aws-profile=<name>`.
-- **Topology** sends `--centralized` or `--distributed`; the labels name the
-  instance types from `deploy.py`, which `electron/cliOptions.js` repeats.
+- **Single server:** every cloud run sends `--centralized` (one m5n.8xlarge).
+  The instance type in the confirmation comes from `electron/cliOptions.js`,
+  and `test/cliOptions.test.js` fails if it stops matching `deploy.py`.
+- **AWS credentials:** cloud runs always use the `default` profile. Add
+  credentials writes it to `~/.aws/credentials` (mode 600); Edit keys replaces
+  its access keys and leaves the rest of the file as it was.
 - **SSH key for the instances** is required. Terraform registers it as the
   instances' key pair.
 

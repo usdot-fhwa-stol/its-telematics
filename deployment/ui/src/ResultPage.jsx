@@ -80,6 +80,37 @@ function CloudInstances({ result }) {
   );
 }
 
+// The database logins the deployment was done with, read from the secret
+// files deploy.py wrote. Shown only on screen; never in Copy output.
+function DatabaseCredentials({ credentials }) {
+  if (!credentials) return null;
+  const value = (text) => (
+    <Box component="span" sx={{ fontFamily: monoFont, color: text ? 'text.primary' : 'text.secondary', wordBreak: 'break-all' }}>
+      {text || 'could not be read'}
+    </Box>
+  );
+  const group = (title, rows) => (
+    <Stack spacing={0.25}>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>{title}</Typography>
+      {rows.map(([label, text]) => (
+        <Typography key={label} variant="body2" color="text.secondary">{label}: {value(text)}</Typography>
+      ))}
+    </Stack>
+  );
+  return (
+    <Field label="Database access">
+      <Alert severity="warning">
+        Save these values somewhere safe, such as a password manager. You need them to manage the databases, and the
+        app shows them only on this page.
+      </Alert>
+      <Stack spacing={1.5} sx={{ bgcolor: '#12151c', border: 1, borderColor: 'divider', borderRadius: 1, px: 2, py: 1.5 }}>
+        {group('MySQL database (for managing users)', [['Username', 'root'], ['Password', credentials.mysqlRootPassword]])}
+        {group('Influx database (for managing device data)', [['Access token', credentials.influxToken]])}
+      </Stack>
+    </Field>
+  );
+}
+
 function headline(result) {
   const { summary } = result;
   const failedTask = summary.execution?.diagnostics?.failed_task_id;
@@ -147,6 +178,8 @@ export default function ResultPage({ result, onBack, onOpenServer }) {
             <Button variant="contained" onClick={() => onOpenServer(uiUrl)} sx={{ flexShrink: 0 }}>Open in app</Button>
           </Box>
         )}
+
+        {result.ok && <DatabaseCredentials credentials={result.credentials} />}
 
         <CloudInstances result={result} />
 
