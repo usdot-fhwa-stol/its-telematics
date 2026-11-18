@@ -452,8 +452,8 @@ def test_kafka_read_publishes_only_when_registered_and_subscribed(bridge_env, mo
 
     bridge.kafka_consumer = _Consumer(
         [
-            SimpleNamespace(topic="spat", value={"timestamp": 1773408367485}),
-            SimpleNamespace(topic="map", value={"timestamp": 1773408367485}),
+            SimpleNamespace(topic="spat", value=b'{"timestamp": 1773408367485}'),
+            SimpleNamespace(topic="map", value=b'{"timestamp": 1773408367485}'),
         ]
     )
 
