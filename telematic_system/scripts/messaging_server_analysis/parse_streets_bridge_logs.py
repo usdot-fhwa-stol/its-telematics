@@ -4,6 +4,7 @@ import csv
 import json
 import sys
 from datetime import timezone, date
+from pathlib import Path
 import pytz
 import re
 import numpy as np
@@ -84,8 +85,6 @@ def parseKafkaBridgeLogs(logname, start_time_epoch, end_time_epoch, run_num):
 
 
 def parseVehicleBridgeLogs(logname,start_time_epoch, end_time_epoch, run_num):
-    if 'kafka' in logname.lower():
-        return parseKafkaBridgeLogs(logname, start_time_epoch, end_time_epoch, run_num)
     filename = logname.split(".")[0]
 
     with open(logname, 'r') as vehicle_bridge_log:
@@ -190,7 +189,11 @@ def main():
             if int(run_num) in runs_range:
 
                 print("Run num: ", run_num)
-                parseVehicleBridgeLogs(logname,start_time_epoch, end_time_epoch, run_num)
+                # Kafka Bridge log filenames must contain 'kafka'.
+                if 'kafka' in Path(logname).name.lower():
+                    parseKafkaBridgeLogs(logname, start_time_epoch, end_time_epoch, run_num)
+                else:
+                    parseVehicleBridgeLogs(logname,start_time_epoch, end_time_epoch, run_num)
 
 
 if __name__ == "__main__":
