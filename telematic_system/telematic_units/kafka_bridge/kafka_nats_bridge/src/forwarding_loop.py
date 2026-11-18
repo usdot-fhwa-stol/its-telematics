@@ -32,15 +32,17 @@ class ForwardingLoopService:
     def __init__(self, bridge: "KafkaNatsBridge"):
         self.bridge = bridge
 
-    def _safe_json_deserialize(self, raw):
+    def _safe_json_deserialize(self, raw, topic=None):
         """Deserialize a Kafka message value, tolerating tombstones and non-JSON payloads."""
         if not raw:
             return None
         try:
             return json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            self.bridge.logger.error(
-                "In _safe_json_deserialize: Unable to process Kafka payload: %s", exc
+            self.bridge.logger.warning(
+                "In _safe_json_deserialize: Skipping non-JSON payload on topic %s: %s",
+                topic,
+                exc,
             )
             return None
 
@@ -76,7 +78,6 @@ class ForwardingLoopService:
                 auto_offset_reset=self.bridge.kafka_offset_reset,
                 enable_auto_commit=True,
                 group_id=None,
-                value_deserializer=self._safe_json_deserialize,
             )
 
             await self.bridge.kafka_consumer.start()
@@ -135,10 +136,11 @@ class ForwardingLoopService:
             async for consumed_msg in self.bridge.kafka_consumer:
                 topic = consumed_msg.topic
                 if topic in self.bridge.subscribers_list and self.bridge.registered:
-                    message = self._build_forward_message(
-                        topic,
-                        consumed_msg.value
-                    )
+                    # Decode only subscribed topics;
+                    payload = self._safe_json_deserialize(consumed_msg.value, topic)
+                    if payload is None:
+                        continue
+                    message = self._build_forward_message(topic, payload)
                     topic_name = "kafka." + self.bridge.unit_id + ".data." + topic
                     self.bridge.logger.info(
                         "In kafka_read: Publishing message: %s",
