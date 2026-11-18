@@ -13,7 +13,7 @@ from typing import Callable, List, Optional, Tuple
 import yaml
 
 from ansible_runner import ALL_HOSTS, run_ad_hoc, run_shell
-from models import CommandResult, ExecutionContext, LogTrace, ROLE_DATABASE, ROLE_PROCESSING, ROLE_UI
+from models import CommandResult, ExecutionContext, LogTrace, ROLE_ALL, ROLE_DATABASE, ROLE_PROCESSING, ROLE_UI
 
 MAX_UPDATE_ATTEMPTS = 10
 STABILITY_SECONDS = 10
@@ -45,6 +45,11 @@ PULL_ATTEMPTS = 3
 PULL_RETRY_DELAYS_SECONDS = (10, 30)  # wait before attempt 2, attempt 3
 STEP_TIMEOUT_SECONDS = 300
 DOCKER_GROUP = "docker"
+ROLE_SERVICES = {
+    ROLE_DATABASE: ("mysqldb", "influxdb", "influxdb3-core"),
+    ROLE_PROCESSING: ("nats", "rosbag2_processing_service", "messaging_server", "rsu_management_service"),
+    ROLE_UI: ("web_server", "web_client", "apache2", "grafana"),
+}
 
 
 def pending_docker_group_user() -> Optional[str]:
@@ -91,6 +96,7 @@ class ContainerOrchestrator:
         self.local_target = bool(context.target_profiles) and all(
             profile.is_local for profile in context.target_profiles
         )
+        self.distributed = any(profile.role != ROLE_ALL for profile in context.target_profiles)
         self.workspace = (
             str(context.repo_root / context.remote_workspace)
             if self.local_target else context.remote_workspace
@@ -99,13 +105,14 @@ class ContainerOrchestrator:
             f"docker compose --project-name {COMPOSE_PROJECT} --env-file {ENV_RUNTIME_FILE}"
         )
 
-    def _docker_shell(self, command_line: str, step: str, timeout: int) -> CommandResult:
+    def _docker_shell(self, command_line: str, step: str, timeout: int, pattern: str = ALL_HOSTS) -> CommandResult:
         """Run a Docker command line on every host, with the docker group on a just-prepared localhost.
 
         Args:
             command_line: Command executed through ansible.builtin.shell.
             step: Pipeline step name recorded in the result.
             timeout: Maximum runtime in seconds.
+            pattern: Ansible host pattern to run against.
 
         Returns:
             CommandResult of the ansible invocation. On localhost, when this process does not have the
@@ -115,7 +122,18 @@ class ContainerOrchestrator:
         user = pending_docker_group_user() if self.local_target else None
         if user:
             command_line = f"sudo -u {shlex.quote(user)} -- /bin/sh -c {shlex.quote(command_line)}"
-        return run_shell(self.inventory, ALL_HOSTS, command_line, step, timeout=timeout)
+        return run_shell(self.inventory, pattern, command_line, step, timeout=timeout)
+
+    def _role_command(self, role: str, command: str) -> str:
+        """Select enabled services belonging to a role, then run a Compose command on them."""
+        filters = " ".join(f"-e {shlex.quote(service)}" for service in ROLE_SERVICES[role])
+        return (
+            f"cd {self._workspace_command_path()} && "
+            f"enabled=$({self._compose} config --services) && "
+            f"{{ services=$(printf '%s\\n' \"$enabled\" | grep -Fx {filters}) || "
+            f"{{ echo 'No enabled services found for {role}' >&2; exit 1; }}; }} && "
+            f"{self._compose} {command} $services"
+        )
 
     def _workspace_command_path(self) -> str:
         """Return the shell-safe workspace path for the local or remote target."""
@@ -231,10 +249,24 @@ class ContainerOrchestrator:
         Returns:
             CommandResult of the last docker compose pull on every host.
         """
+        if self.distributed:
+            missing = [role for role in ROLE_SERVICES if not self.context.inventory.target_groups.get(role)]
+            if missing:
+                return CommandResult("Pull container images", False, 1, "",
+                                     "Missing distributed inventory groups: " + ", ".join(missing))
+            for role in ROLE_SERVICES:
+                result = self._pull_with_retries(self._role_command(role, "pull"), role)
+                if not result.success:
+                    return result
+            return result
         command_line = f"cd {self._workspace_command_path()} && {self._compose} pull"
+        return self._pull_with_retries(command_line)
+
+    def _pull_with_retries(self, command_line: str, pattern: str = ALL_HOSTS) -> CommandResult:
         attempt = 1
         while True:
-            result = self._docker_shell(command_line, "Pull container images", timeout=PULL_TIMEOUT_SECONDS)
+            result = self._docker_shell(command_line, "Pull container images", timeout=PULL_TIMEOUT_SECONDS,
+                                        pattern=pattern)
             if result.success or attempt >= PULL_ATTEMPTS:
                 return result
             delay = PULL_RETRY_DELAYS_SECONDS[min(attempt, len(PULL_RETRY_DELAYS_SECONDS)) - 1]
@@ -280,6 +312,10 @@ class ContainerOrchestrator:
         if not result.success:
             return result
 
+        if self.distributed:
+            self.log("Uploads on the UI instance are not automatically available on the processing instance.")
+            return self._deploy_distributed(step, timeout, workspace)
+
         self.log("Starting services")
         result = self._docker_shell(f"cd {workspace} && {up} --force-recreate", step, timeout=timeout + 300)
         self._log_compose_output(result)
@@ -313,6 +349,32 @@ class ContainerOrchestrator:
             self._log_compose_output(result)
             time.sleep(5)
 
+        status = self._docker_shell(f"cd {workspace} && {self._compose} ps", step, timeout=STEP_TIMEOUT_SECONDS)
+        if not status.success:
+            return CommandResult(step, False, status.exit_code or 1, status.stdout, status.stderr or status.stdout)
+        return CommandResult(step, True, 0, status.stdout, status.stderr)
+
+    def _deploy_distributed(self, step: str, timeout: int, workspace: str) -> CommandResult:
+        """Start databases, processing, then UI without starting cross-host Compose dependencies."""
+        for role in ROLE_SERVICES:
+            self.log(f"Starting {role} services")
+            command = self._role_command(
+                role, f"up -d --no-deps --pull always --wait --wait-timeout {timeout} --force-recreate",
+            )
+            for attempt in range(MAX_UPDATE_ATTEMPTS + 1):
+                result = self._docker_shell(command, step, timeout=timeout + 300, pattern=role)
+                self._log_compose_output(result)
+                if result.success:
+                    break
+                if attempt == MAX_UPDATE_ATTEMPTS:
+                    return result
+                self.log(f"Retrying {role} services (attempt {attempt + 1} of {MAX_UPDATE_ATTEMPTS})")
+                time.sleep(5)
+
+        time.sleep(STABILITY_SECONDS)
+        problems = self._not_running()
+        if problems:
+            return CommandResult(step, False, 1, "", "Services not running:\n" + "\n".join(problems))
         status = self._docker_shell(f"cd {workspace} && {self._compose} ps", step, timeout=STEP_TIMEOUT_SECONDS)
         if not status.success:
             return CommandResult(step, False, status.exit_code or 1, status.stdout, status.stderr or status.stdout)
