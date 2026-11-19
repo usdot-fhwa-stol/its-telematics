@@ -28,7 +28,7 @@
 
     - name: Install Docker and system transport libraries
       ansible.builtin.apt:
-        name: "{{ ([] if docker_ce_installed else ['docker.io']) + ['ca-certificates', 'curl', 'gnupg', 'apt-transport-https'] }}"
+        name: "{{ ([] if docker_ce_installed else ['docker.io']) + ['ca-certificates', 'curl', 'gnupg', 'apt-transport-https', 'python3-yaml'] }}"
         state: present
         update_cache: true
         cache_valid_time: 3600
