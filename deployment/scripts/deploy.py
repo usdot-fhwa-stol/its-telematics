@@ -396,8 +396,8 @@ def validate_host_prerequisites(parameters: InputParameters):
         DeploymentError: Listing every missing prerequisite.
     """
     errors = []
-    if shutil.which("ansible") is None or shutil.which("ansible-playbook") is None:
-        print("error: Ansible is not installed or not in PATH; installing it now.", file=sys.stderr, flush=True)
+    if not ansible_is_usable():
+        print("error: Ansible is not installed, not in PATH, or too old; installing it now.", file=sys.stderr, flush=True)
         install_ansible()
     try:
         import yaml  # noqa: F401  (used by the container orchestrator to read compose manifests)
@@ -452,11 +452,20 @@ def install_apt_packages(name, executables, steps, manual_url):
     print(f"{name} installation: OK", flush=True)
 
 
+def ansible_is_usable():
+    """Return whether Ansible is in PATH and accepts the JSON module arguments the pipeline passes (2.13+)."""
+    if shutil.which("ansible") is None or shutil.which("ansible-playbook") is None:
+        return False
+    probe = ["ansible", "localhost", "-c", "local", "-m", "ansible.builtin.ping", "-a", '{"data": "pong"}']
+    return subprocess.run(probe, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False).returncode == 0
+
+
 def install_ansible():
-    """Install Ansible from the distribution's apt repositories on this Debian/Ubuntu machine."""
+    """Install ansible-core from the Ansible PPA; the Ubuntu 22.04 archive's 2.12 is too old."""
     install_apt_packages(
         "Ansible", ("ansible", "ansible-playbook"),
-        ["{sudo} apt-get update", "{sudo} apt-get install -y --reinstall ansible-core"],
+        ["{sudo} apt-get update", "{sudo} apt-get install -y software-properties-common",
+         "{sudo} add-apt-repository -y ppa:ansible/ansible", "{sudo} apt-get install -y --reinstall ansible-core"],
         "https://docs.ansible.com/ansible/latest/installation_guide/",
     )
 
