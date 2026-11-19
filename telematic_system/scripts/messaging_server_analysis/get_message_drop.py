@@ -77,7 +77,17 @@ def combineFiles(log_dir):
     # Create combined dataframes from
     for key in bridge_dfs:
         if key in messaging_server_dfs:
-            bridge_df_combined = pd.merge(bridge_dfs[key], messaging_server_dfs[key],  how='left', left_on=['Topic','Payload Timestamp'], right_on = ['Topic','Message Time'])
+            # Give each repeated message key an occurrence number so that
+            # duplicate keys match one-to-one rather than multiplying rows.
+            bridge_unit_df = bridge_dfs[key].copy()
+            messaging_unit_df = messaging_server_dfs[key].copy()
+            bridge_unit_df['_occurrence'] = bridge_unit_df.groupby(['Topic', 'Payload Timestamp']).cumcount()
+            messaging_unit_df['_occurrence'] = messaging_unit_df.groupby(['Topic', 'Message Time']).cumcount()
+            bridge_df_combined = pd.merge(
+                bridge_unit_df, messaging_unit_df, how='left',
+                left_on=['Topic', 'Payload Timestamp', '_occurrence'],
+                right_on=['Topic', 'Message Time', '_occurrence'],
+            ).drop(columns=['_occurrence'])
             if not os.path.exists("output"):
                 os.mkdir("output")
             bridge_df_combined.to_csv("output/"+log_dir+"_"+ key + "_combined.csv")

@@ -9,6 +9,43 @@ import numpy as np
 import pandas as pd
 import glob
 
+def complete_docker_logs(log_file):
+    """Join Docker json-file chunks before parsing application log entries."""
+    parts = []
+    first_time = None
+    first_stream = None
+
+    for line_number, line in enumerate(log_file, 1):
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            if parts:
+                print(f"Warning: incomplete Docker message before line {line_number}")
+            parts = []
+            continue
+
+        chunk = record.get("log", "")
+        if not isinstance(chunk, str):
+            continue
+
+        if parts and (record.get("time") != first_time or
+                      record.get("stream") != first_stream):
+            print(f"Warning: incomplete Docker message before line {line_number}")
+            parts = []
+
+        if not parts:
+            first_time = record.get("time")
+            first_stream = record.get("stream")
+        parts.append(chunk)
+
+        if chunk.endswith("\n"):
+            yield "".join(parts)
+            parts = []
+
+    if parts:
+        print("Warning: incomplete Docker message at end of file")
+
+
 '''
 This script reads docker logs from the messaging server according to timestamps defined in the test log sheet.
 The log sheet is defined as a csv with columns (test_num, run_num, epoch_start_time, epoch_end_time)
@@ -53,17 +90,8 @@ def parseInfluxfile(logname, start_time_epoch, end_time_epoch, run_num):
 
         # Search through lines in messaging server logs to get payload info for message being sent to influx
         # Since the message is a flattened json, it needs to be split manually and read to extract required info (unit_id, topic name, message/payload timestamp and log timestamp)
-        for line in influx_log:
-            split_line = line.split(":")
-            if search_string in split_line:
-                # Get log json
-                try:
-                    json_object = json.loads(line)
-                except:
-                    skipped_lines_count += 1
-                    continue
-
-                log_line = json_object["log"]
+        for log_line in complete_docker_logs(influx_log):
+            if search_string + ":" in log_line:
                # Get write time
                 write_time_split = log_line.split("INFO")
                 write_time_string = write_time_split[0][:len(write_time_split[0]) - 2]
