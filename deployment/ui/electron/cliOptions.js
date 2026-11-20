@@ -1,5 +1,8 @@
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
+
 // Labels for the choices deployment/scripts/deploy.py accepts. At startup the
 // app reads the choices themselves from `deploy.py --list-options`
 // (electron/scriptOptions.js); these lists are used as they are only when the
@@ -40,8 +43,24 @@ const ON_PREMISE_TARGET = 'localhost';
 // mention them as missing. `remote` (another host over SSH) is out of scope for now.
 const OMITTED_TARGETS = ['remote'];
 
+// The environment a packaged app deploys, set when the .deb is built
+// (scripts/stage-bundle.mjs records it in the bundle manifest): dev for develop
+// builds, test for release candidates, prod for releases. prod when there is
+// no bundle, for example under `npm run dev`.
+const DEFAULT_DEPLOY_ENVIRONMENT = 'prod';
+function builtEnvironment(resourcesPath = process.resourcesPath) {
+  if (!resourcesPath) return DEFAULT_DEPLOY_ENVIRONMENT;
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(resourcesPath, 'bundle', 'manifest.json'), 'utf8'));
+    if (['dev', 'test', 'prod'].includes(manifest.deployEnvironment)) return manifest.deployEnvironment;
+  } catch {
+    // No bundle, or not readable: use the default.
+  }
+  return DEFAULT_DEPLOY_ENVIRONMENT;
+}
+
 // Choices the app makes for every run; the form does not offer them.
-const DEPLOY_ENVIRONMENT = 'prod';
+const DEPLOY_ENVIRONMENT = builtEnvironment();
 const DEPLOY_USE_CASE = 'all'; // All Services: Core + RSU Management Services
 const DEPLOY_TOPOLOGY = 'centralized'; // Single Server, for the cloud target
 
@@ -62,4 +81,5 @@ const USE_CASES = [
 module.exports = {
   TARGETS, CLOUD_TARGET_LABEL, TOPOLOGIES, ON_PREMISE_TARGET, OMITTED_TARGETS,
   DEPLOY_ENVIRONMENT, DEPLOY_USE_CASE, DEPLOY_TOPOLOGY, ENVIRONMENTS, USE_CASES,
+  builtEnvironment,
 };
