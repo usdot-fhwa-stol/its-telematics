@@ -5,6 +5,7 @@ import argparse
 import configparser
 import contextlib
 from dataclasses import asdict
+import importlib
 import io
 import json
 import os
@@ -395,13 +396,14 @@ def validate_host_prerequisites(parameters: InputParameters):
         DeploymentError: Listing every missing prerequisite.
     """
     errors = []
-    if shutil.which("ansible") is None or shutil.which("ansible-playbook") is None:
-        print("error: Ansible is not installed or not in PATH; installing it now.", file=sys.stderr, flush=True)
+    if not ansible_is_usable():
+        print("error: Ansible is not installed, not in PATH, or too old; installing it now.", file=sys.stderr, flush=True)
         install_ansible()
     try:
         import yaml  # noqa: F401  (used by the container orchestrator to read compose manifests)
     except ImportError:
-        errors.append("The PyYAML package is required; install it with 'pip install pyyaml'.")
+        print("error: PyYAML is not installed; installing it now.", file=sys.stderr, flush=True)
+        install_pyyaml()
     if parameters.target == TARGET_CLOUD and shutil.which("terraform") is None:
         print("error: Terraform is not installed or not in PATH; installing it now.", file=sys.stderr, flush=True)
         install_terraform()
@@ -437,7 +439,10 @@ def install_apt_packages(name, executables, steps, manual_url):
         raise DeploymentError(f"Automatic {name} installation supports apt-based systems only. {manual}")
     if os.geteuid() != 0 and shutil.which("sudo") is None:
         raise DeploymentError(f"Installing {name} requires root privileges or sudo. {manual}")
-    sudo = "" if os.geteuid() == 0 else "sudo"
+    # Non-interactive frontend avoids debconf/needrestart prompts; the lock timeout waits for
+    # cloud-init or unattended-upgrades, which often hold the apt lock on a freshly booted machine.
+    sudo = "env DEBIAN_FRONTEND=noninteractive" if os.geteuid() == 0 else "sudo env DEBIAN_FRONTEND=noninteractive"
+    steps = [step.replace("apt-get ", "apt-get -o DPkg::Lock::Timeout=300 ") for step in steps]
     try:
         run_command(["bash", "-c", " && ".join(step.format(sudo=sudo) for step in steps)])
     except DeploymentError as error:
@@ -447,14 +452,39 @@ def install_apt_packages(name, executables, steps, manual_url):
     print(f"{name} installation: OK", flush=True)
 
 
+def ansible_is_usable():
+    """Return whether Ansible is in PATH and accepts the JSON module arguments the pipeline passes (2.13+)."""
+    if shutil.which("ansible") is None or shutil.which("ansible-playbook") is None:
+        return False
+    probe = ["ansible", "localhost", "-c", "local", "-m", "ansible.builtin.ping", "-a", '{"data": "pong"}']
+    return subprocess.run(probe, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False).returncode == 0
+
+
 def install_ansible():
-    """Install Ansible from the distribution's apt repositories on this Debian/Ubuntu machine."""
+    """Install ansible-core from the Ansible PPA; the Ubuntu 22.04 archive's 2.12 is too old."""
     install_apt_packages(
         "Ansible", ("ansible", "ansible-playbook"),
-        # --reinstall restores executables deleted from a package apt still considers installed.
-        ["{sudo} apt-get update", "{sudo} apt-get install -y --reinstall ansible-core ansible"],
+        ["{sudo} apt-get update", "{sudo} apt-get install -y software-properties-common",
+         "{sudo} add-apt-repository -y ppa:ansible/ansible", "{sudo} apt-get install -y --reinstall ansible-core"],
         "https://docs.ansible.com/ansible/latest/installation_guide/",
     )
+
+
+def install_pyyaml():
+    """Install PyYAML for the system Python from the distribution's apt repositories."""
+    install_apt_packages(
+        "PyYAML", (),
+        ["{sudo} apt-get update", "{sudo} apt-get install -y python3-yaml"],
+        "https://pyyaml.org/wiki/PyYAMLDocumentation",
+    )
+    try:
+        importlib.invalidate_caches()
+        import yaml  # noqa: F401
+    except ImportError:
+        raise DeploymentError(
+            "PyYAML is still not importable after installation; this Python may not be the system "
+            "python3. Install it with 'pip install pyyaml' and rerun."
+        ) from None
 
 
 def install_terraform():
