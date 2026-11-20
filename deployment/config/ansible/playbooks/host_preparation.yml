@@ -4,6 +4,8 @@
   hosts: all
   become: true
   vars:
+    # Compose v2 release supporting Ubuntu 22.04 and newer (static binary, glibc independent).
+    docker_compose_version: v2.29.7
     deployment_user: "{{ ansible_user | default(ansible_user_id) }}"
     # Host directories bind-mounted by the compose files; created once so deployment needs no sudo.
     bind_mount_directories:
@@ -39,17 +41,23 @@
       delay: 15
       until: base_packages is succeeded
 
-    - name: Install the Docker Compose plugin
-      block:
-        - name: Install docker-compose-plugin
-          ansible.builtin.apt:
-            name: docker-compose-plugin
-            state: present
-      rescue:
-        - name: Install docker-compose-v2 (Ubuntu archive package name)
-          ansible.builtin.apt:
-            name: docker-compose-v2
-            state: present
+    - name: Create the Docker CLI plugin directory
+      ansible.builtin.file:
+        path: /usr/local/lib/docker/cli-plugins
+        state: directory
+        mode: "0755"
+
+    # Pinned upstream binary: apt package names for Compose differ across Ubuntu releases.
+    - name: Install the pinned Docker Compose v2 plugin
+      ansible.builtin.get_url:
+        url: "https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-linux-{{ ansible_architecture }}"
+        dest: /usr/local/lib/docker/cli-plugins/docker-compose
+        mode: "0755"
+        force: false
+      register: compose_download
+      retries: 5
+      delay: 15
+      until: compose_download is succeeded
 
     - name: Ensure the Docker daemon is running
       ansible.builtin.service:

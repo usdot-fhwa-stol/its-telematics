@@ -47,10 +47,9 @@ services:
       command: bash -c 'wait-for-it ${MYSQL_HOST}:${MYSQL_PORT} && wait-for-it 127.0.0.1:3000 && /app/service.sh'
       secrets:
         - mysql_password
-        - source: grafana_htpasswd
-          target: /opt/apache2/grafana_htpasswd
       volumes:
         - telematics_upload:/opt/telematics/upload
+        - ./secrets/grafana_htpasswd:/opt/apache2/grafana_htpasswd
 
   web_client:
     build:

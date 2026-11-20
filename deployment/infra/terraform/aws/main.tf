@@ -86,6 +86,30 @@ resource "aws_security_group" "cluster_internal" {
   }
 
   ingress {
+    description = "InfluxDB v2"
+    from_port   = 8086
+    to_port     = 8086
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "InfluxDB v3"
+    from_port   = 8181
+    to_port     = 8181
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "NATS"
+    from_port   = 4222
+    to_port     = 4222
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
     description = "All traffic between cluster nodes"
     from_port   = 0
     to_port     = 0
