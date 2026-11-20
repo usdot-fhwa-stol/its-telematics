@@ -3,9 +3,11 @@ name: Telematics Deploy package
 # Builds the Telematics Deploy Electron app (deployment/ui) into a .deb, keeps
 # it as a build artifact (telematics-deploy-deb) on the workflow run, and
 # publishes it to the STOL apt repository (stol-apt-repository):
-#   develop   -> codename develop     (develop builds)
-#   release/* -> codename release-<x> (release candidates)
-#   tag on master -> codename main    (releases, also attached to the GitHub Release)
+#   develop       -> codename develop,     app deploys environment dev
+#   release/*     -> codename release-<x>, app deploys environment test (release candidates)
+#   tag on master -> codename <tag>,       app deploys environment prod (releases,
+#                    also attached to the GitHub Release)
+# Other builds (PRs, other branches) are only kept as an artifact and deploy prod.
 
 on:
   workflow_dispatch:
@@ -23,8 +25,55 @@ jobs:
   git-revision-info-get:
     uses: usdot-fhwa-stol/actions/.github/workflows/git-revision-info.yml@main
 
+  release-channel:
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.channel.outputs.channel }}
+      deploy-environment: ${{ steps.channel.outputs.deploy_environment }}
+      apt-codename: ${{ steps.channel.outputs.apt_codename }}
+    steps:
+      - name: Checkout ${{ github.event.repository.name }}
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Pick the release channel
+        id: channel
+        run: |
+          channel=""
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            echo "::notice::Pull request builds are only kept as a build artifact."
+          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            if git merge-base --is-ancestor "${GITHUB_SHA}" origin/master; then
+              channel=release
+            else
+              echo "::notice::Tag ${GITHUB_REF_NAME} is not on master, so its .deb is only kept as a build artifact."
+            fi
+          elif [ "${GITHUB_REF_NAME}" = "develop" ]; then
+            channel=develop
+          elif [[ "${GITHUB_REF_NAME}" == release/* ]]; then
+            channel=release-candidate
+          else
+            echo "::notice::${GITHUB_REF_NAME} builds are only kept as a build artifact. Tag master to publish a release."
+          fi
+          case "${channel}" in
+            develop) deploy_environment=dev ;;
+            release-candidate) deploy_environment=test ;;
+            *) deploy_environment=prod ;;
+          esac
+          # Releases go to a codename named after the tag. For the other
+          # channels deb-s3-upload picks the codename from the branch.
+          apt_codename=""
+          if [ "${channel}" = "release" ]; then
+            # Same rule as deb-s3-upload: dashes instead of underscores.
+            apt_codename="${GITHUB_REF_NAME//[_\/]/-}"
+          fi
+          echo "Release channel: ${channel:-none}, app deploys environment ${deploy_environment}${apt_codename:+, apt codename ${apt_codename}}"
+          echo "channel=${channel}" >> "$GITHUB_OUTPUT"
+          echo "deploy_environment=${deploy_environment}" >> "$GITHUB_OUTPUT"
+          echo "apt_codename=${apt_codename}" >> "$GITHUB_OUTPUT"
+
   build-deb:
-    needs: git-revision-info-get
+    needs: [git-revision-info-get, release-channel]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -45,6 +94,7 @@ jobs:
       - name: Build .deb
         env:
           REVISION_INFO: ${{ needs.git-revision-info-get.outputs.git-revision-info }}
+          DEPLOY_ENVIRONMENT: ${{ needs.release-channel.outputs.deploy-environment }}
         run: |
           BUILD_ARGS=(--x64 --publish never)
           if [ -n "${REVISION_INFO}" ]; then
@@ -71,37 +121,6 @@ jobs:
           path: deployment/ui/release/*.deb
           if-no-files-found: error
 
-  release-channel:
-    runs-on: ubuntu-latest
-    outputs:
-      channel: ${{ steps.channel.outputs.channel }}
-    steps:
-      - name: Checkout ${{ github.event.repository.name }}
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Pick the release channel
-        id: channel
-        run: |
-          channel=""
-          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            echo "::notice::Pull request builds are only kept as a build artifact."
-          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            if git merge-base --is-ancestor "${GITHUB_SHA}" origin/master; then
-              channel=release
-            else
-              echo "::notice::Tag ${GITHUB_REF_NAME} is not on master, so its .deb is only kept as a build artifact."
-            fi
-          elif [ "${GITHUB_REF_NAME}" = "develop" ]; then
-            channel=develop
-          elif [[ "${GITHUB_REF_NAME}" == release/* ]]; then
-            channel=release-candidate
-          else
-            echo "::notice::${GITHUB_REF_NAME} builds are only kept as a build artifact. Tag master to publish a release."
-          fi
-          echo "Release channel: ${channel:-none}"
-          echo "channel=${channel}" >> "$GITHUB_OUTPUT"
-
   stol-apt-publish:
     if: needs.release-channel.outputs.channel != ''
     needs: [build-deb, release-channel]
@@ -119,6 +138,7 @@ jobs:
         with:
           artifact-name: telematics-deploy-deb
           architecture: amd64
+          bucket-codename: ${{ needs.release-channel.outputs.apt-codename }}
           component-name: ${{ matrix.ubuntu }}
           aws-access-key-id: ${{ secrets.APT_REPO_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.APT_REPO_AWS_SECRET_ACCESS_KEY }}

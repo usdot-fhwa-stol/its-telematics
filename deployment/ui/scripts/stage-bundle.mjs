@@ -16,6 +16,13 @@ const uiDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(uiDir, '..', '..');
 const outDir = path.join(uiDir, 'build', 'bundle');
 const INCLUDE = ['deployment', 'telematic_system'];
+// The deploy.py environment the packaged app deploys (see electron/cliOptions.js).
+// CI sets it per release channel: dev for develop, test for release candidates.
+const ENVIRONMENTS = ['dev', 'test', 'prod'];
+const deployEnvironment = process.env.DEPLOY_ENVIRONMENT || 'prod';
+if (!ENVIRONMENTS.includes(deployEnvironment)) {
+  throw new Error(`DEPLOY_ENVIRONMENT must be one of ${ENVIRONMENTS.join(', ')}, not ${JSON.stringify(deployEnvironment)}.`);
+}
 const EXCLUDE = ['deployment/ui/'];
 
 const git = (...args) => execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' });
@@ -49,7 +56,8 @@ const manifest = {
   version: hash.digest('hex').slice(0, 16),
   commit,
   dirty,
+  deployEnvironment,
   files,
 };
 fs.writeFileSync(path.join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-console.log(`Bundled ${files.length} files from ${commit}${dirty ? ' (with uncommitted changes)' : ''} into ${path.relative(uiDir, outDir)}`);
+console.log(`Bundled ${files.length} files from ${commit}${dirty ? ' (with uncommitted changes)' : ''} into ${path.relative(uiDir, outDir)}, deploying environment ${deployEnvironment}`);
