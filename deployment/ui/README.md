@@ -48,6 +48,10 @@ tracks under `deployment/` (except this app) and `telematic_system/`, staged by
 the working tree, so commit first; the bundle's `manifest.json` records the
 commit and whether there were uncommitted changes.
 
+The packaged app deploys `prod` unless it is built with `DEPLOY_ENVIRONMENT`
+set to `dev`, `test` or `prod`, for example
+`DEPLOY_ENVIRONMENT=dev npm run dist`. The value is recorded in the manifest.
+
 ### CI builds
 
 The `Telematics Deploy package` workflow (`.github/workflows/deb-package.yml`)
@@ -57,19 +61,23 @@ and `release/*`. Download it from the run's summary page under **Artifacts**
 artifact retention period. For a tag on `master`, the .deb is also attached to
 the tag's GitHub Release, where it is kept.
 
-Pushes to `develop` and `release/*`, and tags on `master`, are also published to
-the STOL apt repository for Ubuntu 22.04 (`jammy`) and 24.04 (`noble`):
+Each build packages the code of the branch or tag it ran on. Pushes to
+`develop` and `release/*`, and tags on `master`, are also published to the STOL
+apt repository for Ubuntu 22.04 (`jammy`) and 24.04 (`noble`), and each one
+deploys the matching environment:
 
-| Build | apt codename |
-| --- | --- |
-| `develop` | `develop` |
-| `release/<name>` (release candidate) | `release-<name>` |
-| Tag on `master` (release) | `main` |
+| Build | apt codename | App deploys |
+| --- | --- | --- |
+| `develop` | `develop` | `--environment dev` |
+| `release/<name>` (release candidate) | `release-<name>` | `--environment test` |
+| Tag on `master` (release) | the tag, for example `4.14.0` (underscores and slashes become dashes) | `--environment prod` |
 
-To install from it, for example the release on 24.04:
+Other builds (pull requests, other branches) deploy `prod`.
+
+To install from it, for example the release tagged `<tag>` on 24.04:
 
 ```bash
-echo "deb [trusted=yes] http://s3.amazonaws.com/stol-apt-repository main noble" \
+echo "deb [trusted=yes] http://s3.amazonaws.com/stol-apt-repository <tag> noble" \
   | sudo tee /etc/apt/sources.list.d/stol-apt-repository.list
 sudo apt update
 sudo apt install telematics-deploy
@@ -102,10 +110,11 @@ downgrade.
 | --- | --- |
 | Deployment Mode: This machine | `--target localhost` |
 | Deployment Mode: Cloud (AWS) | `--target cloud`, plus `--aws-region=<region> --centralized --key-path=<file>` when `deploy.py` lists its cloud options |
-| (always) | `--environment prod --use-case all` (All Services: Core + RSU Management Services) |
+| (always) | `--environment <env>`, the environment the package was built for: `dev`, `test` or `prod` (see [CI builds](#ci-builds)) |
+| (always) | `--use-case all` (All Services: Core + RSU Management Services) |
 | (always) | `--no-volume-prune`, when `deploy.py` lists `--volume-prune`, so a run keeps the stack's existing data |
 
-For example, This machine runs:
+For example, This machine in a release package runs:
 
 ```bash
 ./deployment/scripts/deploy.py --environment prod --target localhost --use-case all --no-volume-prune
